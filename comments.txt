@@ -1,0 +1,63 @@
+Si no hay mucho tiempo yo intentaría mejorar la clasificacion en estrellas tempranas, por ahora
+
+Creo que hay que mejorar desde 2 puntas:
+1- Agregar otras lineas y criterios para refinar la clasificacion
+2- mejorar la manera de medir las lineas
+
+Para el punto 1 tengo que ponerme a revisar qué se puede agregar.
+Un ejemplo de paper para estrellas O es  https://doi.org/10.1051/0004-6361/201833050
+
+En el punto 2 veo que no siempre los Weq parecen estar bien calculados.
+    Las lineas muy intensas tienen eqw chicos
+    hay lineas no visibles con eqw grandes
+    puede haber problema en la identificacion de lineas
+
+Estaría bueno para nosotros que programa genere un archivo con las listas de lineas medidas: ventana usada, continuo medido y adoptado, long. onda medida, EqW
+
+Las líneas pueden no estar bien identificadas (por ejemplo FeI4144~HeI4144, FeII5018~HeI5016 y FeII4923~HeI4921).
+En las estrellas tardías esto es un problema mayor.
+Puede aún así decirse que se usan integraciones en esos rangos de longitudes de onda, que son sensibles a esa línea (no que son una medicion de esa linea)
+En tal caso la tolerancia a la identificacion es simplemente cero.
+
+La eliminacion de rayos cosmicos tiene que hacerse simultaneamente con el ajuste de un continuo al menos aproximado, sino no trabaja bien cuando el espectro no está normalizado (si en el azúl tiene muchas mas cuentas que en el rojo, un rajo cósmico en el rojo no lo corta)
+
+
+
+otros comentarios/dudas
+
+Por qué en los plots la resolucion baja a 0.5A.
+
+En espectros de alta resolucion y alta SN se pueden ver mas lineas, vale la pena modificar tratamiento? Decirle al usuario qué minima R tiene que poner? poner umbrales de acuerdo a SN?
+
+En el ajuste de continuo en espectros ruidosos queda por encima de lo correcto.
+Eso puede sobreestimar las lineas debiles.
+
+En el ajuste del continuo quizas pondría un s menor que len(points), para que haga un ajuste suave, no que pase necesariamente por todos los puntos.
+
+Cómo funciona el temp maching? es posible hacer un remplate con subtipos y muchas lineas de una?
+
+iraf suele calibrar en log wavelength. Hay que advertir que tienen que estar en lineal o que aborte si el rango espectral está fuera del rango util
+
+
+La VR podría resolverse de manera aproximada viendo si el promedio de corrimiento de todas las lineas identificadas es distinto de cero. Pero por ahora seguiría asumiendo que VR=0
+
+
+
+Medicion de EqW:
+Se usa una ventana de unos 10-15 A de ancho
+En esa ventana busca mínimos y elige el más cercano a la wl de laboratorio y que ademas cumpla: tolerancia wl < 2A y profundidad > 0.03
+Si hay una linea a menos de 3A pone una ventana de 6A
+integra el EqW
+
+En las lineas metálicas y He debiles no debería ser mayor de 4A, aun si no hay lineas vecinas
+En Balmer unos 40-60A
+En HeI intensas unos 10-15A, aun si hay lineas vecinas en las alas
+En lineas CaI, MgI, NaI, y algunas de FeI en estrellas tardías,  10-15A con continuo fijo
+Una posibilidad es que se haga una lista de los anchos de ventana para cada linea. Otra evaluar el ancho y modificar el criterio (más flexible pero más peligroso).
+Se puede considerar si conviene medir el FWHM de lineas metálicas para poner una ventana apropiada.
+
+Quizaś habria que poner un criterio mas fino en la condicion de linea vecina, dependiendo de la intensidad.
+
+
+
+

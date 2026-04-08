@@ -1,0 +1,248 @@
+% ═══════════════════════════════════════════════════════════════════════════════
+%  Árbol de Decisión SIMPLIFICADO — SpectroClass v3.1
+%  Tamaño: A4 landscape, apto para presentación / poster
+%  Compilar: pdflatex arbol_simple.tex
+% ═══════════════════════════════════════════════════════════════════════════════
+\documentclass[tikz, border=8mm]{standalone}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-nodecimaldot]{babel}
+\usepackage{lmodern}
+
+\usetikzlibrary{
+  shapes.geometric,
+  arrows.meta,
+  positioning,
+  calc,
+  backgrounds,
+  fit
+}
+
+% ── Paleta de colores por tipo espectral ─────────────────────────────────────
+\definecolor{colO}{RGB}{30,100,200}
+\definecolor{colB}{RGB}{60,180,220}
+\definecolor{colA}{RGB}{220,200,50}
+\definecolor{colF}{RGB}{240,150,40}
+\definecolor{colG}{RGB}{60,160,60}
+\definecolor{colK}{RGB}{210,90,30}
+\definecolor{colM}{RGB}{190,40,40}
+\definecolor{colDec}{RGB}{240,245,255}
+\definecolor{colNew}{RGB}{0,140,130}
+
+\tikzset{
+  %% Nodo de decisión
+  dec/.style={
+    diamond, draw=gray!60, fill=colDec,
+    minimum width=3.6cm, minimum height=1.5cm,
+    text width=3.2cm, align=center,
+    font=\small, inner sep=2pt, aspect=2.2,
+    line width=0.8pt
+  },
+  %% Resultado (hoja del árbol) — color pasado como argumento
+  res/.style 2 args={
+    rectangle, rounded corners=5pt,
+    draw=#1!80!black, fill=#1!30,
+    minimum width=2.8cm, minimum height=1.0cm,
+    text width=2.7cm, align=center,
+    font=\small\bfseries, line width=1pt,
+    text=#1!20!black
+  },
+  %% Entrada / raíz
+  root/.style={
+    rectangle, rounded corners=6pt,
+    draw=gray!70, fill=gray!15,
+    minimum width=4.5cm, minimum height=1.0cm,
+    text width=4.3cm, align=center,
+    font=\normalsize\bfseries, line width=1pt
+  },
+  %% Flecha principal
+  arr/.style={
+    -{Stealth[length=5pt,width=4pt]},
+    line width=1.2pt, gray!70
+  },
+  %% Etiqueta Sí / No
+  sy/.style={font=\small\bfseries, text=colNew!80!black, inner sep=1.5pt},
+  sn/.style={font=\small\bfseries, text=colM!80!black,  inner sep=1.5pt},
+}
+
+\begin{document}
+\begin{tikzpicture}[
+  node distance = 0.9cm and 0.7cm
+]
+
+%% ═══════════════════════════════════════════════════════════
+%%  RAÍZ
+%% ═══════════════════════════════════════════════════════════
+\node[root] (inp) {Espectro normalizado\\(85 líneas · 21 razones)};
+
+%% ═══════════════════════════════════════════════════════════
+%%  NIVEL 1 — He II fuerte?
+%% ═══════════════════════════════════════════════════════════
+\node[dec, below=0.8cm of inp] (d1)
+  {\textbf{¿He\,\textsc{ii} fuerte?}\\EW $>$ 0.30\,Å\\(4686 / 4542 / 4200)};
+
+\draw[arr] (inp) -- (d1);
+
+%% ─── SÍ → tipo O ────────────────────────────────────────────
+\node[dec, below left=1.4cm and 5.5cm of d1] (d2)
+  {\textbf{He\,\textsc{i} vs He\,\textsc{ii}}\\ratio $=$ EW$_{\rm I}$/EW$_{\rm II}$};
+
+\draw[arr] (d1) -| node[sy, pos=0.25]{Sí → O} (d2);
+
+%% Resultados O
+\node[res={colO}{}, left=0.4cm of d2, yshift=+0.9cm] (rO3)
+  {O3–O4\\N\,\textsc{v} 4604\\\small+O\,\textsc{v} 5114};
+\node[res={colO}{}, below=0.35cm of rO3] (rO57)
+  {O5–O7\\ratio $<$ 0.85};
+\node[res={colO}{}, below=0.35cm of rO57] (rO89)
+  {O8–O9.5\\He\,\textsc{i} $>$ He\,\textsc{ii}};
+
+\draw[arr,colO!60] (d2.west) -- ++(-0.3,0) |- (rO3.east);
+\draw[arr,colO!60] (d2.west) -- ++(-0.3,0) |- (rO57.east);
+\draw[arr,colO!60] (d2.west) -- ++(-0.3,0) |- (rO89.east);
+
+%% ─── NO → d3 He I presente? ─────────────────────────────────
+\node[dec, below=1.6cm of d1] (d3)
+  {\textbf{¿He\,\textsc{i} presente?}\\$\geq$2 líneas $>$ 0.15\,Å};
+
+\draw[arr] (d1) -- node[sn, right]{No} (d3);
+
+%% ─── SÍ → tipo B ─────────────────────────────────────────────
+\node[dec, below left=1.4cm and 2.5cm of d3] (d4)
+  {\textbf{He\,\textsc{i} vs Mg\,\textsc{ii}}\\He\,\textsc{i} $>$ 2$\times$ Mg\,\textsc{ii}?};
+
+\draw[arr] (d3) -| node[sy, pos=0.3]{Sí → B} (d4);
+
+%% B tempranas
+\node[res={colB}{}, below left=1.1cm and 1.2cm of d4] (rBe)
+  {B0–B5\\Si\,\textsc{iv}/\textsc{iii}/\textsc{ii}};
+
+%% B tardías
+\node[res={colB}{}, below right=1.1cm and 0.6cm of d4] (rBl)
+  {B6–B9.5\\Mg\,\textsc{ii}/He\,\textsc{i}};
+
+\draw[arr,colB!70] (d4) -| node[sy, pos=0.3]{\footnotesize Sí} (rBe.north);
+\draw[arr,colB!70] (d4) -| node[sn, pos=0.3]{\footnotesize No} (rBl.north);
+
+%% ═══════════════════════════════════════════════════════════
+%%  NIVEL 2 — ¿Balmer domina? (sin helio)
+%% ═══════════════════════════════════════════════════════════
+\node[dec, below=1.5cm of d3] (d5)
+  {\textbf{¿Balmer domina?}\\H$_{\rm avg}$ $>$ 2.0\,Å\\H $>$ 2$\times$ metales};
+
+\draw[arr] (d3) -- node[sn, right]{No} (d5);
+
+%% ─── SÍ → A / F ──────────────────────────────────────────────
+\node[dec, below left=1.4cm and 2.0cm of d5] (d6)
+  {\textbf{ratio Ca\,\textsc{ii}\,K / H$\epsilon$}};
+
+\draw[arr] (d5) -| node[sy, pos=0.3]{Sí → A/F} (d6);
+
+\node[res={colA}{}, below left=1.1cm and 0.8cm of d6] (rA)
+  {A0–A9\\ratio $<$ 0.60\\\small Ca\,\textsc{ii}\,K débil};
+\node[res={colF}{}, below right=1.1cm and 0.2cm of d6] (rF)
+  {F0–F9\\ratio $>$ 0.60\\\small +Sr\,\textsc{ii}, CH\,G};
+
+\draw[arr,colA!70] (d6) -| node[sy,pos=0.3]{\footnotesize $<$0.60} (rA.north);
+\draw[arr,colF!70] (d6) -| node[sn,pos=0.3]{\footnotesize $>$0.60} (rF.north);
+
+%% ─── NO → G / K / M ─────────────────────────────────────────
+\node[dec, below right=1.4cm and 2.0cm of d5] (d7)
+  {\textbf{¿Bandas TiO?}\\4762 / 4955 / 5167\,Å};
+
+\draw[arr] (d5) -| node[sn, pos=0.3]{No → G/K/M} (d7);
+
+%% M
+\node[res={colM}{}, below left=1.1cm and 0.8cm of d7] (rM)
+  {M0–M7\\TiO mod./fuerte\\\small +VO, CaH};
+
+%% ─── G / K ───────────────────────────────────────────────────
+\node[dec, below right=1.2cm and 0.6cm of d7] (d8)
+  {\textbf{Cr\,\textsc{i} vs Fe\,\textsc{i}}\\triplete 4254/4275/4290\,Å};
+
+\draw[arr,colM!70] (d7) -| node[sy,pos=0.3]{\footnotesize Sí} (rM.north);
+\draw[arr] (d7)    -| node[sn,pos=0.3]{\footnotesize No}      (d8.north);
+
+\node[res={colG}{}, below left=1.0cm and 0.9cm of d8] (rG)
+  {G0–G8\\Cr\,\textsc{i} $\leq$ Fe\,\textsc{i}\\\small +Mg\,$b$, Y\,\textsc{ii}};
+\node[res={colK}{}, below right=1.0cm and 0.4cm of d8] (rK)
+  {K0–K7\\Cr\,\textsc{i} $>$ Fe\,\textsc{i}\\\small +Na\,\textsc{i}\,D};
+
+\draw[arr,colG!70] (d8) -| node[sy,pos=0.3]{\footnotesize $\leq$1} (rG.north);
+\draw[arr,colK!70] (d8) -| node[sn,pos=0.3]{\footnotesize $>$1}    (rK.north);
+
+%% ═══════════════════════════════════════════════════════════
+%%  CLASE DE LUMINOSIDAD (banda horizontal al pie)
+%% ═══════════════════════════════════════════════════════════
+\node[
+  root,
+  text width=14cm, minimum height=1.0cm,
+  below=1.8cm of d8, xshift=-2.8cm
+] (lum) {
+  \textbf{Clase de luminosidad I–V} \enspace
+  Sr\,\textsc{ii}/Fe\,\textsc{i} · Ba\,\textsc{ii}/Fe\,\textsc{i} ·
+  Ca\,\textsc{i}/Fe\,\textsc{i} · TiO/CaH · EW(H$\beta$)
+  $\;\Longrightarrow\;$ Ia · Ib · II · III · IV · V
+};
+
+%% ─── flechas de todos los resultados al bloque de luminosidad ───────────────
+\foreach \n in {rO3,rO57,rO89,rBe,rBl,rA,rF,rM,rG,rK}{
+  \draw[arr, gray!45, dashed] (\n.south) -- ++(0,-0.3) -| (lum.north);
+}
+
+%% ═══════════════════════════════════════════════════════════
+%%  LEYENDA
+%% ═══════════════════════════════════════════════════════════
+\node[
+  draw=gray!40, fill=gray!4, rounded corners=4pt,
+  align=left, font=\small,
+  below left=0.5cm and 0.0cm of rO3
+] (leg) {
+  \textbf{Leyenda}\\[4pt]
+  \tikz{\node[dec, minimum width=1.0cm, minimum height=0.5cm,
+              text width=0.9cm, font=\footnotesize]{};}\;Nodo de decisión\\[3pt]
+  \tikz{\node[res={colO}{}, minimum width=0.9cm, minimum height=0.4cm,
+              text width=0.8cm, font=\footnotesize]{O};}\;
+  \tikz{\node[res={colB}{}, minimum width=0.9cm, minimum height=0.4cm,
+              text width=0.8cm, font=\footnotesize]{B};}\;
+  \tikz{\node[res={colA}{}, minimum width=0.9cm, minimum height=0.4cm,
+              text width=0.8cm, font=\footnotesize]{A};}\;
+  \tikz{\node[res={colF}{}, minimum width=0.9cm, minimum height=0.4cm,
+              text width=0.8cm, font=\footnotesize]{F};}\;
+  \tikz{\node[res={colG}{}, minimum width=0.9cm, minimum height=0.4cm,
+              text width=0.8cm, font=\footnotesize]{G};}\;
+  \tikz{\node[res={colK}{}, minimum width=0.9cm, minimum height=0.4cm,
+              text width=0.8cm, font=\footnotesize]{K};}\;
+  \tikz{\node[res={colM}{}, minimum width=0.9cm, minimum height=0.4cm,
+              text width=0.8cm, font=\footnotesize]{M};}\\[3pt]
+  28 nodos · validado en ELODIE (856 esp.)\\
+  Exactitud global: \textbf{86.5\,\%}
+};
+
+%% ═══════════════════════════════════════════════════════════
+%%  TÍTULO
+%% ═══════════════════════════════════════════════════════════
+\node[
+  above=0.4cm of inp,
+  font=\Large\bfseries, text width=15cm, align=center
+] (tit) {Árbol de Decisión Espectral MK — SpectroClass v3.1};
+
+\node[
+  below=0.05cm of tit,
+  font=\normalsize\itshape, text width=15cm, align=center
+] {Clasificador físico · 28 nodos · Gray \& Corbally (2009)};
+
+%% ─── Marco ─────────────────────────────────────────────────
+\begin{scope}[on background layer]
+  \node[
+    draw=gray!35, rounded corners=7pt, fill=white, line width=1pt,
+    fit=(tit)(d1)(d2)(d3)(d4)(d5)(d6)(d7)(d8)
+        (rO3)(rO57)(rO89)(rBe)(rBl)(rA)(rF)(rM)(rG)(rK)
+        (lum)(leg),
+    inner sep=10pt
+  ] {};
+\end{scope}
+
+\end{tikzpicture}
+\end{document}

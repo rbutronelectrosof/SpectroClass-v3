@@ -1,0 +1,473 @@
+% ═══════════════════════════════════════════════════════════════════════════════
+%  Árbol de Decisión — SpectroClass v3.1 — 28 nodos (Gray & Corbally 2009)
+%  Compilar con: pdflatex arbol_decision_28nodos.tex
+%  Requiere: tikz, pgf, lmodern
+% ═══════════════════════════════════════════════════════════════════════════════
+\documentclass[tikz, border=6mm]{standalone}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-nodecimaldot]{babel}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+\usetikzlibrary{
+  shapes.geometric,
+  shapes.misc,
+  arrows.meta,
+  positioning,
+  calc,
+  fit,
+  backgrounds,
+  decorations.pathreplacing,
+  matrix
+}
+
+% ── Estilos ───────────────────────────────────────────────────────────────────
+\tikzset{
+  % ── nodo de decisión (diamante) ─────────────────────────────────────────
+  dec/.style={
+    diamond, draw=gray!70, fill=blue!8,
+    minimum width=3.2cm, minimum height=1.2cm,
+    text width=2.8cm, align=center,
+    font=\fontsize{6.5}{7.5}\selectfont,
+    inner sep=1pt, aspect=2.5
+  },
+  % ── nodo de decisión NUEVO (v3.1) ───────────────────────────────────────
+  decnew/.style={
+    diamond, draw=teal!70, fill=teal!12,
+    minimum width=3.2cm, minimum height=1.2cm,
+    text width=2.8cm, align=center,
+    font=\fontsize{6.5}{7.5}\selectfont,
+    inner sep=1pt, aspect=2.5
+  },
+  % ── nodo de clasificación gruesa ────────────────────────────────────────
+  trunk/.style={
+    rectangle, rounded corners=3pt,
+    draw=gray!80, fill=gray!18,
+    minimum width=3.5cm, minimum height=0.8cm,
+    text width=3.3cm, align=center,
+    font=\fontsize{7}{8}\selectfont\bfseries
+  },
+  % ── resultado espectral ─────────────────────────────────────────────────
+  res/.style={
+    rectangle, rounded corners=2pt,
+    draw=#1!70!black, fill=#1!25,
+    minimum width=2.2cm, minimum height=0.65cm,
+    text width=2.1cm, align=center,
+    font=\fontsize{6.5}{7.5}\selectfont\bfseries
+  },
+  % ── etiquetas Sí/No en aristas ──────────────────────────────────────────
+  lbl/.style={font=\fontsize{5.5}{6}\selectfont\bfseries, inner sep=1pt},
+  lbly/.style={lbl, color=teal!70!black},
+  lbln/.style={lbl, color=red!60!black},
+  % ── flecha normal ───────────────────────────────────────────────────────
+  arr/.style={-{Stealth[length=3pt,width=2pt]}, thick, gray!60},
+  arrnew/.style={-{Stealth[length=3pt,width=2pt]}, thick, teal!60},
+  % ── flecha de resultado ─────────────────────────────────────────────────
+  arres/.style={-{Stealth[length=3pt,width=2pt]}, semithick},
+}
+
+% ── Macro para estrella "NUEVO" ───────────────────────────────────────────────
+\newcommand{\nuevo}{\,{\color{teal!80!black}\fontsize{5}{6}\selectfont[v3.1]}}
+
+\begin{document}
+\begin{tikzpicture}[
+  node distance = 0.55cm and 0.65cm,
+  every node/.style = {font=\fontsize{6.5}{7.5}\selectfont}
+]
+
+% ═══════════════════════════════════════════════════════════════════════════════
+%  ENTRADA
+% ═══════════════════════════════════════════════════════════════════════════════
+\node[trunk] (entrada)
+  {Espectro normalizado\\85 líneas EW · 21 razones};
+
+% ═══════════════════════════════════════════════════════════════════════════════
+%  N1 — NODO RAÍZ: He II fuerte
+% ═══════════════════════════════════════════════════════════════════════════════
+\node[dec, below=0.5cm of entrada] (N1)
+  {\textbf{N1}\\He~\textsc{ii} fuerte?\\{\footnotesize EW(4686 / 4542 / 4200)\\> 0.30 Å}};
+
+\draw[arr] (entrada) -- (N1);
+
+% ─────────────────── SÍ → Tipo O ─────────────────────────────────────────────
+\node[dec, below left=1.2cm and 6.5cm of N1] (N2)
+  {\textbf{N2}\\He~\textsc{i}~4471 vs\\He~\textsc{ii}~4542\\ratio = EW$_{\rm I}$/EW$_{\rm II}$};
+
+\draw[arr] (N1) -| node[lbly, pos=0.25]{Sí} (N2);
+
+% ─── O TEMPRANAS (He I < He II) ───────────────────────────────────────────────
+\node[decnew, below left=1.0cm and 2.5cm of N2] (N3)
+  {\textbf{N3}\nuevo\\N~\textsc{v}~4604 / O~\textsc{v}~5114\\ratio He~\textsc{ii}/He~\textsc{i}};
+
+\draw[arr] (N2) -| node[lbly, pos=0.3]{He~I $<$ He~II} (N3);
+
+\node[res={blue!70}, left=0.4cm of N3, yshift=+1.0cm] (rO3)
+  {O3\\N~\textsc{v} > 0.50 Å\\+ O~\textsc{v}};
+\node[res={blue!70}, below=0.3cm of rO3] (rO4)
+  {O4\\N~\textsc{v} > 0.15 Å\\He~\textsc{ii}/He~\textsc{i} > 5};
+\node[res={blue!60}, below=0.3cm of rO4] (rO5)
+  {O5\\ratio $<$ 0.70};
+\node[res={blue!50}, below=0.3cm of rO5] (rO6)
+  {O6\\ratio $<$ 0.85};
+
+\draw[arres, blue!60] (N3.west) -- +(-0.25,0) |- (rO3.east);
+\draw[arres, blue!60] (N3.west) -- +(-0.25,0) |- (rO4.east);
+\draw[arres, blue!60] (N3.west) -- +(-0.25,0) |- (rO5.east);
+\draw[arres, blue!60] (N3.west) -- +(-0.25,0) |- (rO6.east);
+
+% ─── O7 ───────────────────────────────────────────────────────────────────────
+\node[res={blue!50}, below=0.55cm of N2] (rO7)
+  {O7\\He~\textsc{i} $\approx$ He~\textsc{ii}\\ratio 0.85--1.3};
+
+\draw[arr] (N2) -- node[lbly, right]{$\approx$} (rO7);
+
+% ─── O TARDÍAS ────────────────────────────────────────────────────────────────
+\node[decnew, below right=1.0cm and 1.5cm of N2] (N4)
+  {\textbf{N4}\nuevo\\N~\textsc{iii}~4634--4641\\He~\textsc{i}~4387 vs He~\textsc{ii}};
+
+\draw[arr] (N2) -| node[lbln, pos=0.3]{He~I $>$ He~II} (N4);
+
+\node[res={blue!40}, below left=0.7cm and 0.4cm of N4] (rOf)
+  {O + \textit{f}\\N~\textsc{iii} fuerte\\(viento estelar)};
+\node[res={blue!40}, below=0.45cm of N4] (rO8)
+  {O8\\He~\textsc{i}~4387 $<$ He~\textsc{ii}};
+\node[res={blue!35}, below right=0.7cm and 0.3cm of N4] (rO9)
+  {O9 / O9.5\\Si~\textsc{iii}~4553\\presente};
+
+\draw[arres, blue!50] (N4.south west) -- (rOf.north east);
+\draw[arres, blue!50] (N4) -- (rO8);
+\draw[arres, blue!50] (N4.south east) -- (rO9.north west);
+
+% ─────────────────── NO → Clasificación intermedia / B ───────────────────────
+\node[dec, below right=1.2cm and 3.8cm of N1] (N5)
+  {\textbf{N5}\\He~\textsc{i} ≥ 2 líneas\\> 0.15 Å?};
+
+\draw[arr] (N1) -| node[lbln, pos=0.25]{No} (N5);
+
+% ═══════════════════════════════════════════════════════════════════════════════
+%  TIPO B
+% ═══════════════════════════════════════════════════════════════════════════════
+\node[dec, below left=1.2cm and 1.5cm of N5] (N6)
+  {\textbf{N6}\\He~\textsc{i}~4471\\vs Mg~\textsc{ii}~4481\\He~I $>$ 2× Mg~II?};
+
+\draw[arr] (N5) -| node[lbly, pos=0.3]{Sí → B} (N6);
+
+% ─── B TEMPRANAS ──────────────────────────────────────────────────────────────
+\node[dec, below left=1.2cm and 1.8cm of N6] (N7)
+  {\textbf{N7}\\Si~\textsc{iv}~4089 / Si~\textsc{iii}~4553\\/ Si~\textsc{ii}~4128};
+
+\draw[arr] (N6) -| node[lbly, pos=0.3]{Sí → B temp.} (N7);
+
+\node[res={cyan!70}, below left=0.7cm and 1.2cm of N7] (rB0)
+  {B0\\Si~\textsc{iv} $\approx$ Si~\textsc{iii}\\(He~\textsc{ii} débil)};
+\node[res={cyan!60}, below=0.45cm of N7] (rB12)
+  {B1--B2\\Si~\textsc{iii} $>$ Si~\textsc{iv}};
+\node[res={cyan!55}, below right=0.35cm and 0.5cm of N7] (rB35)
+  {B3--B5\\Si~\textsc{iii} $\leq$ Si~\textsc{ii}};
+
+\draw[arres, cyan!60] (N7.south west) -- (rB0.north east);
+\draw[arres, cyan!60] (N7) -- (rB12);
+\draw[arres, cyan!60] (N7.south east) -- (rB35.north west);
+
+% O II luminosidad B (nuevo) ───────────────────────────────────────────────────
+\node[decnew, below=1.5cm of N7] (N8)
+  {\textbf{N8}\nuevo\\O~\textsc{ii}~4591 / 4596\\presente → lum B};
+
+\draw[arrnew] (N7) -- (N8);
+
+\node[res={cyan!50}, below left=0.6cm and 0.5cm of N8] (rBIII)
+  {B + \textsc{iii}\\O~\textsc{ii} > 0.30 Å};
+\node[res={cyan!40}, below right=0.6cm and 0.3cm of N8] (rBV)
+  {B + \textsc{v}\\O~\textsc{ii} débil};
+
+\draw[arres, cyan!50] (N8.south west) -- (rBIII.north east);
+\draw[arres, cyan!50] (N8.south east) -- (rBV.north west);
+
+% ─── B TARDÍAS ────────────────────────────────────────────────────────────────
+\node[dec, below right=1.2cm and 0.5cm of N6] (N9)
+  {\textbf{N9}\\Mg~\textsc{ii}~4481 / He~\textsc{i}~4471\\ratio = EW$_{\rm Mg}$/EW$_{\rm He}$};
+
+\draw[arr] (N6) -| node[lbln, pos=0.3]{No → B tard.} (N9);
+
+\node[res={cyan!55}, below left=0.7cm and 0.4cm of N9] (rB67)
+  {B6--B7\\ratio $<$ 1.5};
+\node[res={cyan!45}, below=0.45cm of N9] (rB8)
+  {B8\\ratio 1.5--3.0};
+\node[res={cyan!35}, below right=0.35cm and 0.4cm of N9] (rB9)
+  {B9 / B9.5\\ratio $>$ 3.0\\Ti~\textsc{ii} $\approx$ He~\textsc{i}};
+
+\draw[arres, cyan!60] (N9.south west) -- (rB67.north east);
+\draw[arres, cyan!60] (N9) -- (rB8);
+\draw[arres, cyan!60] (N9.south east) -- (rB9.north west);
+
+% ═══════════════════════════════════════════════════════════════════════════════
+%  CLASIFICACIÓN GRUESA (Balmer vs Metales) — sin helio
+% ═══════════════════════════════════════════════════════════════════════════════
+\node[dec, below=1.2cm of N5] (N10)
+  {\textbf{N10}\\H$_{\rm avg}$ > 2.0 Å?\\H $>$ 2× metales?};
+
+\draw[arr] (N5) -- node[lbln, right]{No → A/F/G/K/M} (N10);
+
+% ═══════════════════════════════════════════════════════════════════════════════
+%  TIPOS A / F (INTERMEDIAS)
+% ═══════════════════════════════════════════════════════════════════════════════
+\node[dec, below left=1.2cm and 2.0cm of N10] (N11)
+  {\textbf{N11}\\¿Cubre Ca~\textsc{ii}~K?\\$\lambda_{\rm min} \leq 3950$ Å};
+
+\draw[arr] (N10) -| node[lbly, pos=0.3]{Sí → A/F} (N11);
+
+% ─── Con cobertura azul ───────────────────────────────────────────────────────
+\node[dec, below left=1.0cm and 1.5cm of N11] (N12)
+  {\textbf{N12}\\ratio Ca~\textsc{ii}~K / H$\epsilon$\\= EW$_{\rm Ca}$ / EW$_{H\epsilon}$};
+
+\draw[arr] (N11) -| node[lbly, pos=0.3]{Sí} (N12);
+
+\node[res={yellow!70!orange}, below left=0.7cm and 0.4cm of N12] (rA02)
+  {A0--A2\\ratio $<$ 0.30};
+\node[res={yellow!60!orange}, below=0.45cm of N12] (rA5)
+  {A5\\ratio 0.30--0.60};
+\node[res={orange!55}, below right=0.35cm and 0.4cm of N12] (rF0)
+  {F0\\ratio 0.60--1.20};
+
+\draw[arres, yellow!60!orange] (N12.south west) -- (rA02.north east);
+\draw[arres, yellow!60!orange] (N12) -- (rA5);
+\draw[arres, orange!60] (N12.south east) -- (rF0.north west);
+
+% F5-F9 nuevo ─────────────────────────────────────────────────────────────────
+\node[decnew, right=0.5cm of N12, yshift=-2.8cm] (N13)
+  {\textbf{N13}\nuevo\\Ca~\textsc{i}~4226 / H$\delta$\\+ Sr~\textsc{ii}~4077\\ratio $>$ 1.20};
+
+\draw[arrnew] (N12.east) -- ++(0.5,0) |- (N13.north);
+
+\node[res={orange!65}, below=0.5cm of N13] (rF59)
+  {F5--F9\\Ca~\textsc{i} / H$\delta$ $>$ 0.40\\Sr~\textsc{ii} > 0.10 Å};
+\draw[arres, orange!60] (N13) -- (rF59);
+
+% ─── Sin cobertura azul ───────────────────────────────────────────────────────
+\node[dec, below right=1.0cm and 1.0cm of N11] (N14)
+  {\textbf{N14}\\H$_{\rm avg}$ vs metales\\(sin Ca~\textsc{ii}~K)};
+
+\draw[arr] (N11) -| node[lbln, pos=0.3]{No} (N14);
+
+\node[res={yellow!70!orange}, above right=0.3cm and 0.5cm of N14] (rA02b)
+  {A0--A2\\H$_{\rm avg} > 6.0$\\sin metales};
+\node[res={yellow!60!orange}, right=0.5cm of N14] (rA5b)
+  {A2--A7\\H$_{\rm avg} > 4.0$\\+ Mg~\textsc{ii}?};
+
+\draw[arres, yellow!60!orange] (N14.north east) -- (rA02b.west);
+\draw[arres, yellow!60!orange] (N14.east) -- (rA5b.west);
+
+% CH G banda (nuevo) ───────────────────────────────────────────────────────────
+\node[decnew, below=0.8cm of N14] (N15)
+  {\textbf{N15}\nuevo\\CH banda G\\$\lambda$ 4300 Å\\(EW $>$ 0.30 Å)};
+
+\draw[arrnew] (N14) -- (N15);
+
+\node[res={orange!50}, below left=0.7cm and 0.3cm of N15] (rFG)
+  {F/G temp.\\CH banda G\\visible};
+\node[res={orange!60}, below right=0.5cm and 0.3cm of N15] (rFmet)
+  {F0--F8\\H$_{\rm avg} > 2.0$\\+ metales};
+
+\draw[arres, orange!50] (N15.south west) -- (rFG.north east);
+\draw[arres, orange!50] (N15.south east) -- (rFmet.north west);
+
+% ═══════════════════════════════════════════════════════════════════════════════
+%  TIPOS G / K / M (TARDÍAS)
+% ═══════════════════════════════════════════════════════════════════════════════
+\node[dec, below right=1.2cm and 2.5cm of N10] (N16)
+  {\textbf{N16}\\Ca~\textsc{i}~4227 $>$ 0.5 Å?\\Ca~\textsc{i} $>$ H$_{\rm avg}$?};
+
+\draw[arr] (N10) -| node[lbln, pos=0.3]{No → G/K/M} (N16);
+
+% ─── TIPO F tardía ────────────────────────────────────────────────────────────
+\node[res={orange!55}, above right=0.3cm and 0.5cm of N16] (rFlate)
+  {F tardía\\H$_{\rm avg} > 2.0$\\H $>$ metales};
+\draw[arres, orange!50] (N16.north east) -- (rFlate.west);
+
+% ─── TIPO M (TiO) ─────────────────────────────────────────────────────────────
+\node[dec, below left=1.2cm and 1.2cm of N16] (N17)
+  {\textbf{N17}\\Evaluar bandas TiO\\4762 / 4955 / 5167 Å};
+
+\draw[arr] (N16) -| node[lbly, pos=0.3]{Sí} (N17);
+
+\node[res={red!55}, below left=0.7cm and 0.5cm of N17] (rM57)
+  {M5--M7\\TiO muy fuerte\\3 bandas $>$ 0.30\\Fe~\textsc{i}~4957 $\rightarrow$ 0};
+\node[res={red!45}, below=0.45cm of N17] (rM24)
+  {M0--M4\\TiO mod./fuerte\\asimetría Fe~\textsc{i}};
+
+\draw[arres, red!55] (N17.south west) -- (rM57.north east);
+\draw[arres, red!55] (N17) -- (rM24);
+
+% VO + CaH nuevo ───────────────────────────────────────────────────────────────
+\node[decnew, right=0.4cm of N17, yshift=-1.8cm] (N18)
+  {\textbf{N18}\nuevo\\VO 7434 / 7865 Å\\CaH 6382 / 6750 Å\\(M tardías)};
+
+\draw[arrnew] (N17.east) -- ++(0.4,0) |- (N18.north);
+
+\node[res={red!60}, below left=0.6cm and 0.3cm of N18] (rMlate)
+  {M5+\\VO fuerte};
+\node[res={red!35}, below right=0.4cm and 0.2cm of N18] (rMdwarf)
+  {M enana\\TiO/CaH $\approx$ 1};
+\draw[arres, red!55] (N18.south west) -- (rMlate.north east);
+\draw[arres, red!55] (N18.south east) -- (rMdwarf.north west);
+
+% Sin TiO → K ──────────────────────────────────────────────────────────────────
+\node[res={orange!60!red}, below right=0.55cm and 0.4cm of N17] (rK35)
+  {K3--K5\\sin TiO\\Ca~\textsc{i} fuerte};
+\draw[arres, orange!70!red] (N17.south east) -- (rK35.north west);
+
+% ─── G / K tempranas ──────────────────────────────────────────────────────────
+\node[dec, below right=1.2cm and 0.8cm of N16] (N19)
+  {\textbf{N19}\\H$_\delta$ vs Ca~\textsc{i}~4227\\vs Fe~\textsc{i}~4046 / 4144};
+
+\draw[arr] (N16) -| node[lbln, pos=0.3]{No} (N19);
+
+% G0 ───────────────────────────────────────────────────────────────────────────
+\node[res={green!55!black}, above right=0.3cm and 0.5cm of N19] (rG0)
+  {G0\\H$_\delta > $ Ca~\textsc{i}\\H$_\delta >$ Fe~\textsc{i}};
+\draw[arres, green!50!black] (N19.north east) -- (rG0.west);
+
+% N20: Cr/Fe termómetro (nuevo) ────────────────────────────────────────────────
+\node[decnew, below=0.9cm of N19] (N20)
+  {\textbf{N20}\nuevo\\Cr~\textsc{i} triplete\\4254 / 4275 / 4290 Å\\termómetro G/K};
+
+\draw[arrnew] (N19) -- node[lbly, right]{H$_\delta \approx$ Ca~\textsc{i}} (N20);
+
+\node[res={green!50!black}, below left=0.7cm and 0.5cm of N20] (rG25)
+  {G2--G5\\Cr~\textsc{i} $<$ Fe~\textsc{i}\\ratio $<$ 0.90};
+\node[res={green!45!black}, below=0.45cm of N20] (rG5)
+  {G5\\Cr~\textsc{i} $\approx$ Fe~\textsc{i}\\ratio 0.90--1.10};
+
+\draw[arres, green!50!black] (N20.south west) -- (rG25.north east);
+\draw[arres, green!50!black] (N20) -- (rG5);
+
+% Y II luminosidad G (nuevo) ───────────────────────────────────────────────────
+\node[decnew, below right=0.5cm and 0.6cm of N20] (N21)
+  {\textbf{N21}\nuevo\\Y~\textsc{ii}~4376 / Fe~\textsc{i}~4383\\indicador luminosidad G};
+
+\draw[arrnew] (N20.south east) -- node[lbly, pos=0.5, right]{\scriptsize Cr $>$ Fe} (N21.north west);
+
+\node[res={green!40!black}, below left=0.6cm and 0.3cm of N21] (rG58)
+  {G5--G8\\Y~\textsc{ii}/Fe~\textsc{i} $<$ 1\\clase V};
+\node[res={green!35!black}, below right=0.4cm and 0.2cm of N21] (rG58III)
+  {G + \textsc{iii}\\Y~\textsc{ii}/Fe~\textsc{i} $\geq$ 1\\gigante};
+
+\draw[arres, green!50!black] (N21.south west) -- (rG58.north east);
+\draw[arres, green!50!black] (N21.south east) -- (rG58III.north west);
+
+% Mg b triplete (nuevo) ────────────────────────────────────────────────────────
+\node[decnew, right=0.5cm of N21] (N22)
+  {\textbf{N22}\nuevo\\Tripleta Mg~$b$\\Mg~\textsc{i}~5183 Å\\(G madura)};
+
+\draw[arrnew] (N21.east) -- (N22.west);
+
+\node[res={green!45!black}, below=0.5cm of N22] (rGmg)
+  {G2--G8\\Mg~$b$ visible\\tipo confirma};
+\draw[arres, green!50!black] (N22) -- (rGmg);
+
+% ─── K tempranas ──────────────────────────────────────────────────────────────
+\node[dec, below right=1.0cm and 0.5cm of N19] (N23)
+  {\textbf{N23}\\H$_\delta <$ Ca~\textsc{i}?\\H$_\delta <$ Fe~\textsc{i}?};
+
+\draw[arr] (N19) -| node[lbln, pos=0.3]{No → K} (N23);
+
+\node[res={orange!70!red}, below left=0.6cm and 0.5cm of N23] (rK0)
+  {K0\\Cr~\textsc{i} $>$ Fe~\textsc{i}};
+
+\draw[arres, orange!70!red] (N23.south west) -- (rK0.north east);
+
+% Na I D (nuevo) ───────────────────────────────────────────────────────────────
+\node[decnew, below=0.9cm of N23] (N24)
+  {\textbf{N24}\nuevo\\Na~\textsc{i}~D 5890 / 5896 Å\\+ Ca~\textsc{i}~4227 / Fe~\textsc{i}\\K tardía};
+
+\draw[arrnew] (N23) -- node[lbly, right]{Ca~\textsc{i} $\gg$ H} (N24);
+
+\node[res={orange!65!red}, below left=0.6cm and 0.3cm of N24] (rK57)
+  {K5--K7\\Na~\textsc{i}~D fuerte\\Ca~\textsc{i} $>$ Fe~\textsc{i}};
+\node[res={orange!60!red}, below right=0.4cm and 0.2cm of N24] (rK23)
+  {K2--K4\\Na~\textsc{i}~D mod.};
+
+\draw[arres, orange!60!red] (N24.south west) -- (rK57.north east);
+\draw[arres, orange!60!red] (N24.south east) -- (rK23.north west);
+
+% ═══════════════════════════════════════════════════════════════════════════════
+%  CLASE DE LUMINOSIDAD (al pie)
+% ═══════════════════════════════════════════════════════════════════════════════
+
+% Bounding box de todo el diagrama para colocar la leyenda
+\node[
+  trunk,
+  text width=10cm,
+  minimum height=1.0cm,
+  below=0.8cm of N8,
+  xshift=1.5cm
+] (lum)
+  {\textsf{Clase de luminosidad} (módulo \texttt{luminosity\_classification.py}):
+   Sr~\textsc{ii}/Fe~\textsc{i} · Ba~\textsc{ii}/Fe~\textsc{i} · Ca~\textsc{i}/Fe~\textsc{i}
+   · TiO/CaH · EW(H$\beta$) $\Rightarrow$ I\,a · I\,b · II · III · IV · V};
+
+% ═══════════════════════════════════════════════════════════════════════════════
+%  LEYENDA
+% ═══════════════════════════════════════════════════════════════════════════════
+\node[
+  draw=gray!50, fill=gray!5, rounded corners=3pt,
+  text width=5.8cm,
+  align=left,
+  below right=0.6cm and 0.3cm of N1,
+  xshift=1.0cm,
+  font=\fontsize{6.5}{8}\selectfont
+] (leyenda) {
+  \textbf{Leyenda}\\[2pt]
+  \tikz{\node[dec, minimum width=1.0cm, minimum height=0.4cm, text width=0.9cm, font=\fontsize{5}{6}\selectfont]{};}\;
+  Nodo de decisión (original v1.0)\\[3pt]
+  \tikz{\node[decnew, minimum width=1.0cm, minimum height=0.4cm, text width=0.9cm, font=\fontsize{5}{6}\selectfont]{};}\;
+  Nodo nuevo \textbf{v3.1} (10 en total)\\[3pt]
+  \tikz{\node[res={blue!70}, minimum width=0.8cm, minimum height=0.3cm, text width=0.7cm, font=\fontsize{5}{6}\selectfont]{O};}\;
+  \tikz{\node[res={cyan!60}, minimum width=0.8cm, minimum height=0.3cm, text width=0.7cm, font=\fontsize{5}{6}\selectfont]{B};}\;
+  \tikz{\node[res={yellow!60!orange}, minimum width=0.8cm, minimum height=0.3cm, text width=0.7cm, font=\fontsize{5}{6}\selectfont]{A};}\;
+  \tikz{\node[res={orange!55}, minimum width=0.8cm, minimum height=0.3cm, text width=0.7cm, font=\fontsize{5}{6}\selectfont]{F};}\;
+  \tikz{\node[res={green!50!black}, minimum width=0.8cm, minimum height=0.3cm, text width=0.7cm, font=\fontsize{5}{6}\selectfont]{G};}\;
+  \tikz{\node[res={orange!65!red}, minimum width=0.8cm, minimum height=0.3cm, text width=0.7cm, font=\fontsize{5}{6}\selectfont]{K};}\;
+  \tikz{\node[res={red!55}, minimum width=0.8cm, minimum height=0.3cm, text width=0.7cm, font=\fontsize{5}{6}\selectfont]{M};}\\[2pt]
+  Secuencia espectral O--B--A--F--G--K--M\\[1pt]
+  \textit{[v3.1]}: nodo añadido en versión 3.1\\[1pt]
+  $\star$ Árbol expande 18 $\to$ 28 nodos\\
+  $\star$ 856 espectros ELODIE · R$\sim$42\,000
+};
+
+% ═══════════════════════════════════════════════════════════════════════════════
+%  TÍTULO
+% ═══════════════════════════════════════════════════════════════════════════════
+\node[
+  above=0.35cm of entrada,
+  font=\fontsize{9}{11}\selectfont\bfseries,
+  text width=12cm, align=center
+] (titulo) {Árbol de Decisión Espectral MK — SpectroClass v3.1 (28 nodos)};
+
+\node[
+  below=0.05cm of titulo,
+  font=\fontsize{7}{9}\selectfont\itshape,
+  text width=12cm, align=center
+] {Clasificador físico basado en Gray \& Corbally (2009) · Ampliado de 18 a 28 nodos en v3.1};
+
+% ─── Marco general ────────────────────────────────────────────────────────────
+\begin{scope}[on background layer]
+  \node[
+    draw=gray!40, rounded corners=5pt, fill=white,
+    fit=(titulo)(N1)(N2)(N4)(N5)(N6)(N7)(N8)(N9)(N10)
+        (N11)(N12)(N13)(N14)(N15)(N16)(N17)(N18)(N19)
+        (N20)(N21)(N22)(N23)(N24)(N3)
+        (rO3)(rO4)(rO5)(rO6)(rO7)(rOf)(rO8)(rO9)
+        (rB0)(rB12)(rB35)(rBIII)(rBV)(rB67)(rB8)(rB9)
+        (rA02)(rA5)(rF0)(rF59)(rA02b)(rA5b)(rFG)(rFmet)
+        (rFlate)(rM57)(rM24)(rMlate)(rMdwarf)(rK35)
+        (rG0)(rG25)(rG5)(rG58)(rG58III)(rGmg)
+        (rK0)(rK57)(rK23)(lum)(leyenda),
+    inner sep=6pt
+  ] {};
+\end{scope}
+
+\end{tikzpicture}
+\end{document}

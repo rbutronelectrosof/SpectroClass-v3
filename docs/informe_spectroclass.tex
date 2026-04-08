@@ -1,0 +1,766 @@
+\documentclass[12pt,a4paper]{article}
+
+% ── Codificación y lenguaje ──────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-nodecimaldot]{babel}
+
+% ── Tipografía ───────────────────────────────────────────────────────────────
+\usepackage{lmodern}
+\usepackage{microtype}
+
+% ── Márgenes ─────────────────────────────────────────────────────────────────
+\usepackage[top=2.5cm,bottom=2.5cm,left=3cm,right=3cm]{geometry}
+
+% ── Matemáticas ──────────────────────────────────────────────────────────────
+\usepackage{amsmath,amssymb}
+
+% ── Figuras y tablas ─────────────────────────────────────────────────────────
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{multirow}
+\usepackage{diagbox}
+\usepackage{colortbl}
+\usepackage{rotating}   % para \begin{sidewaysfigure}
+\usepackage{pdflscape}  % para landscape solo en esa página
+
+% ── Código fuente ─────────────────────────────────────────────────────────────
+\usepackage{listings}
+\usepackage[dvipsnames,svgnames,table]{xcolor}
+\definecolor{teal}{RGB}{0,128,128}
+
+\definecolor{codeblue}{rgb}{0.13,0.29,0.53}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codegreen}{rgb}{0.0,0.5,0.0}
+\definecolor{codeback}{rgb}{0.97,0.97,0.97}
+
+\lstset{
+  backgroundcolor=\color{codeback},
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{codeblue}\bfseries,
+  commentstyle=\color{codegreen},
+  stringstyle=\color{red!70!black},
+  numberstyle=\tiny\color{codegray},
+  numbers=left,
+  stepnumber=1,
+  frame=single,
+  rulecolor=\color{gray!40},
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=4,
+  language=Python
+}
+
+% ── Hyperlinks ────────────────────────────────────────────────────────────────
+\usepackage[colorlinks=true,linkcolor=blue!70!black,citecolor=blue!70!black,urlcolor=blue!70!black]{hyperref}
+
+% ── Encabezado/pie de página ──────────────────────────────────────────────────
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small SpectroClass v3.1 — Informe Técnico-Científico}
+\fancyhead[R]{\small \thepage}
+\fancyfoot[C]{\small UNCuyo · Facultad de Ciencias Exactas y Naturales · 2026}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.2pt}
+
+% ── Espaciado ─────────────────────────────────────────────────────────────────
+\usepackage{setspace}
+\onehalfspacing
+
+% ── Bibliografía ──────────────────────────────────────────────────────────────
+\usepackage[numbers,sort&compress]{natbib}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+
+% ── PORTADA ──────────────────────────────────────────────────────────────────
+\begin{titlepage}
+  \centering
+  \vspace*{1.5cm}
+  {\Large\bfseries Universidad Nacional de Cuyo\\[0.4em]
+  Facultad de Ciencias Exactas y Naturales\par}
+  \vspace{1.5cm}
+  \rule{\linewidth}{1pt}\\[0.8em]
+  {\LARGE\bfseries SpectroClass v3.1\par}
+  \vspace{0.5em}
+  {\large\itshape Sistema Automatizado de Clasificación Espectral Estelar\\
+  con Arquitectura Multi-Método\par}
+  \rule{\linewidth}{1pt}
+  \vspace{1.5cm}
+
+  {\large\bfseries Informe Técnico-Científico\par}
+  \vspace{1.2cm}
+
+  \begin{tabular}{rl}
+    \textbf{Autor:}  & Roberto Butrón \\[0.3em]
+    \textbf{Versión:}  & 3.1 \\[0.3em]
+    \textbf{Fecha:}    & Abril 2026 \\[0.3em]
+    \textbf{Palabras clave:} & clasificación espectral, sistema MK, \\
+                             & anchos equivalentes, redes neuronales, \\
+                             & catálogo ELODIE, espectroscopía estelar
+  \end{tabular}
+
+  \vfill
+  {\small Congreso: Evolución estelar, exoplanetas y dinámica de sistemas estelares\\
+  Mendoza, 22--24 de abril de 2026}
+\end{titlepage}
+
+% ── RESUMEN ──────────────────────────────────────────────────────────────────
+\begin{abstract}
+\noindent
+Se presenta \textbf{SpectroClass}, un sistema de código abierto para la clasificación
+espectral automática de estrellas que integra cuatro métodos independientes mediante
+votación ponderada configurable. El sistema procesa espectros en formato TXT y FITS,
+normaliza al continuo mediante ajuste local iterativo con rechazo de rayos cósmicos
+basado en la desviación absoluta de la mediana (MAD), y mide \textbf{85 líneas
+diagnóstico} con ventanas de integración adaptativas. Se calculan \textbf{21 razones
+diagnóstico} que cubren la secuencia OBAFGKM completa. La clasificación se realiza
+mediante: (1)~un clasificador físico con árbol de decisión de 28 nodos calibrado sobre
+estrellas estándar MK, (2)~un árbol de decisión RandomForest entrenado sobre 684
+espectros ELODIE, (3)~comparación con plantillas por $\chi^2$ reducido, y
+(4)~clasificadores neuronales k-NN y CNN-1D. El sistema de votación ponderada alcanza
+una exactitud global del \textbf{86.5\%} sobre el catálogo ELODIE (856 espectros),
+superando en $+2.3$ puntos porcentuales al mejor método individual. SpectroClass se
+distribuye como aplicación web Flask con interfaz interactiva, exportación CSV/TXT/PDF
+y documentación en castellano.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Introducción}
+% ════════════════════════════════════════════════════════════════════════════
+
+\subsection{Contexto y Motivación}
+
+La clasificación espectral estelar es uno de los pilares de la astrofísica moderna.
+Desde los trabajos pioneros de Angelo Secchi en el siglo XIX hasta el sistema
+Harvard-Draper, la categorización de estrellas por sus características espectrales ha
+permitido comprender la física estelar, la evolución química del universo y la
+estructura galáctica.
+
+El sistema de clasificación MK (Morgan-Keenan, 1943) ordena las estrellas en siete
+tipos espectrales principales, O-B-A-F-G-K-M, por temperatura efectiva decreciente, y
+añade clases de luminosidad (I--V) que indican el estado evolutivo.
+
+Con la llegada de \emph{surveys} masivos como SDSS, LAMOST y Gaia, que generan
+millones de espectros por ciclo, la automatización de la clasificación se ha vuelto
+imprescindible. Los sistemas existentes (MKCLASS, LAMOST pipeline, StarNet)
+presentan limitaciones: algunos priorizan la velocidad sobre la trazabilidad física,
+otros requieren infraestructura de entrenamiento no disponible localmente, y la mayoría
+no incluye documentación en castellano.
+
+\subsection{Problemática}
+
+Los métodos automatizados de clasificación espectral enfrentan cuatro desafíos
+principales:
+\begin{enumerate}
+  \item \textbf{Variabilidad instrumental:} distintas resoluciones y rangos espectrales
+        según el espectrógrafo.
+  \item \textbf{Contaminación por artefactos:} rayos cósmicos, defectos de CCD y ruido
+        fotónico.
+  \item \textbf{Efectos físicos:} rotación estelar, velocidad radial y peculiaridades
+        químicas modifican los perfiles.
+  \item \textbf{Ambigüedad intrínseca:} los límites entre tipos espectrales son
+        continuos, no discretos.
+\end{enumerate}
+
+\subsection{Objetivos}
+
+\paragraph{Objetivo general.}
+Desarrollar un sistema computacional robusto para la clasificación automatizada de
+espectros estelares que integre métodos físicos y de aprendizaje automático, con
+trazabilidad diagnóstica y distribución de código abierto.
+
+\paragraph{Objetivos específicos.}
+\begin{enumerate}
+  \item Implementar normalización espectral al continuo con rechazo de rayos cósmicos
+        basado en MAD.
+  \item Medir anchos equivalentes (EW) para 85 líneas diagnóstico con ventanas
+        adaptativas.
+  \item Crear un clasificador físico de 28 nodos siguiendo criterios Gray \& Corbally.
+  \item Entrenar modelos de ML (RandomForest, k-NN, CNN-1D) sobre el catálogo ELODIE.
+  \item Integrar los clasificadores mediante votación ponderada configurable.
+  \item Implementar estimación de clase de luminosidad MK (I--V).
+  \item Validar el sistema con el catálogo ELODIE (856 espectros).
+  \item Distribuir el sistema como aplicación web de código abierto.
+\end{enumerate}
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Marco Teórico}
+% ════════════════════════════════════════════════════════════════════════════
+
+\subsection{Fundamentos de Espectroscopía Estelar}
+
+\subsubsection{Formación del Espectro}
+
+El espectro estelar resulta de la interacción entre la radiación del continuo
+(fotosfera profunda) y la absorción selectiva de capas superiores. En condiciones de
+equilibrio termodinámico local (ETL), la función fuente $S_\lambda$ equivale a la
+función de Planck $B_\lambda(T)$, y la intensidad emergente se rige por la ecuación de
+transferencia radiativa:
+\begin{equation}
+  \frac{dI_\lambda}{d\tau_\lambda} = I_\lambda - B_\lambda(T)
+\end{equation}
+
+Los perfiles de líneas resultan de la convolución de ensanchamientos natural
+(Lorentziano), Doppler térmico, de presión (Stark, Van der Waals) y rotacional,
+aproximados habitualmente por un perfil de Voigt.
+
+\subsubsection{Ancho Equivalente}
+
+El ancho equivalente (EW) es la medida fundamental para la clasificación cuantitativa:
+\begin{equation}
+  \mathrm{EW} = \int \left(1 - \frac{F_\lambda}{F_c}\right) d\lambda \quad [\text{\AA}]
+\end{equation}
+donde $F_\lambda$ es el flujo observado y $F_c$ el flujo del continuo. El EW es
+independiente de la resolución instrumental (a diferencia del FWHM) y refleja la
+abundancia del elemento y las condiciones físicas de la atmósfera estelar.
+
+\subsection{Sistema de Clasificación Espectral MK}
+
+La Tabla~\ref{tab:mk} resume los siete tipos principales con sus propiedades físicas y
+las características espectrales diagnóstico.
+
+\begin{table}[H]
+  \centering
+  \caption{Secuencia de tipos espectrales MK.}
+  \label{tab:mk}
+  \renewcommand{\arraystretch}{1.25}
+  \begin{tabular}{cllp{6cm}}
+    \toprule
+    \textbf{Tipo} & \textbf{$T_\mathrm{ef}$ (K)} & \textbf{Color} &
+    \textbf{Características principales} \\
+    \midrule
+    O & $>30\,000$ & Azul & He~\textsc{ii} fuerte, He~\textsc{i} presente, H débil \\
+    B & $10\,000$--$30\,000$ & Azul-blanco & He~\textsc{i} máximo en B2, H creciente \\
+    A & $7\,500$--$10\,000$ & Blanco & H máximo (Balmer), metales débiles \\
+    F & $6\,000$--$7\,500$ & Amarillo-blanco & H decreciente, Ca~\textsc{ii}~K creciente \\
+    G & $5\,200$--$6\,000$ & Amarillo & Ca~\textsc{ii} H y K fuertes, banda G (CH) \\
+    K & $3\,700$--$5\,200$ & Naranja & Metales dominantes, TiO incipiente \\
+    M & $<3\,700$ & Rojo & Bandas moleculares TiO, VO \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Las clases de luminosidad (Tabla~\ref{tab:lum}) codifican el estado evolutivo a través
+de indicadores sensibles a la gravedad superficial $\log g$.
+
+\begin{table}[H]
+  \centering
+  \caption{Clases de luminosidad MK.}
+  \label{tab:lum}
+  \renewcommand{\arraystretch}{1.2}
+  \begin{tabular}{cll}
+    \toprule
+    \textbf{Clase} & \textbf{Denominación} & \textbf{Indicador diagnóstico principal} \\
+    \midrule
+    Ia, Ib & Supergigantes & Líneas estrechas, ratios de ionización alterados \\
+    II & Gigantes brillantes & Sr~\textsc{ii} / Fe~\textsc{i} elevado \\
+    III & Gigantes & Ba~\textsc{ii} moderado \\
+    IV & Subgigantes & Ca~\textsc{i} / Fe~\textsc{i} intermedio \\
+    V & Enanas (S.P.) & Líneas más anchas (mayor presión) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Metodología}
+% ════════════════════════════════════════════════════════════════════════════
+
+\subsection{Pre-procesamiento Espectral}
+
+\subsubsection{Rechazo de Rayos Cósmicos — Sigma-Clipping MAD}
+
+El algoritmo de sigma-clipping utiliza la Desviación Absoluta de la Mediana (MAD)
+en lugar de la desviación estándar clásica, lo que lo hace resistente a distribuciones
+asimétricas propias de los rayos cósmicos en espectros CCD.
+La desviación estándar robusta se calcula como $\hat{\sigma} = 1.4826 \cdot \mathrm{MAD}$,
+donde el factor $1.4826$ garantiza consistencia con la distribución Gaussiana.
+El proceso itera hasta cinco veces o hasta convergencia.
+
+\subsubsection{Normalización al Continuo}
+
+La normalización correcta es crítica para el cálculo de EW. El algoritmo implementa un
+enfoque de \emph{dos pasos}:
+\begin{enumerate}
+  \item \textbf{Primer pase — continuo rápido:} selección del percentil P90 del flujo
+        en ventanas de 50 píxeles, seguida de ajuste con spline cúbico.
+  \item \textbf{Segundo pase — rechazo relativo:} los rayos cósmicos se rechazan
+        comparando el flujo con el continuo local (no el global), lo que evita
+        distorsiones en espectros con fuerte gradiente de color.
+\end{enumerate}
+El resultado es $F_\mathrm{norm}(\lambda) = F_\mathrm{obs}(\lambda) /
+F_\mathrm{continuo}(\lambda)$, con el continuo igual a la unidad.
+Se destaca que la normalización min-max es \emph{incorrecta} para espectroscopía, ya
+que un rayo cósmico en el máximo comprime todo el espectro hacia cero e impide el
+cálculo de EW.
+
+\subsection{Medición de Anchos Equivalentes}
+
+La función \texttt{measure\_equivalent\_width()} retorna una tupla de cuatro elementos:
+$(\mathrm{EW},\;\mathrm{depth},\;\mathrm{quality\_flag},\;\lambda_\mathrm{med})$.
+El \texttt{quality\_flag} codifica tres niveles de calidad (0 = válido, 1 = warning,
+2 = descartado) basados en la profundidad mínima de la línea, la posición del mínimo
+respecto del centro teórico (tolerancia adaptativa) y la relación S/N local
+($\mathrm{SNR} \geq 30$).
+
+Las ventanas de integración se definen por línea en el diccionario \texttt{LINE\_WINDOWS}
+(6--30~Å). Para líneas metálicas angostas se utiliza una ventana adaptativa:
+$w \approx 4 \times \mathrm{FWHM}$, estimado mediante la función \texttt{estimate\_fwhm()}.
+Las 85 líneas diagnóstico implementadas se distribuyen como se muestra en la
+Tabla~\ref{tab:lineas}.
+
+\begin{table}[H]
+  \centering
+  \caption{Distribución de las 85 líneas diagnóstico por especie.}
+  \label{tab:lineas}
+  \renewcommand{\arraystretch}{1.2}
+  \begin{tabular}{lrl}
+    \toprule
+    \textbf{Especie / Serie} & \textbf{N.º líneas} & \textbf{Uso diagnóstico} \\
+    \midrule
+    Balmer (H\,\textsc{i}) & 5 & Temperatura A--F, luminosidad \\
+    Helio (He\,\textsc{i}) & 6 & Tipos B \\
+    Helio (He\,\textsc{ii}) & 4 & Tipos O \\
+    N, C, O ionizados & 13 & Subtipos O y B \\
+    Silicio (Si) & 8 & Subtipos B \\
+    Calcio (Ca) & 6 & F--G--K primario \\
+    Magnesio (Mg) & 3 & B tardío -- A \\
+    Hierro (Fe) & 13 & G--K--M \\
+    Cr, Sr, Ba, Na & 5 & Luminosidad, K--M \\
+    Ti, Al & 2 & G--K \\
+    CH banda G & 1 & F/G \\
+    Bandas TiO & 6 & M \\
+    Bandas VO y CaH & 4 & M tardías \\
+    Otros metales & 9 & F--K \\
+    \midrule
+    \textbf{Total} & \textbf{85} & \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Razones Diagnóstico}
+
+La función \texttt{compute\_spectral\_ratios()} calcula 21 razones que cubren la
+secuencia completa:
+\begin{itemize}
+  \item \textbf{Tipos O:} He\,\textsc{i}~4471 / He\,\textsc{ii}~4541,
+        N\,\textsc{iv}~4058 / N\,\textsc{iii}~4641, Si\,\textsc{iv}~4089 /
+        He\,\textsc{i}~4026, N\,\textsc{v}/N\,\textsc{iii},
+        O\,\textsc{iii}~5592 / He\,\textsc{i}~5876.
+  \item \textbf{Tipos B:} Si\,\textsc{iii}~4553 / Si\,\textsc{ii}~4128,
+        Si\,\textsc{iv}~4116 / Si\,\textsc{iii}~4553.
+  \item \textbf{Tipos F--G:} Ca\,\textsc{ii}~K / H$\epsilon$,
+        Ca\,\textsc{i}~4227 / H$\delta$, Sr\,\textsc{ii}~4077 / Fe\,\textsc{i}.
+  \item \textbf{Tipos G--K:} Cr\,\textsc{i}~4254 / Fe\,\textsc{i},
+        Na\,\textsc{i}~D / Fe\,\textsc{i}, Y\,\textsc{ii}~4376 / Fe\,\textsc{i}.
+  \item \textbf{Tipos K--M:} TiO~4762 / Ca\,\textsc{i},
+        TiO / CaH, VO~7434 / CaH.
+\end{itemize}
+
+\subsection{Clasificadores}
+
+\subsubsection{Clasificador Físico — Árbol de 28 Nodos}
+
+El clasificador físico implementa los criterios de Gray \& Corbally (2009) en un árbol
+de decisión jerárquico ampliado a 28 nodos.
+La Figura~\ref{fig:arbol} muestra el diagrama completo del árbol con la codificación
+de color por tipo espectral y los 10 nodos nuevos de la versión~3.1 destacados en verde
+(\textit{teal}). Los 10 nodos añadidos en v3.1 cubren:
+subtipos O3--O4 (N\,\textsc{v}~4604 + O\,\textsc{v}~5114), O tardíos
+(N\,\textsc{iii}~4634--4641), B con O\,\textsc{ii}, F5--F9 (Ca\,\textsc{i}~4226/H$\delta$
++ Sr\,\textsc{ii}~4077), F/G con banda CH G, G con Fe\,\textsc{i}~4144/H$\delta$ +
+Cr\,\textsc{i}/Fe\,\textsc{i} + Y\,\textsc{ii}~4376, G con tripleta Mg~$b$, K con
+triplete Cr\,\textsc{i} (4254/4275/4290~Å) como termómetro primario, K con
+Na\,\textsc{i}~D, y M tardías con VO y CaH.
+
+% ── Figura: árbol de decisión ────────────────────────────────────────────────
+\begin{landscape}
+\begin{figure}[p]
+  \centering
+  % Para incluir la figura compilada como PDF externo (recomendado):
+  %   1. Compilar: pdflatex arbol_decision_28nodos.tex
+  %   2. Descomentar la línea \includegraphics y comentar el \fbox
+  %
+  % \includegraphics[width=0.97\linewidth,keepaspectratio]{arbol_decision_28nodos.pdf}
+  %
+  % Mientras no se haya compilado el archivo externo, se muestra este recuadro
+  % con instrucciones:
+  \fbox{\parbox{0.94\linewidth}{\centering\vspace{1cm}
+    \textbf{Árbol de Decisión — 28 Nodos (SpectroClass v3.1)}\\[0.5cm]
+    \textit{Para mostrar el diagrama TikZ, compilar primero el archivo externo:}\\[0.3cm]
+    \texttt{pdflatex arbol\_decision\_28nodos.tex}\\[0.3cm]
+    y luego descomentar la línea \texttt{\textbackslash includegraphics} en este archivo.\\[0.3cm]
+    \textit{Alternativamente, este archivo puede compilarse de forma independiente\\
+    para generar la figura como un PDF standalone.}
+    \vspace{1cm}
+  }}
+  \caption[Árbol de decisión de 28 nodos — SpectroClass v3.1]{%
+    Árbol de decisión del clasificador físico de SpectroClass v3.1 (28 nodos,
+    ampliado desde 18 en la versión~3.0).
+    Los nodos con borde \textcolor{teal}{\textit{teal}} y relleno verde claro son los
+    10 nodos nuevos incorporados en v3.1.
+    El código de colores refleja el tipo espectral de destino:
+    azul~(O), cian~(B), amarillo-naranja~(A), naranja~(F),
+    verde~(G), naranja-rojo~(K) y rojo~(M).
+    Cada nodo de decisión (\textit{diamante}) cita las líneas espectrales y umbrales
+    de EW utilizados; cada nodo terminal (\textit{rectángulo redondeado}) indica el
+    tipo MK asignado y el criterio diagnóstico que lo determina.
+    Al pie se incluye el módulo de clase de luminosidad (I--V).
+  }
+  \label{fig:arbol}
+\end{figure}
+\end{landscape}
+
+\subsubsection{Árbol de Decisión RandomForest}
+
+Se entrena un clasificador RandomForest sobre 684 espectros ELODIE con 24 features de
+entrada (17 EW + 6 razones + H\_avg), profundidad máxima 9, balanceo de clases activo
+y validación cruzada 5-fold.
+
+\subsubsection{Clasificadores Neuronales}
+
+\paragraph{k-NN.} Opera en el espacio de features escaladas (StandardScaler),
+$k=5$ vecinos con ponderación por distancia euclidiana.
+
+\paragraph{CNN-1D.} Red convolucional sobre el espectro remuestreado a grilla uniforme,
+con dos bloques Conv1D--MaxPooling--Dropout (32 y 64 filtros), dos capas densas
+(128 unidades + Dropout 0.3) y salida Softmax. Optimizador Adam, tasa de aprendizaje
+$10^{-3}$.
+
+\subsubsection{Template Matching}
+
+Comparación por $\chi^2$ reducido con plantillas de EW para cada tipo MK:
+\begin{equation}
+  \chi^2_\nu = \frac{1}{N}\sum_{i=1}^{N}
+  \left(\frac{\mathrm{EW}_i^\mathrm{obs} - \mathrm{EW}_i^\mathrm{plantilla}}
+  {\sigma_i}\right)^2
+\end{equation}
+donde $\sigma_i = \max(0.1 \cdot \mathrm{EW}_i^\mathrm{plantilla},\; 0.05\ \text{\AA})$.
+
+\subsection{Votación Ponderada}
+
+La clasificación final combina los cuatro métodos con pesos:
+\begin{align}
+  w_\mathrm{físico} &= 0.10, &
+  w_\mathrm{DT} &= 0.40, &
+  w_\mathrm{template} &= 0.10, &
+  w_\mathrm{neural} &= 0.40.
+\end{align}
+El tipo final es $\hat{T} = \arg\max_T \sum_m w_m \cdot p_m(T)$,
+donde $p_m(T)$ es la confianza del método $m$ para el tipo $T$.
+La confianza global incorpora un factor de consenso que penaliza resultados discordantes.
+
+\subsection{Estimación de Clase de Luminosidad}
+
+El módulo \texttt{luminosity\_classification.py} estima la clase de luminosidad I--V
+mediante indicadores sensibles a $\log g$:
+Sr\,\textsc{ii}/Fe\,\textsc{i} (gigantes y supergigantes tardías),
+Ba\,\textsc{ii}/Fe\,\textsc{i} (gigantes G--K),
+Ca\,\textsc{i}/Fe\,\textsc{i} (subgigantes),
+TiO/CaH (tipos M) y criterios Stark en H$\beta$ para tipos A--B.
+El resultado se combina con el tipo espectral para construir la clasificación MK
+completa (p.~ej., G2V, K3\,\textsc{iii}).
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Implementación Computacional}
+% ════════════════════════════════════════════════════════════════════════════
+
+\subsection{Arquitectura del Sistema}
+
+SpectroClass sigue una arquitectura en capas (Figura~\ref{fig:arch}):
+(1)~carga de datos (TXT / FITS con reconstrucción WCS), (2)~pre-procesamiento
+(normalización + EW), (3)~capa de clasificadores, (4)~votación ponderada y
+(5)~interfaz web Flask con visualización interactiva.
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.88\linewidth}{\centering\ttfamily\small
+    Interfaz Web (Flask)\\
+    \rule{0.7\linewidth}{0.4pt}\\
+    SpectralValidator — Votación Multi-Método\\
+    \rule{0.7\linewidth}{0.4pt}\\
+    Físico \quad | \quad RandomForest \quad | \quad Template \quad | \quad Neural\\
+    \rule{0.7\linewidth}{0.4pt}\\
+    Pre-procesamiento: Normalización + EW + Razones\\
+    \rule{0.7\linewidth}{0.4pt}\\
+    Carga de Datos (.txt / .fits)
+  }}
+  \caption{Arquitectura de capas de SpectroClass v3.1.}
+  \label{fig:arch}
+\end{figure}
+
+\subsection{Módulos Principales}
+
+\begin{description}
+  \item[\texttt{spectral\_classification\_corrected.py}]
+    Módulo central: \texttt{sigma\_clip()}, \texttt{normalize\_to\_continuum()},
+    \texttt{measure\_equivalent\_width()}, \texttt{measure\_diagnostic\_lines()}
+    (85 líneas), \texttt{compute\_spectral\_ratios()} (21 razones),
+    \texttt{classify\_star\_corrected()} (árbol 28 nodos),
+    \texttt{check\_radial\_velocity()}, \texttt{write\_diagnostic\_file()}.
+  \item[\texttt{spectral\_validation.py}]
+    \texttt{SpectralValidator}: gestiona el ciclo de votación ponderada e integra
+    los cuatro clasificadores.
+  \item[\texttt{neural\_classifiers.py}]
+    \texttt{KNNClassifier}, \texttt{CNNClassifier} y
+    \texttt{NeuralClassifierManager} para entrenamiento e inferencia.
+  \item[\texttt{luminosity\_classification.py}]
+    \texttt{estimate\_luminosity\_class()} y
+    \texttt{combine\_spectral\_and\_luminosity()}.
+  \item[\texttt{webapp/app.py}]
+    Servidor Flask con endpoints: \texttt{POST /upload} (espectro individual),
+    \texttt{POST /batch\_process} (lotes), \texttt{POST /train\_neural},
+    \texttt{GET /neural\_metrics} y \texttt{GET /health}.
+\end{description}
+
+\subsection{Dependencias}
+
+NumPy, SciPy, Astropy (lectura FITS), scikit-learn (RandomForest, k-NN),
+TensorFlow/Keras (CNN-1D), Flask (interfaz web), Matplotlib y Pandas.
+Instalación mediante \texttt{pip install -r requirements.txt}.
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Validación y Resultados}
+% ════════════════════════════════════════════════════════════════════════════
+
+\subsection{Conjunto de Datos — Catálogo ELODIE}
+
+El catálogo ELODIE del Observatorio de Haute-Provence proporciona 856 espectros
+de alta calidad (Tabla~\ref{tab:elodie}).
+
+\begin{table}[H]
+  \centering
+  \caption{Características del catálogo ELODIE utilizado para validación.}
+  \label{tab:elodie}
+  \renewcommand{\arraystretch}{1.2}
+  \begin{tabular}{ll}
+    \toprule
+    \textbf{Parámetro} & \textbf{Valor} \\
+    \midrule
+    Total de espectros & 856 \\
+    Rango espectral & 3900--6800~\AA \\
+    Resolución & $R \sim 42\,000$ \\
+    S/N típico & $> 100$ \\
+    División entrenamiento / test & 80\,\% / 20\,\% (684 / 171) \\
+    Validación cruzada & 5-fold estratificada \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+La distribución de la muestra es: F 41.1\,\%, K 30.0\,\%, A 16.2\,\%, B 7.5\,\%,
+M 3.2\,\%, O 1.8\,\% y G 0.1\,\%.
+
+\subsection{Métricas de Rendimiento}
+
+La Tabla~\ref{tab:metricas} compara la exactitud de cada método y del sistema combinado.
+
+\begin{table}[H]
+  \centering
+  \caption{Exactitud global por método (conjunto de test, $N=171$).}
+  \label{tab:metricas}
+  \renewcommand{\arraystretch}{1.2}
+  \begin{tabular}{lccc}
+    \toprule
+    \textbf{Método} & \textbf{Exactitud} & \textbf{CV 5-fold} \\
+    \midrule
+    Árbol de decisión (RandomForest) & 84.2\,\% & $82.5 \pm 3.1$\,\% \\
+    k-NN ($k=5$) & 81.3\,\% & $79.8 \pm 2.8$\,\% \\
+    Clasificador físico & \multicolumn{2}{c}{trazabilidad completa} \\
+    Template matching & \multicolumn{2}{c}{referencia diagnóstica} \\
+    \midrule
+    \textbf{Votación ponderada (todos)} & \textbf{86.5\,\%} & — \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+La Tabla~\ref{tab:report} muestra las métricas detalladas del RandomForest por tipo.
+
+\begin{table}[H]
+  \centering
+  \caption{Reporte de clasificación del árbol RandomForest por tipo espectral.}
+  \label{tab:report}
+  \renewcommand{\arraystretch}{1.2}
+  \begin{tabular}{lcccc}
+    \toprule
+    \textbf{Tipo} & \textbf{Precisión} & \textbf{Recall} & \textbf{F1} &
+    \textbf{Soporte} \\
+    \midrule
+    A & 0.82 & 0.86 & 0.84 & 28 \\
+    B & 0.75 & 0.69 & 0.72 & 13 \\
+    F & 0.89 & 0.90 & 0.89 & 70 \\
+    K & 0.82 & 0.80 & 0.81 & 51 \\
+    M & 0.83 & 0.91 & 0.87 & 6 \\
+    O & 1.00 & 0.67 & 0.80 & 3 \\
+    \midrule
+    \textbf{Promedio ponderado} & 0.84 & 0.84 & 0.84 & 171 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Matriz de Confusión}
+
+La Tabla~\ref{tab:confusion} muestra la matriz de confusión del sistema de votación
+ponderada sobre el conjunto de test.
+
+\begin{table}[H]
+  \centering
+  \caption{Matriz de confusión — sistema de votación ponderada ($N=171$).}
+  \label{tab:confusion}
+  \renewcommand{\arraystretch}{1.3}
+  \begin{tabular}{c|ccccccc}
+    \toprule
+    \diagbox{Real}{Pred.} & \textbf{O} & \textbf{B} & \textbf{A} &
+    \textbf{F} & \textbf{G} & \textbf{K} & \textbf{M} \\
+    \midrule
+    O & \textbf{2} & 1 & 0 & 0 & 0 & 0 & 0 \\
+    B & 0 & \textbf{9} & 3 & 1 & 0 & 0 & 0 \\
+    A & 0 & 2 & \textbf{24} & 2 & 0 & 0 & 0 \\
+    F & 0 & 0 & 2 & \textbf{63} & 0 & 5 & 0 \\
+    K & 0 & 0 & 0 & 5 & 0 & \textbf{46} & 0 \\
+    M & 0 & 0 & 0 & 0 & 0 & 1 & \textbf{5} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Las principales confusiones son B$\leftrightarrow$A (gradiente continuo de temperatura)
+y F$\leftrightarrow$K (solapamiento de características metálicas).
+El bajo recall de O se debe al tamaño reducido de la muestra (3 espectros de test).
+
+\subsection{Comparación con Sistemas Previos}
+
+\begin{table}[H]
+  \centering
+  \caption{Comparación con sistemas de clasificación espectral automatizada.}
+  \label{tab:comparacion}
+  \renewcommand{\arraystretch}{1.2}
+  \begin{tabular}{llll}
+    \toprule
+    \textbf{Sistema} & \textbf{Exactitud} & \textbf{Método} & \textbf{Referencia} \\
+    \midrule
+    SpectroClass v3.1 & \textbf{86.5\,\%} & Multi-método & Este trabajo \\
+    MKCLASS & $\sim$85\,\% & Reglas físicas & Gray \& Corbally (2014) \\
+    LAMOST pipeline & 83\,\% & Template matching & Luo et al. (2015) \\
+    StarNet & 89\,\% & CNN & Fabbro et al. (2018) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Discusión}
+% ════════════════════════════════════════════════════════════════════════════
+
+\subsection{Ventajas del Enfoque Multi-Método}
+
+La combinación de clasificadores mejora la exactitud en $+2.3$ puntos sobre el mejor
+método individual por tres razones complementarias: (1)~el clasificador físico
+proporciona trazabilidad diagnóstica completa (cada decisión cita la línea y el umbral
+que la motivó); (2)~el RandomForest captura relaciones no lineales entre EW que los
+criterios físicos simplifican; (3)~la CNN-1D opera sobre el espectro completo y
+detecta patrones sutiles en el perfil que los EW individuales no capturan.
+
+\subsection{Limitaciones}
+
+\begin{enumerate}
+  \item \textbf{Rango espectral:} Si Ca\,\textsc{ii}~K (3933~Å) queda fuera del
+        rango del instrumento, el árbol interactivo activa nodos alternativos; sin
+        embargo, la confianza en clasificación F--G--K disminuye.
+  \item \textbf{Desbalance de clases:} Los tipos O (1.8\,\%) y G (0.1\,\%) del
+        catálogo ELODIE son insuficientes para estimar métricas robustas.
+  \item \textbf{Velocidad radial:} Sin corrección de VR, las líneas pueden desplazarse
+        hasta $\pm 2$~Å, cubierto por la tolerancia adaptativa pero con riesgo de
+        confusión en líneas cercanas.
+  \item \textbf{Estrellas peculiares:} Ap, Bp, Am y Be requieren criterios adicionales
+        no implementados en la versión actual.
+\end{enumerate}
+
+\subsection{Mejoras Implementadas en v3.1}
+
+Con respecto a la versión 3.0, la versión 3.1 incorpora: (1)~sigma-clipping MAD,
+(2)~normalización de dos pasos relativa al continuo local, (3)~tupla EW de 4 elementos
+con \texttt{quality\_flag}, (4)~diccionario \texttt{LINE\_TYPES} por categoría,
+(5)~\texttt{estimate\_fwhm()} y ventanas adaptativas, (6)~\texttt{compute\_snr()} con
+constantes \texttt{SNR\_MINIMUM = 30} y \texttt{RESOLUTION\_MINIMUM = 2000},
+(7)~registro de \texttt{lambda\_measured} y \texttt{window\_width} en diagnósticos,
+(8)~6 razones adicionales para tipos O--B, (9)~\texttt{write\_diagnostic\_file()}
+genera \texttt{line\_measurements.txt}, y (10)~\texttt{check\_radial\_velocity()}.
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Conclusiones}
+% ════════════════════════════════════════════════════════════════════════════
+
+\begin{enumerate}
+  \item Se desarrolló SpectroClass v3.1, un sistema de clasificación espectral estelar
+        automatizada de código abierto que integra cuatro métodos complementarios con
+        trazabilidad diagnóstica completa.
+  \item El sistema alcanza una exactitud del \textbf{86.5\,\%} en la secuencia
+        OBAFGKM sobre el catálogo ELODIE (856 espectros), superando en $+2.3$~pp al
+        mejor método individual.
+  \item La normalización MAD de dos pasos y las ventanas adaptativas por FWHM reducen
+        los errores sistemáticos en espectros de alta resolución y en tipos O--B
+        tempranos.
+  \item La arquitectura multi-método combina trazabilidad física (28 nodos Gray \&
+        Corbally), aprendizaje automático (RandomForest, k-NN, CNN-1D) y comparación
+        con plantillas, con pesos ajustables por el usuario.
+  \item La estimación de clase de luminosidad I--V mediante indicadores sensibles a
+        $\log g$ permite reportar la clasificación MK completa (p.~ej., K3\,III).
+  \item El sistema se distribuye como aplicación web Flask con interfaz interactiva,
+        árbol de clasificación visual, exportación CSV/TXT/PDF y documentación completa
+        en castellano.
+  \item Trabajo futuro: ampliar el catálogo de entrenamiento (SDSS, LAMOST), incorporar
+        corrección automática de VR, extender a estrellas peculiares (Ap, Am, Be) y
+        añadir incertidumbres bayesianas en la confianza de clasificación.
+\end{enumerate}
+
+% ════════════════════════════════════════════════════════════════════════════
+\section*{Agradecimientos}
+% ════════════════════════════════════════════════════════════════════════════
+
+El autor agradece al Observatorio de Haute-Provence por el acceso público al catálogo
+ELODIE, y a la comunidad de Python científico (Astropy, scikit-learn, TensorFlow) cuyas
+bibliotecas de código abierto hacen posible este trabajo.
+
+% ════════════════════════════════════════════════════════════════════════════
+\bibliographystyle{unsrtnat}
+\begin{thebibliography}{9}
+
+\bibitem{gray2009}
+  Gray, R.~O. \& Corbally, C.~J. (2009).
+  \textit{Stellar Spectral Classification}.
+  Princeton University Press.
+
+\bibitem{mkclass2014}
+  Gray, R.~O. \& Corbally, C.~J. (2014).
+  MKCLASS: A Program for the Automated Classification of Stellar Spectra.
+  \textit{AJ}, 147, 80.
+
+\bibitem{luo2015}
+  Luo, A.-L. et al. (2015).
+  The First Data Release (DR1) of the LAMOST regular survey.
+  \textit{RAA}, 15, 1095.
+
+\bibitem{fabbro2018}
+  Fabbro, S. et al. (2018).
+  An Application of Deep Learning in the Analysis of Stellar Spectra.
+  \textit{MNRAS}, 475, 2978.
+
+\bibitem{moultaka2004}
+  Moultaka, J. et al. (2004).
+  The ELODIE Archive.
+  \textit{PASP}, 116, 693.
+
+\bibitem{morgan1943}
+  Morgan, W.~W., Keenan, P.~C. \& Kellman, E. (1943).
+  \textit{An Atlas of Stellar Spectra}.
+  University of Chicago Press.
+
+\end{thebibliography}
+
+\end{document}

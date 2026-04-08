@@ -1,0 +1,487 @@
+% ═══════════════════════════════════════════════════════════════════════════
+%  SpectroClass v3.1 — Poster Científico A0
+%  Congreso: Evolución estelar, exoplanetas y dinámica de sistemas estelares
+%  Mendoza, 22–24 de abril de 2026
+% ═══════════════════════════════════════════════════════════════════════════
+\documentclass[final]{beamer}
+
+\usepackage[size=a0,scale=1.4,orientation=portrait]{beamerposter}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-nodecimaldot]{babel}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{tikz}
+\usepackage{tcolorbox}
+\usepackage{xcolor}
+\usepackage{multicol}
+\usepackage{setspace}
+\usepackage{microtype}
+\usepackage[most]{tcolorbox}
+
+% ── Colores institucionales ──────────────────────────────────────────────────
+\definecolor{uncuyoazul}{RGB}{0,56,101}       % Azul UNCuyo
+\definecolor{uncuyodorado}{RGB}{200,155,50}    % Dorado UNCuyo
+\definecolor{grisclaro}{RGB}{245,245,250}
+\definecolor{grismedio}{RGB}{180,180,195}
+\definecolor{destacado}{RGB}{220,60,30}        % Rojo acento
+\definecolor{verdeok}{RGB}{30,140,60}
+
+% ── Tema Beamer mínimo ───────────────────────────────────────────────────────
+\usetheme{default}
+\usecolortheme{default}
+\setbeamercolor{background canvas}{bg=white}
+\setbeamercolor{block title}{fg=white,bg=uncuyoazul}
+\setbeamercolor{block body}{fg=black,bg=grisclaro}
+\setbeamercolor{block title alerted}{fg=white,bg=destacado}
+\setbeamercolor{block body alerted}{fg=black,bg=grisclaro}
+\setbeamercolor{block title example}{fg=white,bg=verdeok}
+\setbeamercolor{block body example}{fg=black,bg=grisclaro}
+\setbeamerfont{block title}{size=\Large,series=\bfseries}
+\setbeamerfont{block body}{size=\normalsize}
+
+% ── Caja de resultado destacado ──────────────────────────────────────────────
+\tcbset{
+  resultado/.style={
+    enhanced,colback=uncuyodorado!15,colframe=uncuyodorado,
+    fonttitle=\bfseries\large, title=#1, arc=4pt,
+    boxrule=1.5pt, left=6pt, right=6pt, top=4pt, bottom=4pt
+  },
+  metodo/.style={
+    enhanced, colback=uncuyoazul!8, colframe=uncuyoazul!50,
+    fonttitle=\bfseries\normalsize, title=#1, arc=3pt,
+    boxrule=1pt, left=5pt, right=5pt, top=3pt, bottom=3pt
+  },
+  stat/.style={
+    enhanced,colback=white,colframe=uncuyoazul,
+    arc=6pt, boxrule=2pt, halign=center,
+    fontupper=\bfseries\huge\color{uncuyoazul},
+    fontlower=\small\color{black},
+    left=4pt, right=4pt, top=6pt, bottom=4pt,
+    attach boxed title to top center={yshift=-3mm},
+    boxed title style={colback=uncuyoazul,colframe=uncuyoazul,arc=3pt}
+  }
+}
+
+% ── Sin navegación ───────────────────────────────────────────────────────────
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{headline}{}
+\setbeamertemplate{footline}{}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+\begin{frame}[t]{}
+
+%% ════════════════ CABECERA ══════════════════════════════════════════════════
+\begin{tikzpicture}[remember picture, overlay]
+  %% Fondo cabecera
+  \fill[uncuyoazul] (0,0) rectangle (\paperwidth, 14cm);
+  %% Franja dorada inferior
+  \fill[uncuyodorado] (0,0) rectangle (\paperwidth, 1.2cm);
+\end{tikzpicture}
+
+\vspace{-0.5cm}
+\begin{columns}[T]
+  \begin{column}{0.82\paperwidth}
+    \color{white}
+    {\fontsize{60}{68}\bfseries\selectfont SpectroClass v3.1\par}
+    \vspace{0.4cm}
+    {\fontsize{36}{42}\selectfont
+     Sistema Automatizado de Clasificación Espectral Estelar\\
+     con Arquitectura Multi-Método\par}
+    \vspace{0.6cm}
+    {\fontsize{26}{30}\selectfont
+     \textbf{Roberto Butrón} \hspace{1em}
+     Facultad de Ciencias Exactas y Naturales, UNCuyo · Mendoza, Argentina\par}
+    \vspace{0.3cm}
+    {\fontsize{22}{26}\selectfont\itshape
+     Congreso: Evolución estelar, exoplanetas y dinámica de sistemas estelares
+     · 22--24 de abril de 2026\par}
+  \end{column}
+  \begin{column}{0.15\paperwidth}
+    %% Espacio para logo institucional (descomentar si se dispone de archivo)
+    % \includegraphics[width=0.12\paperwidth]{logo_uncuyo.png}
+    \vspace{3cm}
+    \begin{center}
+      \tikz\draw[white,line width=3pt,rounded corners=8pt]
+        (0,0) rectangle (7cm,7cm)
+        node[midway,white,font=\footnotesize\bfseries,align=center]
+        {Logo\\UNCuyo};
+    \end{center}
+  \end{column}
+\end{columns}
+
+\vspace{0.8cm}
+
+%% ════════════════ CUERPO — 3 COLUMNAS ═══════════════════════════════════════
+\begin{columns}[t,totalwidth=\paperwidth]
+
+%%────────────────────────────────────────────────────────────────────────────
+%% COLUMNA 1
+%%────────────────────────────────────────────────────────────────────────────
+\begin{column}{0.32\paperwidth}
+
+  %% ─── Motivación ────────────────────────────────────────────────────────
+  \begin{block}{1 · Motivación}
+    \begin{itemize}\setlength\itemsep{6pt}
+      \item Los \textit{surveys} modernos (SDSS, LAMOST, Gaia) generan
+            \textbf{millones} de espectros que no pueden clasificarse manualmente.
+      \item La clasificación MK tradicional es subjetiva y no trazable.
+      \item Los sistemas existentes priorizan velocidad o exactitud,
+            pero raramente ambas \emph{con} justificación física.
+      \item No existe un sistema de código abierto con documentación en
+            \textbf{castellano} que integre métodos físicos y aprendizaje
+            automático.
+    \end{itemize}
+  \end{block}
+
+  \vspace{0.5cm}
+
+  %% ─── Objetivo ──────────────────────────────────────────────────────────
+  \begin{alertblock}{2 · Objetivo}
+    Desarrollar un sistema que clasifique espectros estelares en la secuencia
+    OBAFGKM + clase de luminosidad I--V, combinando métodos físicos y de ML
+    con \textbf{trazabilidad diagnóstica completa} y distribución como
+    aplicación web de código abierto.
+  \end{alertblock}
+
+  \vspace{0.5cm}
+
+  %% ─── Pipeline ──────────────────────────────────────────────────────────
+  \begin{block}{3 · Pipeline de Pre-procesamiento}
+
+    \begin{tcolorbox}[metodo={Paso 1 — Rechazo de rayos cósmicos (MAD)}]
+      \textbf{Sigma-clipping iterativo} usando la Desviación Absoluta de la
+      Mediana ($\hat\sigma = 1.4826\,\mathrm{MAD}$) en lugar de $\sigma$
+      clásico. Más robusto ante distribuciones asimétricas y picos CCD.
+    \end{tcolorbox}
+
+    \vspace{0.35cm}
+
+    \begin{tcolorbox}[metodo={Paso 2 — Normalización al continuo (2 pasos)}]
+      \textbf{Primer pase:} percentil P90 en ventanas de 50 px + spline
+      cúbico.\\[4pt]
+      \textbf{Segundo pase:} rechazo relativo al continuo \emph{local}
+      (no global) → evita distorsión en espectros con fuerte gradiente de
+      color (tipos O--B y M).
+    \end{tcolorbox}
+
+    \vspace{0.35cm}
+
+    \begin{tcolorbox}[metodo={Paso 3 — Medición de EW (85 líneas)}]
+      Integración trapezoidal $\mathrm{EW} = \int(1-F_\lambda/F_c)\,d\lambda$.\\[4pt]
+      Retorna tupla $(EW,\,\mathrm{depth},\,\mathrm{quality\_flag},\,
+      \lambda_\mathrm{med})$.\\[4pt]
+      Ventanas adaptativas: $w \approx 4\times\mathrm{FWHM}$ para líneas
+      metálicas.
+    \end{tcolorbox}
+
+    \vspace{0.35cm}
+
+    \begin{tcolorbox}[metodo={Paso 4 — 21 Razones Diagnóstico}]
+      Cubren la secuencia completa: ionización O--B
+      (He\,\textsc{i}/He\,\textsc{ii}, Si\,\textsc{iii}/Si\,\textsc{ii},
+      N\,\textsc{v}/N\,\textsc{iii}), temperatura F--K (Cr\,\textsc{i}/
+      Fe\,\textsc{i}), luminosidad G--M (Sr\,\textsc{ii}/Fe\,\textsc{i},
+      TiO/CaH).
+    \end{tcolorbox}
+
+  \end{block}
+
+  \vspace{0.5cm}
+
+  %% ─── Datos de entrada ─────────────────────────────────────────────────
+  \begin{block}{4 · Datos de Entrada}
+    \centering
+    \begin{tabular}{lll}
+      \toprule
+      \textbf{Formato} & \textbf{Resolución} & \textbf{Rango} \\
+      \midrule
+      TXT (2 col.) & Cualquiera $\geq 2000$ & 3900--6800~Å \\
+      FITS (WCS) & $R \sim 42\,000$ & Flexible \\
+      \bottomrule
+    \end{tabular}\\[0.4cm]
+    Catálogo de validación: \textbf{ELODIE} (Haute-Provence)\\
+    856 espectros, $R\sim42\,000$, S/N $>100$
+  \end{block}
+
+\end{column}
+
+%%────────────────────────────────────────────────────────────────────────────
+%% COLUMNA 2
+%%────────────────────────────────────────────────────────────────────────────
+\begin{column}{0.34\paperwidth}
+
+  %% ─── Arquitectura multi-método ─────────────────────────────────────────
+  \begin{block}{5 · Arquitectura Multi-Método}
+
+  \begin{center}
+  \begin{tikzpicture}[
+    node distance=0.7cm,
+    box/.style={draw=uncuyoazul,fill=uncuyoazul!10,rounded corners=4pt,
+                minimum width=6.8cm,minimum height=1.1cm,
+                font=\bfseries\normalsize,align=center},
+    vote/.style={draw=uncuyodorado!80,fill=uncuyodorado!20,rounded corners=4pt,
+                minimum width=9cm,minimum height=1.3cm,
+                font=\bfseries\large,align=center},
+    arr/.style={->,>=stealth,line width=1.5pt,color=uncuyoazul!70}
+  ]
+    \node[vote] (data) {Espectro de entrada (.txt / .fits)};
+
+    \node[box,below=0.6cm of data,xshift=-5.2cm] (norm)
+      {Normalización\\continuo (MAD)};
+    \node[box,below=0.6cm of data,xshift=5.2cm] (ew)
+      {Medición EW\\85 líneas};
+
+    \node[box,below=1.5cm of data,xshift=-7.5cm] (fis)
+      {\textbf{Físico}\\28 nodos MK};
+    \node[box,below=1.5cm of data,xshift=-2.5cm] (rf)
+      {\textbf{RandomForest}\\24 features};
+    \node[box,below=1.5cm of data,xshift=2.5cm] (tmpl)
+      {\textbf{Template}\\$\chi^2$ reducido};
+    \node[box,below=1.5cm of data,xshift=7.5cm] (nn)
+      {\textbf{k-NN / CNN-1D}\\espectro remuestreado};
+
+    \node[vote,below=3.2cm of data] (voto)
+      {Votación Ponderada ($w_\mathrm{DT}=0.4,\;w_\mathrm{neural}=0.4,\ldots$)};
+
+    \node[vote,below=0.7cm of voto,fill=uncuyoazul!25,draw=uncuyoazul] (out)
+      {Tipo MK + Clase Luminosidad I--V + Confianza \% + Alternativas};
+
+    \draw[arr] (data) -- (norm);
+    \draw[arr] (data) -- (ew);
+    \draw[arr] (norm) -- (fis);
+    \draw[arr] (norm) -- (rf);
+    \draw[arr] (ew) -- (tmpl);
+    \draw[arr] (ew) -- (nn);
+    \draw[arr] (fis) -- (voto);
+    \draw[arr] (rf) -- (voto);
+    \draw[arr] (tmpl) -- (voto);
+    \draw[arr] (nn) -- (voto);
+    \draw[arr] (voto) -- (out);
+  \end{tikzpicture}
+  \end{center}
+
+  \end{block}
+
+  \vspace{0.4cm}
+
+  %% ─── Árbol físico 28 nodos ─────────────────────────────────────────────
+  \begin{block}{6 · Árbol Físico de 28 Nodos (Gray \& Corbally)}
+    \begin{columns}[t]
+      \begin{column}{0.48\linewidth}
+        \textbf{10 nodos nuevos en v3.1:}
+        \begin{itemize}\setlength\itemsep{4pt}
+          \item O3--O4: N\,\textsc{v} + O\,\textsc{v}~5114
+          \item O tardíos: N\,\textsc{iii}~4634--4641
+          \item B con O\,\textsc{ii}
+          \item F5--F9: Ca\,\textsc{i}/H$\delta$ + Sr\,\textsc{ii}~4077
+          \item F/G con banda CH\,G
+        \end{itemize}
+      \end{column}
+      \begin{column}{0.48\linewidth}
+        \begin{itemize}\setlength\itemsep{4pt}
+          \item G: Fe\,\textsc{i}~4144/H$\delta$ + Y\,\textsc{ii}~4376
+          \item G: tripleta Mg~$b$
+          \item K: Cr\,\textsc{i} 4254/4275/4290~Å (termómetro)
+          \item K: Na\,\textsc{i}~D
+          \item M tardías: VO + CaH
+        \end{itemize}
+      \end{column}
+    \end{columns}
+    \vspace{0.3cm}
+    Cada decisión cita la línea, el umbral de EW y el ratio que la motivó
+    → \textbf{trazabilidad diagnóstica completa}.
+  \end{block}
+
+  \vspace{0.4cm}
+
+  %% ─── Resultados clave ──────────────────────────────────────────────────
+  \begin{block}{7 · Resultados Principales}
+
+    \vspace{0.3cm}
+    \begin{columns}[c]
+      \begin{column}{0.32\linewidth}
+        \begin{tcolorbox}[stat,title={}]
+          86.5\%\tcblower Exactitud global\\(votación ponderada)
+        \end{tcolorbox}
+      \end{column}
+      \begin{column}{0.32\linewidth}
+        \begin{tcolorbox}[stat,title={}]
+          +2.3 pp\tcblower Mejora sobre mejor\\método individual
+        \end{tcolorbox}
+      \end{column}
+      \begin{column}{0.32\linewidth}
+        \begin{tcolorbox}[stat,title={}]
+          856\tcblower Espectros ELODIE\\validados
+        \end{tcolorbox}
+      \end{column}
+    \end{columns}
+
+    \vspace{0.5cm}
+
+    \begin{center}
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabular}{lcc}
+      \toprule
+      \textbf{Método} & \textbf{Exactitud} & \textbf{CV 5-fold} \\
+      \midrule
+      RandomForest    & 84.2\,\%  & $82.5\pm3.1$\,\% \\
+      k-NN ($k=5$)    & 81.3\,\%  & $79.8\pm2.8$\,\% \\
+      MKCLASS (ref.)  & $\sim$85\,\% & — \\
+      StarNet (ref.)  & 89\,\%    & — \\
+      \midrule
+      \textbf{SpectroClass v3.1} & \textbf{86.5\,\%} & — \\
+      \bottomrule
+    \end{tabular}
+    \end{center}
+  \end{block}
+
+\end{column}
+
+%%────────────────────────────────────────────────────────────────────────────
+%% COLUMNA 3
+%%────────────────────────────────────────────────────────────────────────────
+\begin{column}{0.32\paperwidth}
+
+  %% ─── Matriz de confusión ───────────────────────────────────────────────
+  \begin{block}{8 · Matriz de Confusión (N\,=\,171)}
+    \centering
+    \renewcommand{\arraystretch}{1.35}
+    \begin{tabular}{c|ccccccc}
+      \toprule
+      \small\diagbox{Real}{Pred.} &
+      \textbf{O} & \textbf{B} & \textbf{A} &
+      \textbf{F} & \textbf{G} & \textbf{K} & \textbf{M} \\
+      \midrule
+      O & \cellcolor{verdeok!30}\textbf{2} & 1 & 0 & 0 & 0 & 0 & 0 \\
+      B & 0 & \cellcolor{verdeok!30}\textbf{9} & 3 & 1 & 0 & 0 & 0 \\
+      A & 0 & 2 & \cellcolor{verdeok!30}\textbf{24} & 2 & 0 & 0 & 0 \\
+      F & 0 & 0 & 2 & \cellcolor{verdeok!30}\textbf{63} & 0 & 5 & 0 \\
+      K & 0 & 0 & 0 & 5 & 0 & \cellcolor{verdeok!30}\textbf{46} & 0 \\
+      M & 0 & 0 & 0 & 0 & 0 & 1 & \cellcolor{verdeok!30}\textbf{5} \\
+      \bottomrule
+    \end{tabular}\\[0.4cm]
+    \small
+    Confusión B$\leftrightarrow$A: gradiente continuo de temperatura.\\
+    Confusión F$\leftrightarrow$K: solapamiento de líneas metálicas.
+  \end{block}
+
+  \vspace{0.5cm}
+
+  %% ─── Líneas diagnóstico ────────────────────────────────────────────────
+  \begin{block}{9 · 85 Líneas Diagnóstico}
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabular}{lrl}
+      \toprule
+      \textbf{Especie} & \textbf{N} & \textbf{Uso} \\
+      \midrule
+      Balmer H\,\textsc{i} & 5 & Temperatura A--F \\
+      He\,\textsc{i} + He\,\textsc{ii} & 10 & Tipos O--B \\
+      N, C, O ionizados & 13 & Subtipos O, B \\
+      Silicio (Si) & 8 & Subtipos B \\
+      Calcio (Ca) & 6 & F--G--K \\
+      Hierro (Fe) & 13 & G--K--M \\
+      Bandas TiO & 6 & Tipo M \\
+      VO, CaH & 4 & M tardías \\
+      Otros metales & 20 & F--K, luminosidad \\
+      \midrule
+      \textbf{Total} & \textbf{85} & \\
+      \bottomrule
+    \end{tabular}
+  \end{block}
+
+  \vspace{0.5cm}
+
+  %% ─── Clase de Luminosidad ──────────────────────────────────────────────
+  \begin{block}{10 · Clase de Luminosidad I--V}
+    \begin{itemize}\setlength\itemsep{5pt}
+      \item \textbf{Ia/Ib} Supergigantes:
+            Sr\,\textsc{ii}/Fe\,\textsc{i} $\gg 1$,
+            líneas de Balmer estrechas.
+      \item \textbf{II--III} Gigantes:
+            Ba\,\textsc{ii}~4554 / Fe\,\textsc{i} elevado.
+      \item \textbf{IV} Subgigantes:
+            Ca\,\textsc{i}/Fe\,\textsc{i} intermedio.
+      \item \textbf{V} Enanas:
+            H$\beta$ ancho (ensanchamiento Stark),
+            TiO/CaH $\approx 1$ en M enanas.
+    \end{itemize}
+    \vspace{0.3cm}
+    Salida: \texttt{G2V}, \texttt{K3\,III}, \texttt{B5\,Ia}, etc.
+  \end{block}
+
+  \vspace{0.5cm}
+
+  %% ─── Interfaz web ──────────────────────────────────────────────────────
+  \begin{block}{11 · Interfaz Web Flask}
+    \begin{itemize}\setlength\itemsep{5pt}
+      \item Subida de espectros TXT / FITS.
+      \item Visualización interactiva con líneas diagnóstico marcadas.
+      \item Árbol de clasificación visual navegable.
+      \item Procesamiento por lotes (CSV).
+      \item Entrenamiento y métricas de modelos neuronales.
+      \item Exportación CSV / TXT / PDF.
+      \item Documentación integrada en \textbf{castellano}.
+    \end{itemize}
+  \end{block}
+
+  \vspace{0.5cm}
+
+  %% ─── Conclusiones ──────────────────────────────────────────────────────
+  \begin{exampleblock}{12 · Conclusiones}
+    \begin{enumerate}\setlength\itemsep{5pt}
+      \item SpectroClass v3.1 alcanza \textbf{86.5\,\%} de exactitud sobre
+            ELODIE, superando en $+2.3$~pp al mejor método individual.
+      \item La normalización MAD de 2 pasos reduce errores sistemáticos en
+            espectros de alta resolución y tipos O--B tempranos.
+      \item El árbol de 28 nodos proporciona clasificación trazable y
+            verificable para cada espectro.
+      \item La votación ponderada combina robustez física con potencia de ML.
+      \item Sistema distribuido como aplicación web de código abierto con
+            documentación completa en castellano.
+    \end{enumerate}
+  \end{exampleblock}
+
+  \vspace{0.5cm}
+
+  %% ─── Referencias ───────────────────────────────────────────────────────
+  \begin{block}{Referencias}
+    \small
+    \begin{itemize}\setlength\itemsep{2pt}
+      \item Gray \& Corbally (2009). \textit{Stellar Spectral Classification}.
+            Princeton Univ.\ Press.
+      \item Gray \& Corbally (2014). \textit{AJ}, 147, 80.
+      \item Luo et al.\ (2015). \textit{RAA}, 15, 1095 (LAMOST DR1).
+      \item Fabbro et al.\ (2018). \textit{MNRAS}, 475, 2978 (StarNet).
+      \item Moultaka et al.\ (2004). \textit{PASP}, 116, 693 (ELODIE).
+    \end{itemize}
+  \end{block}
+
+\end{column}
+\end{columns}
+
+%% ════════════════ PIE DE PÁGINA ═════════════════════════════════════════════
+\vspace{0.4cm}
+\begin{tikzpicture}[remember picture,overlay]
+  \fill[uncuyoazul] (0,0) rectangle (\paperwidth,2.4cm);
+  \fill[uncuyodorado] (0,2.4cm) rectangle (\paperwidth,2.8cm);
+\end{tikzpicture}
+
+\begin{center}
+  \color{white}
+  {\large\bfseries Roberto Butrón \enspace·\enspace
+  Facultad de Ciencias Exactas y Naturales, UNCuyo \enspace·\enspace
+  Mendoza, Argentina \enspace·\enspace Abril 2026}\\[0.2cm]
+  {\normalsize Código abierto \enspace·\enspace
+  Documentación en castellano \enspace·\enspace
+  Catálogo de validación: ELODIE (Haute-Provence)}
+\end{center}
+
+\end{frame}
+\end{document}
