@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clasificación Espectral - Sistema v2.0</title>
+    <title>SpectroClass v3.1</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -11,8 +11,8 @@
         <!-- Header -->
         <header class="app-header">
             <div class="header-content">
-                <h1>🌟 Clasificación Espectral Estelar</h1>
-                <p class="version">Sistema Multi-Método v2.0</p>
+                <h1>🌟 SpectroClass v3.1</h1>
+                <p class="version">Sistema Multi-Método v3.1</p>
             </div>
         </header>
 
@@ -22,10 +22,10 @@
                 📊 Análisis Detallado
             </button>
             <button class="tab-btn active" data-tab="analizar">
-                🔭 Clasificador Espectral Estelar
+                🔭 SpectroClass v3.1
             </button>
             <button class="tab-btn" data-tab="lote">
-                📁 Procesamiento por Lote
+                📁 Procesamientos por Lotes
             </button>
             <button class="tab-btn" data-tab="herramientas">
                 🛠️ Herramientas
@@ -165,6 +165,29 @@
                             </div>
                         </div>
 
+                        <!-- Exportar datos -->
+                        <div class="preambulo-section">
+                            <h3 class="preambulo-section-title">💾 Exportar Datos del Análisis</h3>
+                            <div class="export-grid">
+                                <div class="export-card" onclick="exportarLineas('csv')">
+                                    <div class="export-icon">📊</div>
+                                    <div class="export-info">
+                                        <div class="export-name">Líneas Espectrales — CSV</div>
+                                        <div class="export-desc">Tabla completa: nombre, λ, EW, profundidad, intensidad</div>
+                                    </div>
+                                    <button class="export-btn">⬇ Descargar</button>
+                                </div>
+                                <div class="export-card" onclick="exportarLineas('txt')">
+                                    <div class="export-icon">📄</div>
+                                    <div class="export-info">
+                                        <div class="export-name">Líneas Espectrales — TXT</div>
+                                        <div class="export-desc">Tabla alineada con encabezado SpectroClass v3.1</div>
+                                    </div>
+                                    <button class="export-btn">⬇ Descargar</button>
+                                </div>
+                            </div>
+                        </div>
+
                     </div><!-- /preambuloContent -->
                 </div><!-- /preambulo-container -->
             </section>
@@ -238,7 +261,6 @@
                             <div class="result-body">
                                 <div class="spectral-type-display">
                                     <div class="type-badge" id="typeBadge">-</div>
-                                    <div class="subtype-text" id="subtypeText">-</div>
                                     <!-- Clase de luminosidad MK -->
                                     <div class="mk-full-row" id="mkFullRow" style="display:none;">
                                         <span class="mk-full-badge" id="mkFullBadge" title="Tipo MK completo"></span>
@@ -302,9 +324,24 @@
                         <!-- 1. Espectro Normalizado -->
                         <div class="result-card">
                             <div class="result-header">
-                                <h3 style="margin:0;">📈 Espectro Normalizado</h3>
+                                <div class="label-with-help">
+                                    <h3 style="margin:0;">📈 Espectro Normalizado</h3>
+                                    <span class="help-icon">?
+                                        <div class="tooltip">
+                                            <div class="tooltip-title">Espectro Normalizado</div>
+                                            <p>El flujo se normaliza al continuo para que el valor 1.0 represente la radiación de fondo sin absorción.</p>
+                                            <ul>
+                                                <li><b>Líneas verticales coloreadas:</b> posición de líneas diagnóstico</li>
+                                                <li><b>Líneas rojas:</b> usadas por el árbol de decisión (ML)</li>
+                                                <li><b>Líneas azules/verdes:</b> usadas por el clasificador físico</li>
+                                            </ul>
+                                            <p style="margin-top:8px">Haz clic sobre una línea para ampliarla (zoom ×2 o ×6).</p>
+                                        </div>
+                                    </span>
+                                </div>
+                                <button class="toggle-btn" id="toggleEspectro">▼ Ver espectro</button>
                             </div>
-                            <div class="result-body" style="padding:0.5rem 0.8rem 0.8rem;">
+                            <div class="result-body" id="espectroBody" style="display:none;padding:0.5rem 0.8rem 0.8rem;">
                                 <div id="clasifZoomBar" class="clasif-zoom-bar" style="display:none;">
                                     <span id="clasifZoomLabel" class="clasif-zoom-label"></span>
                                     <div class="clasif-zoom-btns">
@@ -359,7 +396,20 @@
                         <!-- 3. Intensidad de Líneas (barras) -->
                         <div class="result-card">
                             <div class="result-header">
-                                <h3 style="margin:0;">📊 Intensidad de Líneas — Mayor a Menor</h3>
+                                <div class="label-with-help">
+                                    <h3 style="margin:0;">📊 Intensidad de Líneas — Mayor a Menor</h3>
+                                    <span class="help-icon">?
+                                        <div class="tooltip">
+                                            <div class="tooltip-title">Gráfico de Intensidad de Líneas</div>
+                                            <p>Muestra el ancho equivalente (EW) de cada línea detectada, ordenado de mayor a menor intensidad.</p>
+                                            <ul>
+                                                <li><b>EW alto:</b> línea muy pronunciada (importante para la clasificación)</li>
+                                                <li><b>EW bajo (&lt;0.05 Å):</b> línea débil o apenas detectable</li>
+                                            </ul>
+                                            <p style="margin-top:8px"><b>EW</b> (Ancho Equivalente) mide el área del perfil de absorción en Ångströms.</p>
+                                        </div>
+                                    </span>
+                                </div>
                                 <button class="toggle-btn" id="toggleLinesBars">▼ Ver barras</button>
                             </div>
                             <div class="result-body" id="linesBarsBody" style="display:none;">
@@ -386,6 +436,14 @@
                             </div>
                             <div class="result-body" id="decisionTreeBody" style="display:none;">
                                 <div id="criterioABanner" style="display:none;" class="criterio-banner"></div>
+
+                                <!-- Mini espectro con líneas clave -->
+                                <div class="decision-section">
+                                    <h4 class="decision-section-title">📈 Espectro — Líneas de Clasificación</h4>
+                                    <svg id="miniSpecSVG" width="100%" viewBox="0 0 860 180"
+                                         style="display:block;border-radius:6px;background:#0a1628;"></svg>
+                                </div>
+
                                 <div class="decision-section">
                                     <h4 class="decision-section-title">Líneas que determinaron la clasificación</h4>
                                     <div id="lineasUsadasGrid" class="lineas-usadas-grid"></div>
@@ -397,6 +455,51 @@
                                 <div id="advertenciasSection" style="display:none;" class="decision-section">
                                     <h4 class="decision-section-title">⚠️ Advertencias</h4>
                                     <ul id="advertenciasList" class="advertencias-list"></ul>
+                                </div>
+
+                            </div>
+                        </div>
+
+                        <!-- 💾 Guardar Resultados -->
+                        <div class="result-card" id="exportResultsCard" style="display:none;">
+                            <div class="result-header">
+                                <h3 style="margin:0;">💾 Guardar Resultados</h3>
+                                <button class="toggle-btn" id="toggleExport">▼ Ver opciones</button>
+                            </div>
+                            <div class="result-body" id="exportBody" style="display:none;">
+                                <div class="export-grid">
+                                    <div class="export-card" onclick="exportarArbol('txt')">
+                                        <div class="export-icon">📄</div>
+                                        <div class="export-info">
+                                            <div class="export-name">Árbol de Decisión — TXT</div>
+                                            <div class="export-desc">Pasos, líneas usadas y advertencias</div>
+                                        </div>
+                                        <button class="export-btn">⬇ Descargar</button>
+                                    </div>
+                                    <div class="export-card" onclick="exportarArbol('csv')">
+                                        <div class="export-icon">📊</div>
+                                        <div class="export-info">
+                                            <div class="export-name">Árbol de Decisión — CSV</div>
+                                            <div class="export-desc">Líneas clave con EW y longitud de onda</div>
+                                        </div>
+                                        <button class="export-btn">⬇ Descargar</button>
+                                    </div>
+                                    <div class="export-card" onclick="exportarLineas('csv')">
+                                        <div class="export-icon">📊</div>
+                                        <div class="export-info">
+                                            <div class="export-name">Líneas Diagnóstico — CSV</div>
+                                            <div class="export-desc">Todas las líneas detectadas con EW y profundidad</div>
+                                        </div>
+                                        <button class="export-btn">⬇ Descargar</button>
+                                    </div>
+                                    <div class="export-card" onclick="exportarLineas('txt')">
+                                        <div class="export-icon">📄</div>
+                                        <div class="export-info">
+                                            <div class="export-name">Líneas Diagnóstico — TXT</div>
+                                            <div class="export-desc">Tabla alineada con encabezado SpectroClass v3.1</div>
+                                        </div>
+                                        <button class="export-btn">⬇ Descargar</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -414,11 +517,11 @@
                 </div>
             </section>
 
-            <!-- TAB 2: PROCESAMIENTO POR LOTE -->
+            <!-- TAB 2: PROCESAMIENTOS POR LOTES -->
             <section id="tab-lote" class="tab-content">
                 <div class="batch-container">
                     <div class="label-with-help" style="justify-content: center; margin-bottom: 0.5rem;">
-                        <h2 style="margin: 0;">Procesamiento por Lote</h2>
+                        <h2 style="margin: 0;">Procesamientos por Lotes</h2>
                         <span class="help-icon">?
                             <div class="tooltip">
                                 <div class="tooltip-title">Análisis Masivo</div>
@@ -489,6 +592,84 @@
                         </button>
                         <div id="batchResultsGrid" class="results-grid"></div>
                     </div>
+
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <!-- EXTRACTOR Y CONVERTIDOR DE FITS EN LOTE            -->
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <hr style="border-color:#334155;margin:2rem 0;">
+
+                    <div class="label-with-help" style="justify-content:center;margin-bottom:0.5rem;">
+                        <h2 style="margin:0;">🔭 Extractor de Metadatos FITS → TXT</h2>
+                        <span class="help-icon">?
+                            <div class="tooltip">
+                                <div class="tooltip-title">Extractor de Metadatos FITS</div>
+                                <p>Convierte archivos FITS al formato TXT compatible con SpectroClass.</p>
+                                <ul>
+                                    <li>Extrae el espectro (wavelength, flux) del FITS</li>
+                                    <li>Renombra usando <b>OBJECT</b> + <b>SPTYPE</b> de la cabecera</li>
+                                    <li>Guarda como TXT con columnas <code>Longitud_de_onda_A, espectro</code></li>
+                                </ul>
+                                <p style="margin-top:8px">Útil para convertir espectros descargados de bases de datos astronómicas (ELODIE, MILES, etc.).</p>
+                            </div>
+                        </span>
+                    </div>
+                    <p class="batch-description">
+                        Extrae metadatos de archivos FITS, renombra cada archivo usando
+                        <b>OBJECT</b> + <b>SPTYPE</b> y guarda el espectro como TXT
+                        con columnas <code>Longitud_de_onda_A, espectro</code>.
+                        Los archivos sin espectro válido se omiten con un aviso.
+                    </p>
+
+                    <!-- Drop zone FITS -->
+                    <div class="upload-box">
+                        <div class="drop-zone" id="dropZoneFits">
+                            <div class="drop-zone-icon">🔭</div>
+                            <p class="drop-zone-text">Arrastra archivos <b>.fits / .fit</b> aquí</p>
+                            <p class="drop-zone-hint">o</p>
+                            <input type="file" id="fileInputFits" multiple accept=".fits,.fit" style="display:none;">
+                            <button class="btn-upload" id="btnSelectFits">Seleccionar FITS</button>
+                        </div>
+                    </div>
+
+                    <div id="fitsFilesList" class="batch-files-list"></div>
+
+                    <div id="fitsActions" class="batch-actions" style="display:none;">
+                        <button class="btn-primary" id="processFitsBtn">🚀 Extraer y Convertir</button>
+                        <button class="btn-secondary" id="clearFitsBtn">🗑️ Limpiar</button>
+                    </div>
+
+                    <!-- Progreso -->
+                    <div id="fitsProgress" class="batch-progress" style="display:none;">
+                        <h3 id="fitsProgressTitle">Procesando FITS...</h3>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="fitsProgressFill"></div>
+                        </div>
+                        <p id="fitsProgressText">0 / 0 procesados</p>
+                        <div id="fitsLog" class="train-log"></div>
+                    </div>
+
+                    <!-- Resultados -->
+                    <div id="fitsResults" style="display:none;">
+                        <div class="batch-summary">
+                            <h3>Resumen de Extracción</h3>
+                            <div class="summary-stats">
+                                <div class="stat-box success">
+                                    <div class="stat-number" id="fitsOkCount">0</div>
+                                    <div class="stat-label">Convertidos</div>
+                                </div>
+                                <div class="stat-box error">
+                                    <div class="stat-number" id="fitsErrCount">0</div>
+                                    <div class="stat-label">Omitidos</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:0.7rem;flex-wrap:wrap;margin:0.8rem 0;">
+                            <button class="btn-primary" id="downloadFitsTxtZip">📂 Guardar TXT en carpeta...</button>
+                            <button class="btn-secondary" id="downloadFitsMeta">📊 Descargar Metadatos (CSV)</button>
+                        </div>
+                        <div id="fitsResultsTable"></div>
+                    </div>
+
                 </div>
             </section>
 
@@ -507,6 +688,35 @@
 
                     <!-- SUBTAB: ENTRENAR MODELOS -->
                     <div id="subtab-entrenar" class="subtab-content active">
+
+                        <!-- Banner: modelo actual -->
+                        <div id="currentModelBanner" class="current-model-banner" style="display:none;">
+                            <div class="cmb-left">
+                                <span class="cmb-icon">🤖</span>
+                                <span class="cmb-label">Modelo activo:</span>
+                                <span id="cmbModelType" class="cmb-type">—</span>
+                            </div>
+                            <div class="cmb-stats">
+                                <div class="cmb-stat">
+                                    <span class="cmb-stat-value" id="cmbAccuracy">—</span>
+                                    <span class="cmb-stat-label">% acierto (test)</span>
+                                </div>
+                                <div class="cmb-stat">
+                                    <span class="cmb-stat-value" id="cmbSamples">—</span>
+                                    <span class="cmb-stat-label">muestras</span>
+                                </div>
+                                <div class="cmb-stat">
+                                    <span class="cmb-stat-value" id="cmbTimestamp">—</span>
+                                    <span class="cmb-stat-label">entrenado</span>
+                                </div>
+                            </div>
+                            <div class="cmb-bar-wrap">
+                                <div class="cmb-bar-track">
+                                    <div class="cmb-bar-fill" id="cmbBarFill"></div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="config-panel">
                             <h3>⚙️ Configuración de Entrenamiento</h3>
 
@@ -636,7 +846,20 @@
 
                                 <!-- Ruta de salida -->
                                 <div class="config-item">
-                                    <label for="outputPath">💾 Ruta de Salida</label>
+                                    <div class="label-with-help">
+                                        <label for="outputPath">💾 Ruta de Salida</label>
+                                        <span class="help-icon">?
+                                            <div class="tooltip">
+                                                <div class="tooltip-title">Ruta de Salida del Modelo</div>
+                                                <p>Directorio donde se guardarán los archivos del modelo entrenado.</p>
+                                                <ul>
+                                                    <li><code>models/</code>: Directorio por defecto (recomendado)</li>
+                                                    <li>Puedes usar rutas relativas o absolutas</li>
+                                                </ul>
+                                                <p style="margin-top:8px">Se crean automáticamente: <code>decision_tree.pkl</code>, <code>metadata.json</code> y <code>confusion_matrix.png</code>.</p>
+                                            </div>
+                                        </span>
+                                    </div>
                                     <input type="text" id="outputPath" value="models/" placeholder="models/">
                                     <small>Donde se guardarán los modelos</small>
                                 </div>
@@ -665,14 +888,25 @@
                         <!-- Resultados del entrenamiento -->
                         <div id="trainResults" class="train-results" style="display: none;">
                             <h3>📈 Resultados del Entrenamiento</h3>
+
+                            <!-- Accuracy destacada -->
+                            <div class="accuracy-hero">
+                                <div class="accuracy-hero-circle">
+                                    <span class="accuracy-hero-value" id="trainAccuracy">—</span>
+                                    <span class="accuracy-hero-pct">%</span>
+                                </div>
+                                <div class="accuracy-hero-label">Porcentaje de acierto<br><small>(conjunto de test)</small></div>
+                                <div class="accuracy-hero-bar-wrap">
+                                    <div class="accuracy-hero-bar-track">
+                                        <div class="accuracy-hero-bar-fill" id="trainAccuracyBar"></div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="results-summary">
                                 <div class="metric-box">
-                                    <span class="metric-value" id="trainAccuracy">-%</span>
-                                    <span class="metric-label">Accuracy (Test)</span>
-                                </div>
-                                <div class="metric-box">
                                     <span class="metric-value" id="trainSamples">-</span>
-                                    <span class="metric-label">Muestras</span>
+                                    <span class="metric-label">Muestras totales</span>
                                 </div>
                                 <div class="metric-box">
                                     <span class="metric-value" id="trainTime">-</span>
@@ -691,7 +925,21 @@
                             <div class="config-grid">
                                 <!-- Selector de archivo con búsqueda -->
                                 <div class="config-item full-width">
-                                    <label for="testSpectrumFile">📄 Archivo de Espectro</label>
+                                    <div class="label-with-help">
+                                        <label for="testSpectrumFile">📄 Archivo de Espectro</label>
+                                        <span class="help-icon">?
+                                            <div class="tooltip">
+                                                <div class="tooltip-title">Selección de Espectro para Test</div>
+                                                <p>Elige el espectro que quieres clasificar individualmente para diagnóstico.</p>
+                                                <ul>
+                                                    <li><b>Buscar en catálogo:</b> filtra por nombre o tipo espectral</li>
+                                                    <li><b>Subir archivo:</b> carga desde tu PC, pen drive, etc.</li>
+                                                    <li><b>Escribir ruta:</b> ruta relativa o absoluta al archivo</li>
+                                                </ul>
+                                                <p style="margin-top:8px">Formatos admitidos: <code>.txt</code>, <code>.fits</code>, <code>.fit</code></p>
+                                            </div>
+                                        </span>
+                                    </div>
 
                                     <!-- Buscador de catálogo -->
                                     <div class="file-browser-panel">
@@ -774,7 +1022,19 @@
 
                                 <!-- Guardar gráfico -->
                                 <div class="config-item">
-                                    <label>💾 Opciones de Salida</label>
+                                    <div class="label-with-help">
+                                        <label>💾 Opciones de Salida</label>
+                                        <span class="help-icon">?
+                                            <div class="tooltip">
+                                                <div class="tooltip-title">Opciones de Guardado</div>
+                                                <ul>
+                                                    <li><b>Generar gráfico:</b> Crea una imagen PNG del espectro con las líneas marcadas</li>
+                                                    <li><b>Exportar a CSV:</b> Guarda las líneas detectadas y sus anchos equivalentes</li>
+                                                </ul>
+                                                <p style="margin-top:8px">Los archivos se guardan en la carpeta <code>results/</code>.</p>
+                                            </div>
+                                        </span>
+                                    </div>
                                     <div class="checkbox-group">
                                         <label><input type="checkbox" id="testSavePlot" checked> Generar gráfico</label>
                                         <label><input type="checkbox" id="testSaveCSV"> Exportar a CSV</label>
@@ -853,7 +1113,22 @@
                             <!-- ⚖️ Pesos de Votación -->
                             <div class="tool-card tool-card-weights" id="weightsToolCard">
                                 <div class="tool-icon">⚖️</div>
-                                <h3>Pesos de Votación</h3>
+                                <div class="label-with-help" style="justify-content:center;">
+                                    <h3 style="margin:0;">Pesos de Votación</h3>
+                                    <span class="help-icon">?
+                                        <div class="tooltip">
+                                            <div class="tooltip-title">Pesos de Votación</div>
+                                            <p>El sistema combina 4 métodos para dar la clasificación final. Los pesos determinan cuánto influye cada uno.</p>
+                                            <ul>
+                                                <li><b>Físico (10%):</b> Reglas espectroscópicas clásicas</li>
+                                                <li><b>Árbol de Decisión (40%):</b> Modelo ML entrenado</li>
+                                                <li><b>Templates (10%):</b> Comparación con espectros de referencia</li>
+                                                <li><b>Neural (40%):</b> KNN o CNN</li>
+                                            </ul>
+                                            <p style="margin-top:8px">La suma de todos los pesos debe ser siempre <b>1.00</b>.</p>
+                                        </div>
+                                    </span>
+                                </div>
                                 <p>Ajusta cómo influye cada método en la clasificación final</p>
                                 <button class="btn-tool" onclick="toggleWeightsPanel()">
                                     Configurar
@@ -863,7 +1138,22 @@
                             <!-- Instalar dependencias -->
                             <div class="tool-card">
                                 <div class="tool-icon">📦</div>
-                                <h3>Instalar Dependencias</h3>
+                                <div class="label-with-help" style="justify-content:center;">
+                                    <h3 style="margin:0;">Instalar Dependencias</h3>
+                                    <span class="help-icon">?
+                                        <div class="tooltip">
+                                            <div class="tooltip-title">Instalar Dependencias</div>
+                                            <p>Ejecuta <code>pip install -r requirements.txt</code> para instalar todas las librerías necesarias:</p>
+                                            <ul>
+                                                <li>numpy, scipy, matplotlib</li>
+                                                <li>scikit-learn (árbol de decisión, KNN)</li>
+                                                <li>astropy (lectura de FITS)</li>
+                                                <li>flask (servidor web)</li>
+                                            </ul>
+                                            <p style="margin-top:8px">Solo necesario la primera vez o al cambiar de entorno Python.</p>
+                                        </div>
+                                    </span>
+                                </div>
                                 <p>Instala numpy, scipy, matplotlib, sklearn, etc.</p>
                                 <button class="btn-tool" onclick="runScript('1_INSTALAR_DEPENDENCIAS')">
                                     Ejecutar
@@ -873,7 +1163,20 @@
                             <!-- Listar catálogos disponibles -->
                             <div class="tool-card">
                                 <div class="tool-icon">📂</div>
-                                <h3>Listar Catálogos</h3>
+                                <div class="label-with-help" style="justify-content:center;">
+                                    <h3 style="margin:0;">Listar Catálogos</h3>
+                                    <span class="help-icon">?
+                                        <div class="tooltip">
+                                            <div class="tooltip-title">Listar Catálogos Disponibles</div>
+                                            <p>Muestra todos los directorios de espectros disponibles para entrenamiento.</p>
+                                            <ul>
+                                                <li><code>data/elodie/</code>: Catálogo principal ELODIE</li>
+                                                <li><code>data/espectros/</code>: Espectros personalizados</li>
+                                            </ul>
+                                            <p style="margin-top:8px">Muestra cuántos espectros hay por tipo espectral en cada catálogo.</p>
+                                        </div>
+                                    </span>
+                                </div>
                                 <p>Muestra los directorios con espectros disponibles</p>
                                 <button class="btn-tool" onclick="listCatalogs()">
                                     Listar
@@ -883,7 +1186,21 @@
                             <!-- Verificar modelo -->
                             <div class="tool-card">
                                 <div class="tool-icon">✅</div>
-                                <h3>Verificar Modelo</h3>
+                                <div class="label-with-help" style="justify-content:center;">
+                                    <h3 style="margin:0;">Verificar Modelo</h3>
+                                    <span class="help-icon">?
+                                        <div class="tooltip">
+                                            <div class="tooltip-title">Verificar Modelo</div>
+                                            <p>Comprueba que el modelo de clasificación esté cargado correctamente y listo para usar.</p>
+                                            <ul>
+                                                <li>Verifica que <code>models/decision_tree.pkl</code> existe</li>
+                                                <li>Prueba una clasificación de ejemplo</li>
+                                                <li>Muestra la versión y fecha de entrenamiento</li>
+                                            </ul>
+                                            <p style="margin-top:8px">Si falla: ve a "Entrenar Modelos" para crear un modelo nuevo.</p>
+                                        </div>
+                                    </span>
+                                </div>
                                 <p>Comprueba que el modelo esté correctamente cargado</p>
                                 <button class="btn-tool" onclick="verifyModel()">
                                     Verificar
@@ -893,7 +1210,21 @@
                             <!-- Limpiar caché -->
                             <div class="tool-card">
                                 <div class="tool-icon">🗑️</div>
-                                <h3>Limpiar Caché</h3>
+                                <div class="label-with-help" style="justify-content:center;">
+                                    <h3 style="margin:0;">Limpiar Caché</h3>
+                                    <span class="help-icon">?
+                                        <div class="tooltip">
+                                            <div class="tooltip-title">Limpiar Caché</div>
+                                            <p>Elimina archivos temporales generados durante el análisis.</p>
+                                            <ul>
+                                                <li>Gráficos temporales en <code>results/</code></li>
+                                                <li>Archivos <code>__pycache__</code> de Python</li>
+                                                <li>Logs y salidas intermedias</li>
+                                            </ul>
+                                            <p style="margin-top:8px"><b>No borra</b> los modelos entrenados ni los espectros del catálogo.</p>
+                                        </div>
+                                    </span>
+                                </div>
                                 <p>Elimina archivos temporales y resultados antiguos</p>
                                 <button class="btn-tool" onclick="clearCache()">
                                     Limpiar
@@ -907,7 +1238,21 @@
                         <div id="weightsPanelFull" class="weights-panel-full" style="display: none;">
 
                             <div class="weights-panel-header">
-                                <h3>⚖️ Configuración de Pesos de Votación</h3>
+                                <div class="label-with-help">
+                                    <h3 style="margin:0;">⚖️ Configuración de Pesos de Votación</h3>
+                                    <span class="help-icon">?
+                                        <div class="tooltip">
+                                            <div class="tooltip-title">Configuración de Pesos</div>
+                                            <p>Controla la influencia de cada método en la clasificación final mediante votación ponderada.</p>
+                                            <ul>
+                                                <li>Mueve los deslizadores para ajustar el peso de cada método</li>
+                                                <li>La suma total <b>debe ser exactamente 1.00</b></li>
+                                                <li>Un peso de 0.00 desactiva ese método completamente</li>
+                                            </ul>
+                                            <p style="margin-top:8px">Pulsa <b>↺ Restaurar</b> para volver a los pesos por defecto.</p>
+                                        </div>
+                                    </span>
+                                </div>
                                 <button class="weights-panel-close" onclick="toggleWeightsPanel()">✕</button>
                             </div>
 
@@ -924,7 +1269,23 @@
                                     <div class="wm-card-header">
                                         <span class="wm-icon">🔬</span>
                                         <div>
-                                            <h4>Físico</h4>
+                                            <div class="label-with-help" style="margin:0">
+                                                <h4 style="margin:0">Físico</h4>
+                                                <span class="help-icon">?
+                                                    <div class="tooltip">
+                                                        <div class="tooltip-title">Clasificador Físico — Peso por defecto: 0.10</div>
+                                                        <p>Aplica reglas espectroscópicas clásicas basadas en la presencia e intensidad de líneas diagnóstico:</p>
+                                                        <ul>
+                                                            <li><b>He II fuerte</b> → tipo O</li>
+                                                            <li><b>He I presente</b> → tipo B</li>
+                                                            <li><b>Balmer domina</b> → tipo A / F</li>
+                                                            <li><b>Ca II K + metales</b> → tipo G / K / M</li>
+                                                        </ul>
+                                                        <p style="margin-top:6px"><b>Peso 0.10 (10%)</b> — recibe poco peso porque falla en espectros sin cobertura azul (sin Ca II K).</p>
+                                                        <p>Auméntalo si confías más en las reglas físicas que en el modelo ML.</p>
+                                                    </div>
+                                                </span>
+                                            </div>
                                             <span class="wm-accuracy">Precisión: ~72%</span>
                                         </div>
                                         <span class="wm-badge" id="badgePhysical">0.10</span>
@@ -949,7 +1310,22 @@
                                     <div class="wm-card-header">
                                         <span class="wm-icon">🌿</span>
                                         <div>
-                                            <h4>Árbol de Decisión</h4>
+                                            <div class="label-with-help" style="margin:0">
+                                                <h4 style="margin:0">Árbol de Decisión</h4>
+                                                <span class="help-icon">?
+                                                    <div class="tooltip">
+                                                        <div class="tooltip-title">Árbol de Decisión ML — Peso por defecto: 0.40</div>
+                                                        <p>Modelo de Machine Learning entrenado con el catálogo ELODIE. Aprende umbrales óptimos en los anchos equivalentes (EW) para separar los 7 tipos espectrales.</p>
+                                                        <ul>
+                                                            <li>Requiere haber entrenado el modelo (pestaña Entrenamiento)</li>
+                                                            <li>Accuracy ~85% con el catálogo ELODIE completo</li>
+                                                            <li>Usa 17 EWs + 6 ratios como features</li>
+                                                        </ul>
+                                                        <p style="margin-top:6px"><b>Peso 0.40 (40%)</b> — es el método más preciso, por eso recibe el mayor peso entre los métodos clásicos.</p>
+                                                        <p>Si el modelo no está entrenado, su voto se omite automáticamente.</p>
+                                                    </div>
+                                                </span>
+                                            </div>
                                             <span class="wm-accuracy">Precisión: ~85%</span>
                                         </div>
                                         <span class="wm-badge" id="badgeDT">0.40</span>
@@ -974,7 +1350,21 @@
                                     <div class="wm-card-header">
                                         <span class="wm-icon">📋</span>
                                         <div>
-                                            <h4>Template Matching</h4>
+                                            <div class="label-with-help" style="margin:0">
+                                                <h4 style="margin:0">Template Matching</h4>
+                                                <span class="help-icon">?
+                                                    <div class="tooltip">
+                                                        <div class="tooltip-title">Template Matching — Peso por defecto: 0.10</div>
+                                                        <p>Compara los EWs medidos contra plantillas de referencia (valores típicos de la literatura) para cada tipo espectral usando chi-cuadrado reducido (χ²).</p>
+                                                        <ul>
+                                                            <li>A menor χ², mejor coincidencia con la plantilla</li>
+                                                            <li>No requiere entrenamiento — siempre está activo</li>
+                                                            <li>Funciona mejor con espectros de buen SNR y amplio rango λ</li>
+                                                        </ul>
+                                                        <p style="margin-top:6px"><b>Peso 0.10 (10%)</b> — recibe poco peso porque sus plantillas son valores fijos que no se adaptan a variaciones de subtipo, resolución ni SNR.</p>
+                                                    </div>
+                                                </span>
+                                            </div>
                                             <span class="wm-accuracy">Precisión: ~68%</span>
                                         </div>
                                         <span class="wm-badge" id="badgeTemplate">0.10</span>
@@ -999,7 +1389,21 @@
                                     <div class="wm-card-header">
                                         <span class="wm-icon">🧠</span>
                                         <div>
-                                            <h4>Neural (KNN / CNN)</h4>
+                                            <div class="label-with-help" style="margin:0">
+                                                <h4 style="margin:0">Neural (KNN / CNN)</h4>
+                                                <span class="help-icon">?
+                                                    <div class="tooltip">
+                                                        <div class="tooltip-title">Clasificador Neural — Peso por defecto: 0.40</div>
+                                                        <p>Modelos de aprendizaje automático entrenados desde la pestaña <b>Redes Neuronales</b>:</p>
+                                                        <ul>
+                                                            <li><b>KNN (~84%):</b> K-Nearest Neighbors. Usa EWs como features. Rápido de entrenar, muy preciso.</li>
+                                                            <li><b>CNN 1D (~45%+):</b> Red convolucional. Usa el espectro completo. Necesita más datos para superar al KNN.</li>
+                                                        </ul>
+                                                        <p style="margin-top:6px"><b>Peso 0.40 (40%)</b> — igual al Árbol de Decisión. Si no hay modelo neural entrenado, este peso se redistribuye automáticamente entre los otros métodos.</p>
+                                                        <p>Si tienes KNN entrenado, es el método más recomendado junto con el Árbol.</p>
+                                                    </div>
+                                                </span>
+                                            </div>
                                             <span class="wm-accuracy">KNN: ~84% · CNN: ~45%</span>
                                         </div>
                                         <span class="wm-badge" id="badgeNeural">0.40</span>
@@ -1115,7 +1519,21 @@
 
                     <!-- Panel de parámetros KNN -->
                     <div id="knnParams" class="params-panel">
-                        <h3>⚙️ Parámetros KNN (K-Nearest Neighbors)</h3>
+                        <div class="label-with-help">
+                            <h3 style="margin:0;">⚙️ Parámetros KNN (K-Nearest Neighbors)</h3>
+                            <span class="help-icon">?
+                                <div class="tooltip">
+                                    <div class="tooltip-title">K-Nearest Neighbors (KNN)</div>
+                                    <p>Algoritmo que clasifica un espectro buscando los K espectros más similares en el catálogo de entrenamiento.</p>
+                                    <ul>
+                                        <li><b>Ventaja:</b> Simple, interpretable, sin entrenamiento largo</li>
+                                        <li><b>Accuracy típica:</b> ~84% con anchos equivalentes como features</li>
+                                        <li><b>Requiere:</b> catálogo bien etiquetado con variedad de tipos</li>
+                                    </ul>
+                                    <p style="margin-top:8px">No requiere GPU. Funciona bien con los ~400 espectros del catálogo ELODIE.</p>
+                                </div>
+                            </span>
+                        </div>
                         <div class="params-grid">
                             <div class="param-item">
                                 <div class="label-with-help">
@@ -1188,7 +1606,21 @@
 
                     <!-- Panel de parámetros CNN -->
                     <div id="cnnParams" class="params-panel" style="display: none;">
-                        <h3>⚙️ Parámetros CNN (Red Neuronal Convolucional)</h3>
+                        <div class="label-with-help">
+                            <h3 style="margin:0;">⚙️ Parámetros CNN (Red Neuronal Convolucional)</h3>
+                            <span class="help-icon">?
+                                <div class="tooltip">
+                                    <div class="tooltip-title">Red Neuronal Convolucional 1D (CNN)</div>
+                                    <p>Red neuronal que analiza el espectro completo como señal 1D para aprender patrones automáticamente.</p>
+                                    <ul>
+                                        <li><b>Ventaja:</b> Detecta patrones sin necesitar medidas manuales de EW</li>
+                                        <li><b>Desventaja:</b> Requiere más datos y tiempo de entrenamiento</li>
+                                        <li><b>Accuracy típica:</b> ~45-70% (mejora con más espectros)</li>
+                                    </ul>
+                                    <p style="margin-top:8px">Recomendado cuando hay <b>más de 200 espectros por tipo</b> espectral.</p>
+                                </div>
+                            </span>
+                        </div>
                         <div class="params-grid">
                             <div class="param-item">
                                 <div class="label-with-help">
@@ -1293,7 +1725,21 @@
 
                     <!-- Panel de parámetros CNN 2D específicos -->
                     <div id="cnn2dParams" class="params-panel" style="display: none;">
-                        <h3>🖼️ Parámetros Específicos CNN 2D</h3>
+                        <div class="label-with-help">
+                            <h3 style="margin:0;">🖼️ Parámetros Específicos CNN 2D</h3>
+                            <span class="help-icon">?
+                                <div class="tooltip">
+                                    <div class="tooltip-title">CNN 2D — Clasificación por Imagen</div>
+                                    <p>Variante que clasifica espectros a partir de imágenes PNG del gráfico espectral.</p>
+                                    <ul>
+                                        <li>Requiere imágenes PNG generadas previamente</li>
+                                        <li>Un CSV de etiquetas asociando imagen ↔ tipo espectral</li>
+                                        <li>Más memoria y tiempo que CNN 1D o KNN</li>
+                                    </ul>
+                                    <p style="margin-top:8px"><b>Recomendado solo</b> si tienes imágenes de espectros de alta calidad y muchos datos.</p>
+                                </div>
+                            </span>
+                        </div>
                         <div class="params-grid">
                             <div class="param-item">
                                 <div class="label-with-help">
@@ -1336,7 +1782,8 @@
                                 </div>
                                 <div class="input-with-btn">
                                     <input type="text" id="cnn2dImageDir" value="modelos cnn_knn/espectros_imagenes/" placeholder="ruta/a/imagenes/">
-                                    <button class="btn-small" onclick="browseImageDir()">📂</button>
+                                    <input type="file" id="cnn2dImageDirInput" webkitdirectory style="display:none" onchange="onImageDirSelected(this)">
+                                    <button class="btn-small" onclick="document.getElementById('cnn2dImageDirInput').click()">📂 Seleccionar Carpeta</button>
                                 </div>
                                 <small>Carpeta con imágenes PNG de espectros</small>
                             </div>
@@ -1355,7 +1802,8 @@
                                 </div>
                                 <div class="input-with-btn">
                                     <input type="text" id="cnn2dLabelsCSV" value="modelos cnn_knn/labels.csv" placeholder="labels.csv">
-                                    <button class="btn-small" onclick="browseLabelsCSV()">📂</button>
+                                    <input type="file" id="cnn2dLabelsCsvInput" accept=".csv" style="display:none" onchange="onLabelsCsvSelected(this)">
+                                    <button class="btn-small" onclick="document.getElementById('cnn2dLabelsCsvInput').click()">📂 Seleccionar CSV</button>
                                 </div>
                                 <small>CSV con columnas: imagen, tipo_espectral</small>
                             </div>
@@ -1364,7 +1812,21 @@
 
                     <!-- Configuración común de datos -->
                     <div class="data-config-panel">
-                        <h3>📁 Datos de Entrenamiento</h3>
+                        <div class="label-with-help">
+                            <h3 style="margin:0;">📁 Datos de Entrenamiento</h3>
+                            <span class="help-icon">?
+                                <div class="tooltip">
+                                    <div class="tooltip-title">Datos de Entrenamiento</div>
+                                    <p>Configuración del catálogo de espectros que se usa para entrenar el modelo neuronal.</p>
+                                    <ul>
+                                        <li><b>Catálogo:</b> directorio con espectros etiquetados</li>
+                                        <li><b>% Test:</b> fracción de datos reservada para evaluación</li>
+                                        <li><b>Guardar en:</b> ruta de salida del modelo entrenado</li>
+                                    </ul>
+                                    <p style="margin-top:8px">Se recomienda al menos <b>50 espectros por tipo</b> para un buen resultado.</p>
+                                </div>
+                            </span>
+                        </div>
                         <div class="params-grid">
                             <div class="param-item">
                                 <div class="label-with-help">
@@ -1384,9 +1846,20 @@
                                 </div>
                                 <div class="input-with-btn">
                                     <input type="text" id="nnCatalogPath" value="data/elodie/" placeholder="data/elodie/">
-                                    <button class="btn-small" onclick="browseNNCatalog()">📂</button>
+                                    <button class="btn-small" onclick="toggleNNCatalogList()">📂 Explorar</button>
                                 </div>
                                 <small>Directorio con archivos *_tipo*.txt</small>
+
+                                <!-- Lista inline de catálogos para Red Neuronal -->
+                                <div id="nnCatalogsList" class="catalogs-inline" style="display: none; margin-top: 10px;">
+                                    <div class="catalogs-inline-header">
+                                        <span>📁 Catálogos Disponibles:</span>
+                                        <button class="btn-close" onclick="document.getElementById('nnCatalogsList').style.display='none'">✕</button>
+                                    </div>
+                                    <div id="nnCatalogsContent" class="catalogs-inline-content">
+                                        <div class="loading-hint">⏳ Cargando...</div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="param-item">
                                 <div class="label-with-help">
@@ -1408,7 +1881,21 @@
                                 <small>Recomendado: 20% (80% entrena, 20% evalúa)</small>
                             </div>
                             <div class="param-item">
-                                <label for="nnOutputPath">Guardar Modelo En</label>
+                                <div class="label-with-help">
+                                    <label for="nnOutputPath">Guardar Modelo En</label>
+                                    <span class="help-icon">?
+                                        <div class="tooltip">
+                                            <div class="tooltip-title">Directorio de Salida del Modelo</div>
+                                            <p>Ruta donde se guardan los archivos del modelo neuronal entrenado.</p>
+                                            <ul>
+                                                <li>KNN: <code>models/knn_model.pkl</code></li>
+                                                <li>CNN 1D: <code>models/cnn_1d_model.h5</code></li>
+                                                <li>Metadatos: <code>models/knn_metadata.json</code></li>
+                                            </ul>
+                                            <p style="margin-top:8px">El directorio se crea automáticamente si no existe.</p>
+                                        </div>
+                                    </span>
+                                </div>
                                 <input type="text" id="nnOutputPath" value="models/" placeholder="models/">
                                 <small>Directorio para guardar .pkl/.h5</small>
                             </div>
@@ -1711,7 +2198,7 @@
             <section id="tab-ayuda" class="tab-content">
                 <div class="help-container">
 
-                    <h2>Ayuda — Sistema de Clasificación Espectral Estelar</h2>
+                    <h2>Ayuda — SpectroClass v3.1</h2>
                     <p style="color:#666; margin-bottom:1.5rem;">
                         Guía teórica y práctica completa. Pasa el cursor sobre los
                         <span class="help-icon" style="position:relative; display:inline-flex; cursor:default;">?
@@ -3585,7 +4072,7 @@ print(<span class="mlc-str">"✅ Modelo CNN 2D guardado en models/cnn2d_model.h5
 
         <!-- Footer -->
         <footer class="app-footer">
-            <p>Sistema de Clasificación Espectral v2.0 (Multi-Método) | 2026</p>
+            <p>SpectroClass v3.1 (Multi-Método) | 2026</p>
         </footer>
     </div>
 

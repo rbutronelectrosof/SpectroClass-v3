@@ -1,10 +1,10 @@
 {
-  "n_train": 685,
-  "n_test": 172,
-  "accuracy_test": 0.9069767441860465,
-  "accuracy_cv_mean": 0.9043111655106759,
-  "accuracy_cv_std": 0.011507018955740082,
-  "accuracy_physical": 0.08041958041958042,
+  "n_train": 1076,
+  "n_test": 269,
+  "accuracy_test": 0.8438661710037175,
+  "accuracy_cv_mean": 0.8148698884758364,
+  "accuracy_cv_std": 0.031138128760404345,
+  "accuracy_physical": 0.07806691449814127,
   "feature_names": [
     "ew_He_II_4686",
     "ew_He_I_4471",
@@ -31,5 +31,5 @@
     "ratio_Ca_I_H_gamma",
     "H_avg"
   ],
-  "timestamp": "2026-02-28T19:19:49.666648"
+  "timestamp": "2026-04-08T22:50:10.919381"
 }

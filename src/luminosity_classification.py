@@ -48,8 +48,13 @@ from __future__ import annotations
 from typing import Dict
 
 # ---------------------------------------------------------------------------
-# Tipo interno: measurements es el dict devuelto por measure_diagnostic_lines
-# donde cada valor tiene la forma {"ew": float, "depth": float, ...}
+# Alias de tipo interno: "measurements" es el diccionario devuelto por
+# measure_diagnostic_lines().  Cada clave es el nombre de una línea espectral
+# (p. ej. "He_II_4686") y cada valor es un sub-dict con al menos:
+#   "ew"    → ancho equivalente en Ångströms (EW; positivo = absorción)
+#   "depth" → profundidad de la línea normalizada al continuo (0-1)
+# En formato plano (tests / llamadas externas) el valor puede ser
+# directamente el EW como float, sin sub-dict.
 # ---------------------------------------------------------------------------
 Measurements = Dict[str, dict]
 
@@ -82,10 +87,13 @@ def _ew(measurements: Measurements, key: str, default: float = 0.0) -> float:
     """
     entry = measurements.get(key)
     if entry is None:
+        # La línea no fue medida (fuera de rango o no detectada)
         return default
     if isinstance(entry, dict):
+        # Formato interno SpectroClass: extraer el campo 'ew'
+        # El operador "or default" reemplaza None y 0.0 por el valor de fallback
         return float(entry.get('ew', default) or default)
-    # Formato plano: el valor ya es el EW
+    # Formato plano (uso externo/tests): el valor ya es directamente el EW
     return float(entry)
 
 
@@ -125,72 +133,92 @@ def _luminosity_OB(measurements: Measurements) -> str:
     str
         "Ia", "Ib", "II", "III", "IV" o "V".
     """
-    he2_4686 = _ew(measurements, 'He_II_4686')
-    he2_4542 = _ew(measurements, 'He_II_4542')
+    # ── Extracción de indicadores primarios (He II) ──────────────────────
+    he2_4686 = _ew(measurements, 'He_II_4686')  # línea principal del efecto Of
+    he2_4542 = _ew(measurements, 'He_II_4542')  # línea alternativa He II (Pickering)
 
-    # Promedio He II disponible
+    # Promedio de las líneas He II disponibles; evita depender de una sola medición
     he2_vals = [v for v in (he2_4686, he2_4542) if v != 0.0]
     he2_avg  = sum(he2_vals) / len(he2_vals) if he2_vals else 0.0
 
-    # Indicadores secundarios O tempranas
+    # ── Indicadores secundarios para estrellas O tempranas ───────────────
+    # Si IV 4089 Å: crece en supergigantes O por mayor flujo de fotones ionizantes
     si4_4089  = _ew(measurements, 'Si_IV_4089')
+    # O II 4591/4596 Å: multipleto que crece en luminosas (Of) por ionización alta
     o2_4591   = _ew(measurements, 'O_II_4591')
     o2_4596   = _ew(measurements, 'O_II_4596')
+    # O II 4070/4076 Å: blend azul, criterio de luminosidad en B1-B4
     o2_4070   = _ew(measurements, 'O_II_4070')
     o2_4076   = _ew(measurements, 'O_II_4076')
+    # Promedios para reducir ruido en mediciones individuales
     o2_avg    = (o2_4591 + o2_4596) / 2.0
     o2_blue   = (o2_4070 + o2_4076) / 2.0   # criterio B1-B4
 
-    # He I 4713: criterio clave para O tardías (O8-O9.7)
+    # He I 4713 Å: presente en O tardías (O8-O9.7); su razón con He II 4686
+    # discrimina la clase de luminosidad (Gray & Corbally 2009 §3.2)
     he1_4713  = _ew(measurements, 'He_I_4713')
 
-    # Si IV 4116 / He I 4121: criterio B0-B0.7
+    # Si IV 4116 Å y He I 4121 Å: criterio de luminosidad para B0-B0.7
+    # (Si IV crece respecto a He I al aumentar la luminosidad)
     si4_4116  = _ew(measurements, 'Si_IV_4116')
     he1_4121  = _ew(measurements, 'He_I_4121')
+    # Razón Si IV / He I; se protege la división por cero con épsilon 0.01
     si4_he1_121 = si4_4116 / (he1_4121 + 0.01) if he1_4121 > 0.005 else 0.0
 
     # ── Regla principal: He II 4686 (efecto Of) ──────────────────────────
+    # El efecto Of ocurre cuando el viento estelar intenso (alta pérdida de masa)
+    # invierte la absorción He II 4686 hacia emisión, resultando en EW negativo.
+    # Solo las supergigantes O tienen vientos suficientemente densos para esto.
     if he2_4686 < -0.05:
-        # EW negativo → línea en emisión (viento estelar) → supergigante
+        # EW negativo → línea en emisión neta → supergigante (Of)
+        # O II y Si IV fuertes adicionales indican supergigante muy luminosa (Ia)
         if o2_avg > 0.40 or si4_4089 > 0.30 or o2_blue > 0.30:
-            return 'Ia'   # supergigante muy luminosa
-        return 'Ib'       # supergigante moderada
+            return 'Ia'   # supergigante muy luminosa: viento más denso y metal-rich
+        return 'Ib'       # supergigante moderada: emisión Of presente pero más débil
 
     if he2_avg < 0.05:
-        # Absorción débil o rellena → gigante
+        # He II casi ausente o muy rellena → gigante luminosa (no supergigante)
         return 'III'
 
-    # ── Regla secundaria: He II 4686 vs He I 4713 (O tardías) ────────────
-    if he1_4713 > 0.02:   # He I 4713 medible → O tardía, aplicar criterio
-        ratio_he = he2_4686 / (he1_4713 + 0.01)
+    # ── Regla secundaria: He II 4686 vs He I 4713 (O tardías O8-O9.7) ────
+    # En O tardías ambas líneas son medibles; su razón refleja el gradiente
+    # de gravedad: a menor log g (mayor luminosidad) He II se debilita.
+    if he1_4713 > 0.02:   # He I 4713 presente → O tardía, aplicar criterio Gray §3.2
+        ratio_he = he2_4686 / (he1_4713 + 0.01)  # épsilon evita división por cero
         if ratio_he < 0.7:
-            return 'Ib'   # He II 4686 < He I 4713
+            return 'Ib'   # He II < He I → supergigante moderada
         if ratio_he < 1.1:
-            return 'II'   # He II 4686 ≈ He I 4713
+            return 'II'   # He II ≈ He I → gigante brillante
         if ratio_he < 2.5:
-            return 'III'  # He II 4686 > He I 4713 pero no muy fuerte
+            return 'III'  # He II algo mayor que He I → gigante normal
         if ratio_he < 5.0:
-            return 'IV'
-        return 'V'
+            return 'IV'   # He II bastante mayor → subgigante
+        return 'V'        # He II >> He I → enana de secuencia principal
 
-    # ── Regla terciaria: O II 4070-4076 / He I 4026 (B1-B4) ─────────────
+    # ── Regla terciaria: O II 4070-4076 (criterio B1-B4) ─────────────────
+    # En estrellas B1-B4 el blend O II azul crece notablemente en supergigantes
+    # porque la mayor luminosidad mantiene más oxígeno en estados ionizados altos
     if o2_blue > 0.20:
         if o2_blue > 0.40:
-            return 'Ib'
+            return 'Ib'   # O II azul muy fuerte → supergigante
         if o2_blue > 0.30:
-            return 'II'
-        return 'III'
+            return 'II'   # O II azul moderadamente fuerte → gigante brillante
+        return 'III'      # O II azul presente pero débil → gigante normal
 
-    # ── Regla cuaternaria: Si IV / He I (B0-B0.7) ────────────────────────
+    # ── Regla cuaternaria: Si IV 4116 / He I 4121 (B0-B0.7) ─────────────
+    # En B0-B0.7, Si IV 4116 crece con la luminosidad mientras He I 4121
+    # permanece relativamente estable; la razón discrimina Ib de III-V
     if si4_he1_121 > 1.5:
-        return 'Ib'
+        return 'Ib'   # Si IV dominante → supergigante
     if si4_he1_121 > 0.8:
-        return 'III'
+        return 'III'  # Si IV comparable a He I → gigante
 
-    # Absorción moderada-fuerte → distinguir IV de V con indicadores extra
+    # ── Último recurso: O II rojo + Si IV 4089 combinados ────────────────
+    # Si ambos indicadores secundarios son moderados, probablemente subgigante
     if o2_avg > 0.20 and si4_4089 > 0.10:
-        return 'IV'
+        return 'IV'   # indicadores de luminosidad presentes pero débiles → subgigante
 
+    # Sin indicadores de luminosidad significativos → enana de secuencia principal
     return 'V'
 
 
@@ -219,44 +247,61 @@ def _luminosity_AF(measurements: Measurements) -> str:
     str
         "Ia", "Ib", "II", "III", "IV" o "V".
     """
+    # ── Líneas diagnóstico principales para A-F ───────────────────────────
+    # Sr II 4077 Å: resonante de estroncio ionizado, sensible a la densidad
+    # electrónica (crece con la luminosidad porque la ionización Sr I→Sr II
+    # se favorece a baja presión / menor log g)
     sr2_4077  = _ew(measurements, 'Sr_II_4077')
-    sr2_4216  = _ew(measurements, 'Sr_II_4216')
+    sr2_4216  = _ew(measurements, 'Sr_II_4216')  # línea alternativa de Sr II
+
+    # Fe I 4071 Å: referencia de hierro neutro, relativamente insensible a
+    # la luminosidad → denominador ideal para la razón Sr II / Fe I
     fe1_4071  = _ew(measurements, 'Fe_I_4071')
-    fe1_4046  = _ew(measurements, 'Fe_I_4046')
-    fe1_4383  = _ew(measurements, 'Fe_I_4383')
+    fe1_4046  = _ew(measurements, 'Fe_I_4046')   # segunda referencia Fe I
+    fe1_4383  = _ew(measurements, 'Fe_I_4383')   # tercera referencia Fe I
 
-    # Blends Fe II / Ti II (luminosidad A7-F5)
-    ti2_4178  = _ew(measurements, 'Ti_II_4178')
-    ti2_4399  = _ew(measurements, 'Ti_II_4399')
-    ti2_4444  = _ew(measurements, 'Ti_II_4444')
-    tifeii_avg = (ti2_4178 + ti2_4399) / 2.0
+    # ── Blends Fe II / Ti II para A7-F5 (criterio Gray & Corbally §4.3) ──
+    # Los blends de Fe II + Ti II en 4172-4178 y 4395-4400 Å crecen
+    # notablemente en supergigantes A tardías / F tempranas; en enanas son
+    # apenas perceptibles porque Fe II es favorecido a baja densidad electrónica
+    ti2_4178  = _ew(measurements, 'Ti_II_4178')   # blend Fe II + Ti II ~4172-4178 Å
+    ti2_4399  = _ew(measurements, 'Ti_II_4399')   # blend Fe II + Ti II ~4395-4400 Å
+    ti2_4444  = _ew(measurements, 'Ti_II_4444')   # Ti II 4444 Å (complementario)
+    tifeii_avg = (ti2_4178 + ti2_4399) / 2.0      # promedio de ambos blends
 
-    # Referencia neutral Fe I (la más estable)
+    # Seleccionar la mejor referencia de Fe I disponible
+    # (la primera con señal suficiente gana para ser denominador)
     fe1_ref = fe1_4046 if fe1_4046 > 0.005 else (fe1_4383 if fe1_4383 > 0.005 else 0.0)
 
     # ── Criterio 1: Sr II 4077 / Fe I 4071 (primario para toda A-F) ──────
-    sr2_available = sr2_4077 > 0.01 or sr2_4216 > 0.01
+    # Determinar si hay señal medible en cada indicador
+    sr2_available = sr2_4077 > 0.01 or sr2_4216 > 0.01  # al menos una línea Sr II
+    # Elegir la línea Sr II más fuerte como numerador de la razón
     sr2_best      = max(sr2_4077, sr2_4216)
-    fe1_available = fe1_4071 > 0.005 or fe1_ref > 0.005
+    fe1_available = fe1_4071 > 0.005 or fe1_ref > 0.005  # alguna referencia Fe I
+    # Preferir Fe I 4071 como denominador; usar referencia alternativa si no hay
     fe1_best      = fe1_4071 if fe1_4071 > 0.005 else fe1_ref
 
     if sr2_available and fe1_available:
-        ratio_sr = sr2_best / (fe1_best + 0.01)
+        # Razón Sr II / Fe I: aumenta monotónicamente de V (enana) a Ia (supergigante)
+        ratio_sr = sr2_best / (fe1_best + 0.01)  # épsilon evita división por cero
         if ratio_sr > 6.0:
-            return 'Ia'
+            return 'Ia'   # Sr II >> Fe I → supergigante muy luminosa
         if ratio_sr > 4.0:
-            return 'Ib'
+            return 'Ib'   # Sr II bastante mayor → supergigante moderada
         if ratio_sr > 2.0:
-            return 'III'
+            return 'III'  # Sr II claramente mayor → gigante
         if ratio_sr > 1.0:
-            return 'IV'
-        return 'V'
+            return 'IV'   # Sr II ligeramente mayor → subgigante
+        return 'V'        # Sr II ≤ Fe I → enana de secuencia principal
 
     # ── Criterio 2: Blends Fe II/Ti II / Fe I (A tardía-F temprana) ──────
+    # Cuando Sr II no está disponible (espectro con cobertura limitada en 4077 Å)
+    # se usa la razón de los blends de Fe II+Ti II frente a Fe I como proxy
     if fe1_ref > 0.005 and tifeii_avg > 0.005:
         ratio_ti = tifeii_avg / (fe1_ref + 0.01)
         if ratio_ti > 3.0:
-            return 'Ia'
+            return 'Ia'   # blends Fe II/Ti II muy fuertes respecto a Fe I → supergigante
         if ratio_ti > 2.0:
             return 'Ib'
         if ratio_ti > 1.2:
@@ -265,21 +310,30 @@ def _luminosity_AF(measurements: Measurements) -> str:
             return 'IV'
         return 'V'
 
-    # ── Indicadores de último recurso ────────────────────────────────────
+    # ── Indicadores de último recurso (cuando faltan los primarios) ───────
+    # Las líneas de Balmer (H_beta, H_gamma, H_delta) y Mg II 4481 se usan
+    # solo como último recurso porque tienen poca sensibilidad a la luminosidad
+    # en A-F comparados con Sr II y los blends de Fe II/Ti II
     mg2_4481 = _ew(measurements, 'Mg_II_4481')
-    h_beta   = _ew(measurements, 'H_beta')
-    h_gamma  = _ew(measurements, 'H_gamma')
-    h_delta  = _ew(measurements, 'H_delta')
+    h_beta   = _ew(measurements, 'H_beta')    # Hβ 4861 Å: Balmer 4
+    h_gamma  = _ew(measurements, 'H_gamma')   # Hγ 4341 Å: Balmer 5
+    h_delta  = _ew(measurements, 'H_delta')   # Hδ 4102 Å: Balmer 6
+    # Promedio Balmer: en A/F las supergigantes tienen EW Balmer menor que las
+    # enanas porque la menor presión reduce el efecto Stark (ensanchamiento)
     h_avg    = (h_beta + h_gamma + h_delta) / 3.0 if (h_beta + h_gamma + h_delta) > 0 else 0.0
 
     if h_avg > 8.0:
+        # Balmer muy fuerte → efecto Stark intenso → alta presión → enana
         return 'V'
     if h_avg > 5.0:
+        # Balmer moderadamente fuerte → subgigante (presión intermedia)
         return 'IV'
     if mg2_4481 > 0.4:
+        # Mg II 4481 fuerte en A-F es más característico de enanas
         return 'V'
 
-    return 'V'   # defecto conservador
+    # Sin indicadores claros → asumir enana (clasificación conservadora)
+    return 'V'   # defecto conservador: evita sobreclasificar estrellas de campo
 
 
 def _luminosity_GK(measurements: Measurements) -> str:

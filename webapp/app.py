@@ -85,7 +85,7 @@ app = Flask(__name__)
 _webapp_dir = os.path.dirname(os.path.abspath(__file__))
 app.config['UPLOAD_FOLDER']  = os.path.join(_webapp_dir, 'uploads')
 app.config['RESULTS_FOLDER'] = os.path.join(_webapp_dir, 'results')
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB max
+app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024  # 2 GB max
 app.config['ALLOWED_EXTENSIONS'] = {'txt', 'fits', 'fit'}
 
 # Crear directorios si no existen
@@ -207,7 +207,11 @@ def load_spectrum_file(filepath):
             header = hdul[0].header
             hdul.close()
 
-            # Calcular eje de longitud de onda
+            # Calcular eje de longitud de onda según cabecera FITS WCS (World Coordinate System)
+            # Fórmula estándar: λ(px) = CRVAL1 + (px - CRPIX1) × CDELT1
+            #   CRVAL1 = longitud de onda del píxel de referencia (en Å)
+            #   CRPIX1 = número del píxel de referencia (generalmente 1)
+            #   CDELT1 = dispersión en Å/píxel
             crval1 = header.get('CRVAL1', 0)
             crpix1 = header.get('CRPIX1', 1)
             cdelt1 = header.get('CDELT1', 1)
@@ -330,6 +334,16 @@ def process_spectrum(filepath, filename, use_multi_method=True,
         return {'error': error}
 
     # Construir pesos personalizados según configuración del usuario
+    # Los pesos determinan cuánto "vale" cada método en la votación final.
+    # La suma de todos los pesos debe ser 1.0.
+    #
+    # Cuando hay modelo neural disponible con peso neural_weight (ej. 0.40):
+    #   - El peso restante (1.0 - 0.40 = 0.60) se reparte entre los 3 métodos
+    #     clásicos manteniendo sus proporciones originales (10%, 40%, 10%).
+    #   - Fórmula: peso_método_nuevo = (peso_orig / 0.60) × (1 - neural_weight)
+    #
+    # Cuando NO hay modelo neural:
+    #   - Los 3 métodos clásicos se reparten el 100%
     if include_neural and neural_weight > 0:
         remaining = 1.0 - neural_weight
         custom_weights = {
@@ -339,6 +353,7 @@ def process_spectrum(filepath, filename, use_multi_method=True,
             'neural':           neural_weight
         }
     else:
+        # Sin neural: el árbol de decisión domina (70%) por su alta accuracy
         custom_weights = {
             'physical': 0.15,
             'decision_tree': 0.70,
@@ -424,6 +439,29 @@ def process_spectrum(filepath, filename, use_multi_method=True,
     except Exception as e:
         return {'error': f"Error generando gráfico: {str(e)}"}
 
+    # ── Agregar líneas del Árbol de Decisión a lineas_usadas ───────────────
+    # El árbol usa siempre las mismas 17 features + 6 ratios.
+    # Se añaden las que realmente están medidas (EW > 0) al diagnóstico
+    # para que aparezcan resaltadas en el espectro SVG.
+    DT_FEATURE_LINES = [
+        'He_II_4686', 'He_I_4471',
+        'H_beta', 'H_gamma', 'H_delta', 'H_epsilon',
+        'Si_IV_4089', 'Si_III_4553', 'Si_II_4128',
+        'Mg_II_4481',
+        'Ca_II_K', 'Ca_II_H', 'Ca_I_4227',
+        'Fe_I_4046', 'Fe_I_4144', 'Fe_I_4383', 'Fe_I_4957',
+    ]
+    existing_lu = set(diagnostics.get('lineas_usadas', []))
+    dt_lineas_en_rango = []
+    for ln in DT_FEATURE_LINES:
+        data = measurements.get(ln, {})
+        if data.get('ew', 0) > 0.05:          # detectada y en rango
+            display = ln.replace('_', ' ')
+            dt_lineas_en_rango.append(display)
+            existing_lu.add(display)           # evitar duplicados
+    diagnostics['lineas_usadas'] = sorted(existing_lu)
+    diagnostics['dt_lineas'] = dt_lineas_en_rango  # campo separado para el frontend
+
     # Preparar líneas detectadas (EW significativo) y medición completa
     detected_lines = []
     todas_lineas   = []
@@ -442,14 +480,31 @@ def process_spectrum(filepath, filename, use_multi_method=True,
     detected_lines.sort(key=lambda x: x['ancho_equivalente'], reverse=True)
     todas_lineas.sort(key=lambda x: x['longitud_onda'])
 
-    # Datos de espectro para visualización SVG (muestreo a máx 2000 puntos)
+    # Datos de espectro para visualización SVG
     try:
         _wav  = np.asarray(wavelengths, dtype=float)
         _flux = np.nan_to_num(np.asarray(flux_normalized, dtype=float), nan=1.0, posinf=1.0, neginf=0.0)
-        _samp = max(1, len(_wav) // 2000)
+
+        # Recortar rayos cósmicos y spikes de emisión para no distorsionar el eje Y
+        _flux = np.clip(_flux, 0.0, 1.5)
+
+        # Submuestreo con preservación de mínimos (mantiene visibles las líneas de absorción)
+        # Para espectros de alta resolución (p.ej. 0.05 Å/px) el stride simple elimina
+        # líneas estrechas; tomar el mínimo en cada bin garantiza que las absorpciones
+        # más profundas siempre se incluyen en la curva final.
+        TARGET_PTS = 4000
+        _samp = max(1, len(_wav) // TARGET_PTS)
+        if _samp > 1:
+            n_bins = len(_wav) // _samp
+            wav_out  = _wav[:n_bins * _samp].reshape(n_bins, _samp).mean(axis=1)
+            flux_out = _flux[:n_bins * _samp].reshape(n_bins, _samp).min(axis=1)
+        else:
+            wav_out  = _wav
+            flux_out = _flux
+
         spectrum_data = {
-            'wavelength': _wav[::_samp].tolist(),
-            'flux':       _flux[::_samp].tolist(),
+            'wavelength': wav_out.tolist(),
+            'flux':       flux_out.tolist(),
             'wmin': float(_wav.min()),
             'wmax': float(_wav.max())
         }
@@ -693,6 +748,206 @@ def export_detailed_csv(filename):
     # Recargar resultados desde caché si es necesario
     # Por ahora, devolver error
     return jsonify({'error': 'Función no implementada aún'}), 501
+
+
+@app.route('/fits_extract_one', methods=['POST'])
+def fits_extract_one():
+    """
+    Procesa UN solo archivo FITS y devuelve el TXT + metadatos.
+    El JS lo llama en bucle, de a uno, para evitar límites de tamaño.
+    """
+    import io as _io
+    try:
+        from astropy.io import fits as _fits
+    except ImportError:
+        return jsonify({'ok': False, 'error': 'astropy no instalado. Ejecuta: pip install astropy'}), 500
+
+    f = request.files.get('file')
+    if not f:
+        return jsonify({'ok': False, 'error': 'No se recibió archivo'}), 400
+
+    orig_name = f.filename
+    try:
+        raw = f.read()
+        with _fits.open(_io.BytesIO(raw)) as hdul:
+            header = hdul[0].header
+            data   = hdul[0].data
+
+            objeto = str(header.get('OBJECT',  header.get('OBJNAME', ''))).strip()
+            sptype = str(header.get('SPTYPE',  header.get('SPTTYPE', ''))).strip()
+
+            if not objeto:
+                h_ident = str(header.get('H_IDENT', '')).strip()
+                if h_ident:
+                    parts = h_ident.split('/')
+                    objeto = parts[0].strip()
+                    if not sptype and len(parts) > 1:
+                        sptype = parts[1].strip()
+
+            objeto_safe = (objeto or os.path.splitext(orig_name)[0]).replace('/', '-').replace(' ', '_')
+            sptype_safe = (sptype or 'tipo_desconocido').replace('/', '-').replace(' ', '_')
+
+            if data is None:
+                raise ValueError('HDU sin datos')
+            if data.ndim > 1:
+                data = data.flatten()
+            if len(data) == 0:
+                raise ValueError('Array vacío')
+
+            crval1 = float(header.get('CRVAL1', 1.0))
+            crpix1 = float(header.get('CRPIX1', 1.0))
+            cdelt1 = float(header.get('CDELT1', 1.0))
+            pixels = np.arange(1, len(data) + 1, dtype=float)
+            wavelengths = crval1 + (pixels - crpix1) * cdelt1
+
+            nombre_out = f"{objeto_safe}_tipo{sptype_safe}.txt"
+            lines_out  = ['Longitud_de_onda_A,espectro']
+            for w, v in zip(wavelengths, data):
+                lines_out.append(f'{w:.4f},{v:.6g}')
+            txt_content = '\n'.join(lines_out)
+
+            return jsonify({
+                'ok':          True,
+                'original':    orig_name,
+                'objeto':      objeto,
+                'sptype':      sptype,
+                'nombre_out':  nombre_out,
+                'rango_lambda': f'{wavelengths[0]:.1f}–{wavelengths[-1]:.1f} Å',
+                'n_puntos':    int(len(data)),
+                'txt_content': txt_content
+            })
+
+    except Exception as exc:
+        return jsonify({'ok': False, 'original': orig_name, 'error': str(exc)})
+
+
+@app.route('/fits_extract_batch', methods=['POST'])
+def fits_extract_batch():
+    """
+    Recibe uno o varios archivos FITS, extrae metadatos y convierte a TXT.
+    Devuelve un ZIP con los TXT + un CSV de metadatos.
+    """
+    import zipfile
+    import io as _io
+    try:
+        from astropy.io import fits as _fits
+        _ASTROPY = True
+    except ImportError:
+        _ASTROPY = False
+
+    if not _ASTROPY:
+        return jsonify({'error': 'astropy no está instalado. Ejecuta: pip install astropy'}), 500
+
+    files = request.files.getlist('files')
+    if not files:
+        return jsonify({'error': 'No se recibieron archivos'}), 400
+
+    results   = []   # lista de dicts con metadatos
+    txt_files = {}   # nombre_salida -> contenido TXT
+
+    for f in files:
+        orig_name = f.filename
+        entry = {
+            'original':  orig_name,
+            'objeto':    '',
+            'sptype':    '',
+            'nombre_out': '',
+            'rango_lambda': '',
+            'n_puntos':  0,
+            'ok':        False,
+            'error':     ''
+        }
+        try:
+            raw = f.read()
+            with _fits.open(_io.BytesIO(raw)) as hdul:
+                header = hdul[0].header
+                data   = hdul[0].data
+
+                # Metadatos clave
+                objeto  = str(header.get('OBJECT',  header.get('OBJNAME', ''))).strip().replace('/', '-').replace(' ', '_')
+                sptype  = str(header.get('SPTYPE',  header.get('SPTTYPE', ''))).strip().replace('/', '-').replace(' ', '_')
+                # H_IDENT como alternativa
+                if not objeto:
+                    h_ident = str(header.get('H_IDENT', '')).strip()
+                    if h_ident:
+                        parts = h_ident.split('/')
+                        objeto = parts[0].strip().replace(' ', '_')
+                        if not sptype and len(parts) > 1:
+                            sptype = parts[1].strip().replace(' ', '_')
+
+                objeto  = objeto  or os.path.splitext(orig_name)[0]
+                sptype  = sptype  or 'tipo_desconocido'
+
+                entry['objeto'] = objeto
+                entry['sptype'] = sptype
+
+                # Validar que hay datos 1D
+                if data is None:
+                    raise ValueError('El HDU primario no contiene datos')
+                if data.ndim > 1:
+                    data = data.flatten()
+                if len(data) == 0:
+                    raise ValueError('Array de datos vacío')
+
+                # Calcular longitudes de onda
+                crval1 = float(header.get('CRVAL1', 1.0))
+                crpix1 = float(header.get('CRPIX1', 1.0))
+                cdelt1 = float(header.get('CDELT1', 1.0))
+                pixels = np.arange(1, len(data) + 1, dtype=float)
+                wavelengths = crval1 + (pixels - crpix1) * cdelt1
+
+                entry['rango_lambda'] = f"{wavelengths[0]:.1f}–{wavelengths[-1]:.1f} Å"
+                entry['n_puntos']     = len(data)
+
+                # Nombre de salida: OBJETO_tipoSPTYPE.txt
+                nombre_out = f"{objeto}_tipo{sptype}.txt"
+                entry['nombre_out'] = nombre_out
+
+                # Construir TXT con dos columnas
+                lines_out = ['Longitud_de_onda_A,espectro']
+                for w, v in zip(wavelengths, data):
+                    lines_out.append(f'{w:.4f},{v:.6g}')
+                txt_files[nombre_out] = '\n'.join(lines_out)
+
+                entry['ok'] = True
+
+        except Exception as exc:
+            entry['error'] = str(exc)
+
+        results.append(entry)
+
+    # Construir ZIP en memoria
+    zip_buf = _io.BytesIO()
+    with zipfile.ZipFile(zip_buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for nombre, contenido in txt_files.items():
+            zf.writestr(nombre, contenido)
+
+        # CSV de metadatos
+        meta_lines = ['original,objeto,sptype,nombre_salida,rango_lambda,n_puntos,ok,error']
+        for r in results:
+            meta_lines.append(
+                f'"{r["original"]}","{r["objeto"]}","{r["sptype"]}",'
+                f'"{r["nombre_out"]}","{r["rango_lambda"]}",{r["n_puntos"]},'
+                f'{r["ok"]},"{r["error"]}"'
+            )
+        zf.writestr('_metadatos.csv', '\n'.join(meta_lines))
+
+    zip_buf.seek(0)
+
+    ok_count  = sum(1 for r in results if r['ok'])
+    err_count = len(results) - ok_count
+
+    # Devolver ZIP como base64 + resumen JSON
+    import base64 as _b64
+    zip_b64 = _b64.b64encode(zip_buf.read()).decode()
+
+    return jsonify({
+        'ok':        ok_count,
+        'errores':   err_count,
+        'resultados': results,
+        'zip_b64':   zip_b64,
+        'meta_csv':  '\n'.join(meta_lines)
+    })
 
 
 @app.route('/info')
@@ -955,9 +1210,23 @@ def train_model_stream():
     train_script = os.path.join(project_root, 'src', 'train_and_validate.py')
 
     def generate():
+        """
+        Generador SSE (Server-Sent Events).
+
+        Protocolo SSE: cada mensaje tiene formato 'data: <JSON>\n\n'.
+        El navegador lo recibe en tiempo real a través de EventSource.
+        Aquí lanzamos el proceso Python de entrenamiento y transmitimos
+        su salida línea a línea al navegador conforme va apareciendo.
+
+        Tipos de evento JSON:
+          'line'  → línea de texto del proceso (mostrar en consola)
+          'done'  → entrenamiento terminó (con success, accuracy, n_samples)
+        El campo 'pct' opcional indica el porcentaje de progreso (0-100).
+        """
         import time as _time
 
         def evt(msg, pct=None, tipo='line'):
+            # Empaquetar mensaje como JSON y formatear en protocolo SSE
             if pct is not None:
                 return f"data: {_json.dumps({'type': tipo, 'pct': pct, 'msg': msg})}\n\n"
             return f"data: {_json.dumps({'type': tipo, 'msg': msg})}\n\n"
@@ -1008,13 +1277,17 @@ def train_model_stream():
 
         last_keepalive = _time.time()
 
-        # Leer línea a línea con keepalive cada 3 segundos
+        # Leer línea a línea con keepalive cada 3 segundos.
+        # IMPORTANTE: readline() bloquea hasta que llega una línea o el proceso termina.
+        # Si el proceso no emite output por >3s enviamos un comentario SSE de keepalive
+        # para mantener la conexión HTTP activa (nginx/proxies cierran conexiones ociosas).
         while True:
             line = proc.stdout.readline()
 
             # readline() devuelve '' cuando el proceso termina y cierra stdout
             if line == '':
                 if proc.poll() is not None:
+                    # El proceso terminó y cerró stdout → salir del loop
                     break
                 # Proceso vivo pero sin output aún → keepalive
                 if _time.time() - last_keepalive >= 3:
@@ -1028,6 +1301,8 @@ def train_model_stream():
             if not line.strip():
                 continue
 
+            # Mapeo de palabras clave del output → porcentaje de progreso
+            # Permite mostrar una barra de progreso en el navegador
             if 'Archivos encontrados' in line:
                 pct = 10
             elif 'Procesados:' in line:
@@ -1646,6 +1921,7 @@ def get_metrics():
             'n_train': metadata.get('n_train', 0),
             'n_test': metadata.get('n_test', 0),
             'timestamp': metadata.get('timestamp', 'N/A'),
+            'model_type': metadata.get('model_type', 'Árbol de Decisión'),
             'accuracy_by_type': accuracy_by_type,
             'has_confusion_matrix': has_confusion_matrix,
             'top_features': top_features,
@@ -2008,7 +2284,7 @@ def method_not_allowed(e):
 
 @app.errorhandler(413)
 def too_large(e):
-    return jsonify({'success': False, 'error': 'Archivo demasiado grande (máximo 50 MB)'}), 413
+    return jsonify({'success': False, 'error': 'Archivo demasiado grande (máximo 2 GB)'}), 413
 
 @app.errorhandler(500)
 def server_error(e):

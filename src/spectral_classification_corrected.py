@@ -2,6 +2,73 @@
 Clasificación Espectral Corregida
 ==================================
 
+Motor principal de clasificación espectral de SpectroClass v3.1.
+Implementa el esquema MK (Morgan-Keenan) para los tipos O, B, A, F, G, K, M.
+
+Módulos principales
+-------------------
+- ``normalize_to_continuum``      : Normalización robusta al continuo (2 pasos + sigma-clip)
+- ``measure_equivalent_width``    : EW por integración trapezoidal con banderas de calidad
+- ``measure_diagnostic_lines``    : Mide EW de todas las líneas diagnóstico del catálogo
+- ``compute_spectral_ratios``     : Calcula razones diagnóstico entre líneas
+- ``classify_star_decision_tree`` : Clasificador físico estándar (árbol de decisión espectral)
+- ``classify_star_corrected``     : Función principal pública (envuelve el árbol físico)
+- ``check_radial_velocity``       : Estimación de velocidad radial por desplazamiento Doppler
+
+Flujo de clasificación
+----------------------
+1. Normalizar espectro al continuo (continuo = 1.0)
+2. Medir EW de ~85 líneas diagnóstico
+3. Calcular razones de líneas
+4. Clasificar por árbol de decisión físico:
+   a. Clasificación gruesa: ¿dominan He II, He I, H Balmer, o metales?
+   b. Clasificación fina por tipo espectral
+   c. Estimar subtipo numérico (p.ej. G5, K2)
+5. Estimar clase de luminosidad MK (I-V) via luminosity_classification.py
+6. Compilar diagnósticos y advertencias
+
+Correcciones críticas respecto a versiones anteriores
+------------------------------------------------------
+1. Normalización con sigma-clip relativo al continuo local (no global),
+   evita que rayos cósmicos distorsionen el continuo de referencia.
+2. EW calculado por integración trapezoidal (∫(1 - F/F_cont) dλ),
+   NO por FWHM (que mide ensanchamiento, no intensidad).
+3. Clasificación basada en INTENSIDADES (EW), no en detección de longitudes
+   de onda (que depende de la resolución espectral y SNR).
+
+Líneas diagnóstico incluidas (~85 líneas)
+------------------------------------------
+He II (4200, 4542, 4686, 5411 Å) – tipo O
+He I  (4026, 4121, 4144, 4387, 4471, 4713, 4922, 5016, 5876 Å) – tipos O-B
+H Balmer (Hε, Hδ, Hγ, Hβ, Hα) – máximo en tipo A, decrece hacia K
+Ca II K/H (3934, 3969 Å) – fuerte en F-G-K, criterio diagnóstico clave
+Ca I 4227 Å – temperaturas G-K
+Fe I (4046, 4144, 4260, 4383, 4957 Å) – metales en tipos tardíos
+Si IV/III/II – subtipos B tempranos/tardíos
+TiO (4762, 4955, 5167, 5448, 6158, 6651 Å) – bandas moleculares en tipo M
+CaH, VO, MgH – discriminadores enana/gigante en M
+Y II 4376, Sr II 4077 – indicadores de luminosidad en G-K y A-F
+
+Referencias
+-----------
+* Gray & Corbally (2009) — *Stellar Spectral Classification*, Princeton UP.
+* Morgan, Keenan & Kellman (1943) — Atlas MK original.
+* Jaschek & Jaschek (1987) — *The Classification of Stars*, Cambridge UP.
+
+Uso
+---
+    from spectral_classification_corrected import (
+        normalize_to_continuum,
+        measure_diagnostic_lines,
+        classify_star_corrected
+    )
+
+    flux_norm, continuum = normalize_to_continuum(wavelengths, flux)
+    measurements = measure_diagnostic_lines(wavelengths, flux_norm)
+    spectral_type, subtype, diagnostics = classify_star_corrected(
+        measurements, wavelengths, flux_norm
+    )
+    # Ej: spectral_type='G', subtype='G5', diagnostics={'He_II': 0.0, 'H_avg': 2.1, ...}
 """
 
 import numpy as np

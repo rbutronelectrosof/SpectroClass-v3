@@ -53,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupTabs();
     setupSingleAnalysis();
     setupBatchProcessing();
+    setupFitsExtractor();
     initPreambuloUpload();
 });
 
@@ -75,6 +76,9 @@ function setupTabs() {
             // Add active class to clicked
             btn.classList.add('active');
             document.getElementById(`tab-${tabName}`).classList.add('active');
+
+            // Recargar banner de modelo actual al entrar en Herramientas
+            if (tabName === 'herramientas') loadCurrentModelBanner();
         });
     });
 }
@@ -242,7 +246,6 @@ function displaySingleResult(result) {
     const subtipo = result.subtipo || '';
     const subtipoDisplay = subtipo && subtipo !== result.tipo_clasificado ? subtipo : result.tipo_clasificado;
     document.getElementById('typeBadge').textContent = subtipoDisplay;
-    document.getElementById('subtypeText').textContent = subtipoDisplay;
 
     // 1b. Clase de luminosidad MK
     const diag0 = result.diagnostics || {};
@@ -345,23 +348,15 @@ function displaySingleResult(result) {
         const alternativesList = document.getElementById('alternativesList');
         alternativesList.innerHTML = '';
 
-        result.alternativas.forEach((alt, idx) => {
-            const altDiv = document.createElement('div');
-            altDiv.className = `alternative-item rank-${idx + 1}`;
-            const subtipoLabel = alt.subtipo && alt.subtipo !== alt.tipo
-                ? `<span class="alt-subtipo">${alt.subtipo}</span>`
-                : '';
-            altDiv.innerHTML = `
-                <div class="alternative-header">
-                    <span class="alternative-type">#${idx + 1} - Tipo ${alt.tipo} ${subtipoLabel}</span>
-                    <span class="alternative-confidence">${alt.confianza.toFixed(1)}%</span>
-                </div>
-                <div class="alternative-justification">
-                    ${alt.justificacion}
-                </div>
-            `;
-            alternativesList.appendChild(altDiv);
-        });
+        alternativesList.innerHTML = result.alternativas.map((alt, idx) => {
+            const tipo = alt.subtipo && alt.subtipo !== alt.tipo ? alt.subtipo : alt.tipo;
+            const just = alt.justificacion || '';
+            return `<div class="alt-chip rank-${idx + 1}">
+                        <span class="alt-chip-tipo">${tipo}</span>
+                        <span class="alt-chip-pct">${alt.confianza.toFixed(1)}%</span>
+                        ${just ? `<span class="alt-chip-just">— ${just}</span>` : ''}
+                    </div>`;
+        }).join('');
     }
 
     // 4. Decision tree card — lineas_usadas, justificacion, advertencias (Fix 4 + Fix 6)
@@ -374,6 +369,8 @@ function displaySingleResult(result) {
 
     if (lineasUsadas.length > 0 || justificacion) {
         document.getElementById('decisionTreeCard').style.display = 'block';
+        const _expCard = document.getElementById('exportResultsCard');
+        if (_expCard) _expCard.style.display = 'block';
 
         // Fix 6: banner criterio A
         const criterioABanner = document.getElementById('criterioABanner');
@@ -399,14 +396,39 @@ function displaySingleResult(result) {
         }
 
         // Líneas usadas en la decisión
+        // Separamos las líneas del árbol de decisión (DT) de las del clasificador físico
         const lineasUsadasGrid = document.getElementById('lineasUsadasGrid');
         lineasUsadasGrid.innerHTML = '';
-        lineasUsadas.forEach(linea => {
-            const el = document.createElement('span');
-            el.className = 'linea-usada-badge';
-            el.textContent = linea;
-            lineasUsadasGrid.appendChild(el);
-        });
+        const dtLineasSet = new Set((diag.dt_lineas || []).map(l => l.toLowerCase()));
+
+        // Primero las líneas DT (features del árbol), luego las del clasificador físico
+        const dtLineas = (diag.dt_lineas || []).slice().sort();
+        const fisLineas = lineasUsadas.filter(l => !dtLineasSet.has(l.toLowerCase())).sort();
+
+        if (dtLineas.length > 0) {
+            const dtHeader = document.createElement('div');
+            dtHeader.style.cssText = 'width:100%;font-size:10px;color:#94a3b8;margin-bottom:4px;margin-top:2px;font-weight:600;letter-spacing:.5px;text-transform:uppercase';
+            dtHeader.textContent = 'Features del árbol de decisión';
+            lineasUsadasGrid.appendChild(dtHeader);
+            dtLineas.forEach(linea => {
+                const el = document.createElement('span');
+                el.className = 'linea-usada-badge linea-dt-badge';
+                el.textContent = linea;
+                lineasUsadasGrid.appendChild(el);
+            });
+        }
+        if (fisLineas.length > 0) {
+            const fisHeader = document.createElement('div');
+            fisHeader.style.cssText = 'width:100%;font-size:10px;color:#94a3b8;margin-bottom:4px;margin-top:8px;font-weight:600;letter-spacing:.5px;text-transform:uppercase';
+            fisHeader.textContent = 'Clasificador físico';
+            lineasUsadasGrid.appendChild(fisHeader);
+            fisLineas.forEach(linea => {
+                const el = document.createElement('span');
+                el.className = 'linea-usada-badge';
+                el.textContent = linea;
+                lineasUsadasGrid.appendChild(el);
+            });
+        }
 
         // Pasos del árbol (justificación separada por " | ")
         const justificacionList = document.getElementById('justificacionList');
@@ -432,6 +454,7 @@ function displaySingleResult(result) {
         } else {
             advertenciasSection.style.display = 'none';
         }
+
     }
 
     // 5. Lines detected — Fix 1: mostrar TODAS (sin límite de 12)
@@ -499,6 +522,7 @@ function displaySingleResult(result) {
         requestAnimationFrame(() => {
             try {
                 dibujarClasifEspectro(_clasifSpecData, _clasifTodasLineas, _clasifLineasUsadasSet);
+                dibujarMiniSpec(_clasifSpecData, _clasifTodasLineas, _clasifLineasUsadasSet);
             } catch(err) {
                 console.error('dibujarClasifEspectro:', err);
             }
@@ -865,6 +889,124 @@ function renderClasifLinesBars(lineasDetectadas, lineasUsadasSet) {
     }).join('');
 }
 
+// ── Mini espectro — solo líneas clave ────────────────────────────────────────
+
+function dibujarMiniSpec(specData, todasLineas, lineasUsadasSet) {
+    const svg = document.getElementById('miniSpecSVG');
+    if (!svg || !specData) return;
+
+    const wl   = specData.wavelength || [];
+    const flux = specData.flux || [];
+    if (wl.length < 2) { svg.innerHTML = ''; return; }
+
+    const W = 860, H = 190;
+    const PAD_L = 42, PAD_R = 16, PAD_T = 28, PAD_B = 28;
+    const PW = W - PAD_L - PAD_R;
+    const PH = H - PAD_T - PAD_B;
+
+    const wMin = wl[0], wMax = wl[wl.length - 1];
+
+    // Rango visible del flux
+    let fMin = Infinity, fMax = -Infinity;
+    for (let i = 0; i < flux.length; i++) {
+        if (Number.isFinite(flux[i])) {
+            if (flux[i] < fMin) fMin = flux[i];
+            if (flux[i] > fMax) fMax = flux[i];
+        }
+    }
+    if (!Number.isFinite(fMin) || fMax <= fMin) { fMin = 0; fMax = 1.5; }
+
+    const tx = w => PAD_L + ((w - wMin) / (wMax - wMin)) * PW;
+    const ty = f => PAD_T + (1 - (f - fMin) / (fMax - fMin)) * PH;
+
+    // Polilínea — subsample para no generar SVG enorme
+    const step = Math.max(1, Math.floor(wl.length / 1200));
+    const pts = wl
+        .filter((_, i) => i % step === 0 && Number.isFinite(flux[i]))
+        .map((w, i) => `${tx(w).toFixed(1)},${ty(flux[i * step]).toFixed(1)}`)
+        .join(' ');
+
+    // Solo líneas usadas en la clasificación
+    const keyLines = (todasLineas || []).filter(l => {
+        const k = l.nombre.replace(/ /g, '_');
+        return lineasUsadasSet.has(k) && l.longitud_onda >= wMin && l.longitud_onda <= wMax;
+    });
+
+    // Stagger etiquetas para evitar solapamiento
+    keyLines.sort((a, b) => a.longitud_onda - b.longitud_onda);
+    const linesSVG = keyLines.map((l, idx) => {
+        const x   = tx(l.longitud_onda);
+        const col = colorLinea(l.nombre);
+        const yLbl = idx % 2 === 0 ? PAD_T - 6 : PAD_T - 16;
+        return `<line x1="${x.toFixed(1)}" y1="${PAD_T}" x2="${x.toFixed(1)}" y2="${(PAD_T + PH).toFixed(1)}"
+                      stroke="${col}" stroke-width="1.5" opacity="0.8" stroke-dasharray="4,3"/>
+                <text x="${x.toFixed(1)}" y="${yLbl}" fill="${col}" font-size="9"
+                      text-anchor="middle" font-family="monospace">${l.nombre}</text>`;
+    }).join('');
+
+    // Eje X
+    const nTicks = 7;
+    const ticksSVG = Array.from({length: nTicks}, (_, i) => {
+        const w = wMin + (i / (nTicks - 1)) * (wMax - wMin);
+        const x = tx(w);
+        return `<line x1="${x.toFixed(1)}" y1="${(PAD_T + PH).toFixed(1)}"
+                      x2="${x.toFixed(1)}" y2="${(PAD_T + PH + 4).toFixed(1)}"
+                      stroke="#334155" stroke-width="1"/>
+                <text x="${x.toFixed(1)}" y="${(PAD_T + PH + 15).toFixed(1)}"
+                      fill="#64748b" font-size="9" text-anchor="middle">${Math.round(w)}</text>`;
+    }).join('');
+
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.innerHTML = `
+        <rect x="0" y="0" width="${W}" height="${H}" fill="#0a1628" rx="6"/>
+        <line x1="${PAD_L}" y1="${PAD_T}" x2="${PAD_L}" y2="${PAD_T + PH}" stroke="#334155" stroke-width="1"/>
+        <line x1="${PAD_L}" y1="${PAD_T + PH}" x2="${W - PAD_R}" y2="${PAD_T + PH}" stroke="#334155" stroke-width="1"/>
+        <polyline points="${pts}" fill="none" stroke="#60a5fa" stroke-width="1.5" opacity="0.92"/>
+        ${linesSVG}
+        ${ticksSVG}
+        <text x="${W / 2}" y="${H - 2}" fill="#475569" font-size="9"
+              text-anchor="middle" font-family="monospace">λ (Å)</text>
+    `;
+}
+
+// ── Exportar árbol de decisión ────────────────────────────────────────────────
+
+function exportarArbol(formato) {
+    const nombre = (window._preambuloFilename || 'espectro').replace(/\.[^.]+$/, '');
+    const pasos = Array.from(document.querySelectorAll('#justificacionList li')).map(li => li.textContent.trim());
+    const badges = Array.from(document.querySelectorAll('#lineasUsadasGrid .linea-usada-badge')).map(b => b.textContent.trim());
+    const advs = Array.from(document.querySelectorAll('#advertenciasList li')).map(li => li.textContent.trim());
+    const keyLines = (_clasifTodasLineas || []).filter(l => _clasifLineasUsadasSet.has(l.nombre.replace(/ /g, '_')));
+
+    let contenido, mime, ext;
+    const sep = '─'.repeat(60);
+
+    if (formato === 'txt') {
+        contenido = `SpectroClass v3.1 — Árbol de Decisión Espectroscópico\n`;
+        contenido += `Archivo: ${nombre}\n${sep}\n\n`;
+        contenido += `LÍNEAS DETERMINANTES\n${badges.join(', ')}\n\n`;
+        contenido += `PASOS DEL ÁRBOL\n`;
+        pasos.forEach((p, i) => { contenido += `${i + 1}. ${p}\n`; });
+        if (advs.length) {
+            contenido += `\nADVERTENCIAS\n`;
+            advs.forEach(a => { contenido += `• ${a}\n`; });
+        }
+        mime = 'text/plain;charset=utf-8;'; ext = 'txt';
+    } else {
+        contenido = 'Linea,Lambda_A,EW_A,Profundidad\n';
+        contenido += keyLines.map(l =>
+            `"${l.nombre}",${l.longitud_onda.toFixed(3)},${l.ancho_equivalente.toFixed(4)},${l.profundidad.toFixed(4)}`
+        ).join('\n');
+        mime = 'text/csv;charset=utf-8;'; ext = 'csv';
+    }
+
+    const blob = new Blob([contenido], { type: mime });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = `${nombre}_arbol.${ext}`; a.click();
+    URL.revokeObjectURL(url);
+}
+
 function populatePreambulo(result) {
     document.getElementById('preambuloPlaceholder').style.display = 'none';
     document.getElementById('preambuloContent').style.display     = 'block';
@@ -1000,6 +1142,7 @@ function populatePreambulo(result) {
 
     // ── 4. Todas las líneas ───────────────────────────────────────────
     _todasLineasData = result.todas_lineas || result.lineas_detectadas || [];
+    window._preambuloFilename = result.filename || 'espectro';
     document.getElementById('soloDetectadas').checked = false;
     document.getElementById('linesSortSelect').value  = 'ew';
     document.getElementById('linesFilterInput').value = '';
@@ -1386,8 +1529,10 @@ function filtrarLineas() {
             </td>
             <td class="ll-zoom">
                 <button class="btn-ll-zoom${isActive ? ' active' : ''}"
-                    onclick="${isActive ? 'preambuloResetZoom()' : `preambuloZomarLinea(${l.longitud_onda}, '${safeName}')`}"
-                    title="${isActive ? 'Volver a vista completa' : `Ampliar ${l.nombre}`}">
+                    onclick="${isActive
+                        ? 'preambuloResetZoom()'
+                        : `preambuloZomarLinea(${l.longitud_onda}, '${safeName}'); document.getElementById('preambuloSVG')?.scrollIntoView({behavior:'smooth', block:'center'})`}"
+                    title="${isActive ? 'Volver a vista completa del espectro' : `Ver ${l.nombre} (${l.longitud_onda.toFixed(1)} Å) en el espectro de arriba`}">
                     ${isActive ? '✕' : '🔍'}
                 </button>
             </td>
@@ -1396,6 +1541,53 @@ function filtrarLineas() {
 
     document.getElementById('linesCountLabel').textContent =
         `Mostrando ${lista.length} de ${_todasLineasData.length} líneas`;
+}
+
+// ── Exportar tabla de líneas ─────────────────────────────────────────────────
+
+function exportarLineas(formato) {
+    const datos = _todasLineasData || [];
+    if (!datos.length) { alert('No hay datos para exportar.'); return; }
+
+    const nombre = (window._preambuloFilename || 'lineas_espectrales').replace(/\.[^.]+$/, '');
+    let contenido, mime, ext;
+
+    if (formato === 'csv') {
+        const cabecera = 'Linea,Lambda_A,EW_A,Profundidad,Intensidad\n';
+        const filas = datos.map(l => {
+            const intens = l.ancho_equivalente > 3 ? 'Muy fuerte'
+                         : l.ancho_equivalente > 1 ? 'Fuerte'
+                         : l.ancho_equivalente > 0.3 ? 'Moderada'
+                         : l.ancho_equivalente > 0.05 ? 'Debil'
+                         : 'No detectada';
+            return `"${l.nombre}",${l.longitud_onda.toFixed(3)},${l.ancho_equivalente.toFixed(4)},${l.profundidad.toFixed(4)},"${intens}"`;
+        }).join('\n');
+        contenido = cabecera + filas;
+        mime = 'text/csv;charset=utf-8;';
+        ext  = 'csv';
+    } else {
+        const sep = '─'.repeat(60);
+        const cab = `${'Línea'.padEnd(20)} ${'λ (Å)'.padStart(9)} ${'EW (Å)'.padStart(9)} ${'Prof.'.padStart(8)}  Intensidad`;
+        const filas = datos.map(l => {
+            const intens = l.ancho_equivalente > 3 ? 'Muy fuerte'
+                         : l.ancho_equivalente > 1 ? 'Fuerte'
+                         : l.ancho_equivalente > 0.3 ? 'Moderada'
+                         : l.ancho_equivalente > 0.05 ? 'Débil'
+                         : 'No detectada';
+            return `${l.nombre.padEnd(20)} ${l.longitud_onda.toFixed(2).padStart(9)} ${l.ancho_equivalente.toFixed(4).padStart(9)} ${l.profundidad.toFixed(4).padStart(8)}  ${intens}`;
+        }).join('\n');
+        contenido = `SpectroClass v3.1 — Líneas Espectrales\nArchivo: ${nombre}\n${sep}\n${cab}\n${sep}\n${filas}\n${sep}\n`;
+        mime = 'text/plain;charset=utf-8;';
+        ext  = 'txt';
+    }
+
+    const blob = new Blob([contenido], { type: mime });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `${nombre}_lineas.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
 }
 
 // ── Zoom en el espectro del Análisis Detallado ───────────────────────────────
@@ -1528,24 +1720,38 @@ function analizarDesdePreambulo(file) {
 
 function setupToggleButtons() {
     const toggles = [
-        { btn: 'toggleAlternatives', body: 'alternativesBody' },
-        { btn: 'toggleDecisionTree', body: 'decisionTreeBody' },
-        { btn: 'toggleLines', body: 'linesBody' },
-        { btn: 'toggleLinesBars', body: 'linesBarsBody' },
-        { btn: 'toggleMethods', body: 'methodsBody' }
+        { btn: 'toggleAlternatives', body: 'alternativesBody',  label: 'Ver detalles' },
+        { btn: 'toggleEspectro',     body: 'espectroBody',       label: 'Ver espectro' },
+        { btn: 'toggleLines',        body: 'linesBody',          label: 'Ver líneas'   },
+        { btn: 'toggleLinesBars',    body: 'linesBarsBody',      label: 'Ver barras'   },
+        { btn: 'toggleDecisionTree', body: 'decisionTreeBody',   label: 'Ver árbol'    },
+        { btn: 'toggleExport',       body: 'exportBody',         label: 'Ver opciones' },
+        { btn: 'toggleMethods',      body: 'methodsBody',        label: 'Ver detalles' }
     ];
 
-    toggles.forEach(({ btn, body }) => {
-        const btnEl = document.getElementById(btn);
+    toggles.forEach(({ btn, body, label }) => {
+        const btnEl  = document.getElementById(btn);
         const bodyEl = document.getElementById(body);
+        if (!btnEl || !bodyEl) return;
 
-        if (btnEl && bodyEl) {
-            btnEl.addEventListener('click', () => {
-                const isHidden = bodyEl.style.display === 'none';
-                bodyEl.style.display = isHidden ? 'block' : 'none';
-                btnEl.textContent = isHidden ? '▲ Ocultar' : '▼ Ver detalles';
-            });
-        }
+        btnEl.addEventListener('click', () => {
+            const isHidden = bodyEl.style.display === 'none';
+            bodyEl.style.display = isHidden ? 'block' : 'none';
+            btnEl.textContent = isHidden ? `▲ Ocultar` : `▼ ${label}`;
+
+            // Redibujar espectro principal al abrirlo
+            if (btn === 'toggleEspectro' && isHidden && _clasifSpecData) {
+                requestAnimationFrame(() =>
+                    dibujarClasifEspectro(_clasifSpecData, _clasifTodasLineas, _clasifLineasUsadasSet)
+                );
+            }
+            // Redibujar mini espectro al abrir el árbol de decisión
+            if (btn === 'toggleDecisionTree' && isHidden && _clasifSpecData) {
+                requestAnimationFrame(() =>
+                    dibujarMiniSpec(_clasifSpecData, _clasifTodasLineas, _clasifLineasUsadasSet)
+                );
+            }
+        });
     });
 }
 
@@ -2077,10 +2283,16 @@ async function trainModel() {
                         setTimeout(() => {
                             progressDiv.style.display = 'none';
                             resultsDiv.style.display = 'block';
-                            document.getElementById('trainAccuracy').textContent = `${event.accuracy}%`;
+                            // Mostrar accuracy en la sección de resultados
+                            document.getElementById('trainAccuracy').textContent = event.accuracy;
                             document.getElementById('trainSamples').textContent  = event.n_samples || '-';
                             document.getElementById('trainTime').textContent     = `${elapsed}s`;
                             document.getElementById('trainDetailsOutput').textContent = 'Entrenamiento completado correctamente.';
+                            // Barra de accuracy
+                            const bar = document.getElementById('trainAccuracyBar');
+                            if (bar) { bar.style.width = Math.min(event.accuracy, 100) + '%'; bar.style.background = event.accuracy >= 80 ? '#22c55e' : event.accuracy >= 60 ? '#f59e0b' : '#ef4444'; }
+                            // Actualizar banner del modelo actual
+                            _updateCurrentModelBanner({ accuracy: event.accuracy, n_samples: event.n_samples, timestamp: new Date().toLocaleDateString() });
                         }, 800);
                     } else {
                         progressFill.style.width = '100%';
@@ -2111,6 +2323,49 @@ function resetTrainConfig() {
     document.getElementById('outputPath').value = 'models/';
     document.getElementById('nEstimatorsGroup').style.display = 'none';
 }
+
+// ─── Banner "Modelo Actual" en la pestaña de entrenamiento ───────────────────
+
+function _updateCurrentModelBanner(info) {
+    const banner = document.getElementById('currentModelBanner');
+    if (!banner) return;
+    const acc = parseFloat(info.accuracy) || 0;
+    const accEl    = document.getElementById('cmbAccuracy');
+    const sampEl   = document.getElementById('cmbSamples');
+    const tsEl     = document.getElementById('cmbTimestamp');
+    const barEl    = document.getElementById('cmbBarFill');
+    const typeEl   = document.getElementById('cmbModelType');
+
+    if (accEl)  accEl.textContent  = acc.toFixed(1) + '%';
+    if (sampEl) sampEl.textContent = info.n_samples || info.n_train + info.n_test || '—';
+    if (tsEl)   tsEl.textContent   = info.timestamp || '—';
+    if (typeEl) typeEl.textContent = info.model_type || 'Árbol de Decisión';
+    if (barEl) {
+        barEl.style.width      = Math.min(acc, 100) + '%';
+        barEl.style.background = acc >= 85 ? '#22c55e' : acc >= 70 ? '#f59e0b' : '#ef4444';
+    }
+    banner.style.display = 'flex';
+}
+
+async function loadCurrentModelBanner() {
+    try {
+        const resp = await fetch('/get_metrics');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (data.accuracy_test !== undefined) {
+            _updateCurrentModelBanner({
+                accuracy:    data.accuracy_test,   // ya viene en % desde la API
+                n_samples:   (data.n_train || 0) + (data.n_test || 0),
+                timestamp:   data.timestamp || '—',
+                model_type:  data.model_type || 'Árbol de Decisión'
+            });
+        }
+    } catch (_) {}
+}
+
+// Llamar al cargar la página y al activar la pestaña de herramientas
+document.addEventListener('DOMContentLoaded', () => { loadCurrentModelBanner(); });
+
 
 function browseCatalog() {
     // Abrir listado de catálogos
@@ -3165,17 +3420,69 @@ async function verifyNeuralModels() {
 }
 
 // Funciones auxiliares para navegación de archivos
-function browseNNCatalog() {
-    listCatalogs();
-    // Cambiar a la pestaña de herramientas momentáneamente para ver los catálogos
+
+// Toggle catálogo inline para Red Neuronal (igual que training tab)
+async function toggleNNCatalogList() {
+    const listDiv = document.getElementById('nnCatalogsList');
+    const contentDiv = document.getElementById('nnCatalogsContent');
+
+    if (listDiv.style.display === 'none') {
+        listDiv.style.display = 'block';
+        contentDiv.innerHTML = '<div class="loading-hint">⏳ Cargando catálogos...</div>';
+
+        try {
+            const response = await fetch('/list_catalogs');
+            const data = await response.json();
+
+            if (data.success && data.catalogs.length > 0) {
+                contentDiv.innerHTML = '';
+                data.catalogs.forEach(catalog => {
+                    const typesStr = Object.entries(catalog.types || {})
+                        .map(([t, c]) => `<span class="type-badge-small">${t}:${c}</span>`)
+                        .join(' ');
+                    const item = document.createElement('div');
+                    item.className = 'catalog-inline-item';
+                    item.innerHTML = `
+                        <div class="catalog-inline-info">
+                            <strong>📂 ${catalog.name}</strong>
+                            <span class="catalog-count">${catalog.n_files} archivos</span>
+                        </div>
+                        <div class="catalog-inline-types">${typesStr}</div>
+                        <button class="btn-small btn-use" onclick="selectNNCatalog('${catalog.path}')">Usar</button>
+                    `;
+                    contentDiv.appendChild(item);
+                });
+            } else {
+                contentDiv.innerHTML = '<div class="no-catalogs">No se encontraron catálogos. Verifica que existan carpetas con archivos *_tipo*.txt</div>';
+            }
+        } catch (error) {
+            contentDiv.innerHTML = `<div class="error-hint">❌ Error: ${error.message}</div>`;
+        }
+    } else {
+        listDiv.style.display = 'none';
+    }
 }
 
-function browseImageDir() {
-    alert('Selecciona el directorio que contiene las imágenes PNG de los espectros.\n\nEjemplo: modelos cnn_knn/espectros_imagenes/');
+function selectNNCatalog(path) {
+    document.getElementById('nnCatalogPath').value = path;
+    document.getElementById('nnCatalogsList').style.display = 'none';
 }
 
-function browseLabelsCSV() {
-    alert('Selecciona el archivo CSV con las etiquetas.\n\nDebe tener columnas: imagen, tipo_espectral\n\nEjemplo: modelos cnn_knn/labels.csv');
+// Selección de carpeta de imágenes para CNN 2D
+function onImageDirSelected(input) {
+    if (input.files && input.files.length > 0) {
+        // webkitRelativePath es "carpeta/archivo.png" — extraer solo el primer segmento
+        const firstPath = input.files[0].webkitRelativePath;
+        const folderName = firstPath.split('/')[0];
+        document.getElementById('cnn2dImageDir').value = folderName + '/';
+    }
+}
+
+// Selección de archivo CSV de etiquetas para CNN 2D
+function onLabelsCsvSelected(input) {
+    if (input.files && input.files.length > 0) {
+        document.getElementById('cnn2dLabelsCSV').value = input.files[0].name;
+    }
 }
 
 
@@ -5281,3 +5588,239 @@ function mlCopyCode(btn) {
         ft.style.visibility = 'hidden';
     }, true);
 })();
+
+// ═══════════════════════════════════════════════════════════
+// EXTRACTOR DE METADATOS FITS → TXT (LOTE)
+// ═══════════════════════════════════════════════════════════
+
+function setupFitsExtractor() {
+    const dropZone   = document.getElementById('dropZoneFits');
+    const fileInput  = document.getElementById('fileInputFits');
+    const btnSelect  = document.getElementById('btnSelectFits');
+    const filesList  = document.getElementById('fitsFilesList');
+    const actions    = document.getElementById('fitsActions');
+    const processBtn = document.getElementById('processFitsBtn');
+    const clearBtn   = document.getElementById('clearFitsBtn');
+    if (!dropZone) return;
+
+    let selectedFiles = [];
+
+    btnSelect.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', e => addFiles(Array.from(e.target.files)));
+
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', e => { if (!dropZone.contains(e.relatedTarget)) dropZone.classList.remove('drag-over'); });
+    dropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        addFiles(Array.from(e.dataTransfer.files).filter(f => /\.(fits?|fit)$/i.test(f.name)));
+    });
+
+    function addFiles(files) {
+        files.forEach(f => { if (!selectedFiles.find(x => x.name === f.name)) selectedFiles.push(f); });
+        renderFilesList();
+    }
+
+    function renderFilesList() {
+        filesList.innerHTML = selectedFiles.map((f, i) =>
+            `<div class="batch-file-item">
+                <span class="file-icon">🔭</span>
+                <span class="file-name">${f.name}</span>
+                <span class="file-size">${(f.size / 1024 / 1024).toFixed(1)} MB</span>
+                <button class="file-remove" onclick="fitsRemoveFile(${i})">✕</button>
+            </div>`
+        ).join('');
+        actions.style.display = selectedFiles.length ? 'flex' : 'none';
+        document.getElementById('fitsResults').style.display = 'none';
+    }
+
+    window.fitsRemoveFile = idx => { selectedFiles.splice(idx, 1); renderFilesList(); };
+
+    clearBtn.addEventListener('click', () => {
+        selectedFiles = [];
+        fileInput.value = '';
+        renderFilesList();
+        document.getElementById('fitsProgress').style.display = 'none';
+        document.getElementById('fitsResults').style.display  = 'none';
+    });
+
+    // ── Procesar de a UNO para evitar límites de tamaño ──────────────────────
+    processBtn.addEventListener('click', async () => {
+        if (!selectedFiles.length) return;
+
+        const total    = selectedFiles.length;
+        const prog     = document.getElementById('fitsProgress');
+        const progFill = document.getElementById('fitsProgressFill');
+        const progText = document.getElementById('fitsProgressText');
+        const titleEl  = document.getElementById('fitsProgressTitle');
+        const logEl    = document.getElementById('fitsLog');
+
+        // ── Pedir carpeta de destino UNA sola vez antes de empezar ────────────
+        let dirHandle = null;
+        const usarCarpeta = 'showDirectoryPicker' in window;
+        if (usarCarpeta) {
+            try {
+                titleEl.textContent = 'Seleccioná la carpeta donde guardar los TXT…';
+                prog.style.display  = 'block';
+                dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+            } catch (err) {
+                if (err.name === 'AbortError') { prog.style.display = 'none'; return; }
+                // Si falla el picker continuamos sin él (fallback al final)
+                dirHandle = null;
+            }
+        }
+
+        prog.style.display = 'block';
+        document.getElementById('fitsResults').style.display = 'none';
+        logEl.innerHTML = '';
+        progFill.style.width = '0%';
+
+        const resultados  = [];
+        const txtFallback = [];   // solo se usa si no hay dirHandle
+        let okCount = 0, errCount = 0;
+
+        for (let i = 0; i < total; i++) {
+            const f = selectedFiles[i];
+            titleEl.textContent  = `Procesando ${i + 1} / ${total}: ${f.name}`;
+            progText.textContent = `${i} / ${total} procesados`;
+            progFill.style.width = `${Math.round((i / total) * 100)}%`;
+
+            const fd = new FormData();
+            fd.append('file', f);
+
+            try {
+                const resp = await fetch('/fits_extract_one', { method: 'POST', body: fd });
+                const data = await resp.json();
+                resultados.push(data);
+
+                if (data.ok) {
+                    okCount++;
+
+                    if (dirHandle) {
+                        // Guardar directamente en la carpeta elegida
+                        try {
+                            const fh = await dirHandle.getFileHandle(data.nombre_out, { create: true });
+                            const wr = await fh.createWritable();
+                            await wr.write(data.txt_content);
+                            await wr.close();
+                            logEl.innerHTML += `<div style="color:#4ade80;font-size:0.78rem;padding:1px 0;">
+                                ✅ ${f.name} → <b>${data.nombre_out}</b>
+                                (${data.rango_lambda}, ${data.n_puntos} pts) — guardado</div>`;
+                        } catch (we) {
+                            logEl.innerHTML += `<div style="color:#fbbf24;font-size:0.78rem;padding:1px 0;">
+                                ⚠️ ${data.nombre_out}: no se pudo escribir — ${we.message}</div>`;
+                            txtFallback.push({ nombre: data.nombre_out, contenido: data.txt_content });
+                        }
+                    } else {
+                        // Sin picker: acumular para descarga al final
+                        txtFallback.push({ nombre: data.nombre_out, contenido: data.txt_content });
+                        logEl.innerHTML += `<div style="color:#4ade80;font-size:0.78rem;padding:1px 0;">
+                            ✅ ${f.name} → <b>${data.nombre_out}</b>
+                            (${data.rango_lambda}, ${data.n_puntos} pts)</div>`;
+                    }
+                } else {
+                    errCount++;
+                    logEl.innerHTML += `<div style="color:#f87171;font-size:0.78rem;padding:1px 0;">
+                        ❌ ${f.name}: ${data.error}</div>`;
+                }
+            } catch (err) {
+                errCount++;
+                resultados.push({ ok: false, original: f.name, error: err.message });
+                logEl.innerHTML += `<div style="color:#f87171;font-size:0.78rem;padding:1px 0;">
+                    ❌ ${f.name}: Error de red — ${err.message}</div>`;
+            }
+
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        progFill.style.width = '100%';
+        titleEl.textContent  = dirHandle
+            ? `✅ Completado — archivos guardados en carpeta seleccionada`
+            : `✅ Procesamiento completado`;
+        progText.textContent = `${okCount} convertidos, ${errCount} omitidos`;
+
+        // Contadores
+        document.getElementById('fitsOkCount').textContent  = okCount;
+        document.getElementById('fitsErrCount').textContent = errCount;
+
+        // Tabla resumen
+        document.getElementById('fitsResultsTable').innerHTML = `
+            <table class="all-lines-table" style="margin-top:0.8rem;">
+                <thead><tr>
+                    <th>Original</th><th>Objeto</th><th>SPTYPE</th>
+                    <th>Salida</th><th>Rango λ</th><th>Puntos</th><th>Estado</th>
+                </tr></thead>
+                <tbody>
+                ${resultados.map(r => `<tr>
+                    <td class="fits-key">${r.original || ''}</td>
+                    <td>${r.objeto || '—'}</td>
+                    <td><b>${r.sptype || '—'}</b></td>
+                    <td class="fits-val">${r.nombre_out || '—'}</td>
+                    <td>${r.rango_lambda || '—'}</td>
+                    <td>${r.n_puntos || '—'}</td>
+                    <td style="color:${r.ok ? '#4ade80' : '#f87171'}">${r.ok ? '✅ OK' : '❌ ' + (r.error||'')}</td>
+                </tr>`).join('')}
+                </tbody>
+            </table>`;
+
+        document.getElementById('fitsResults').style.display = 'block';
+
+        // Botón TXT: solo relevante si NO se usó picker (o si hubo errores de escritura)
+        const btnTxt = document.getElementById('downloadFitsTxtZip');
+        if (dirHandle && txtFallback.length === 0) {
+            // Todo guardado en carpeta → ocultar botón de descarga
+            btnTxt.style.display = 'none';
+        } else {
+            btnTxt.style.display = '';
+            btnTxt.textContent   = dirHandle
+                ? `📥 Reintentar ${txtFallback.length} TXT no guardados`
+                : `📂 Guardar TXT en carpeta...`;
+            btnTxt.onclick = async () => {
+                if (!txtFallback.length) { alert('No hay archivos pendientes.'); return; }
+                if (usarCarpeta) {
+                    try {
+                        const dh = await window.showDirectoryPicker({ mode: 'readwrite' });
+                        for (const arch of txtFallback) {
+                            const fh = await dh.getFileHandle(arch.nombre, { create: true });
+                            const wr = await fh.createWritable();
+                            await wr.write(arch.contenido);
+                            await wr.close();
+                        }
+                        alert(`✅ ${txtFallback.length} archivos guardados.`);
+                    } catch (err) {
+                        if (err.name !== 'AbortError') _fitsFallbackDownload(txtFallback);
+                    }
+                } else {
+                    _fitsFallbackDownload(txtFallback);
+                }
+            };
+        }
+
+        // CSV metadatos
+        const metaCSV = ['original,objeto,sptype,nombre_salida,rango_lambda,n_puntos,ok,error']
+            .concat(resultados.map(r =>
+                `"${r.original||''}","${r.objeto||''}","${r.sptype||''}","${r.nombre_out||''}",` +
+                `"${r.rango_lambda||''}",${r.n_puntos||0},${r.ok},"${r.error||''}"`
+            )).join('\n');
+
+        document.getElementById('downloadFitsMeta').onclick = () => {
+            const blob = new Blob([metaCSV], { type: 'text/csv;charset=utf-8;' });
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href = url; a.download = 'metadatos_fits.csv'; a.click();
+            URL.revokeObjectURL(url);
+        };
+    });
+
+    function _fitsFallbackDownload(archivos) {
+        archivos.forEach((f, idx) => {
+            setTimeout(() => {
+                const blob = new Blob([f.contenido], { type: 'text/plain;charset=utf-8;' });
+                const url  = URL.createObjectURL(blob);
+                const a    = document.createElement('a');
+                a.href = url; a.download = f.nombre; a.click();
+                URL.revokeObjectURL(url);
+            }, idx * 300);
+        });
+    }
+}

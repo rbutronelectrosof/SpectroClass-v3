@@ -660,28 +660,47 @@ class SpectralValidator:
 
     def _weighted_vote(self, results):
         """
-        Votación ponderada entre métodos.
+        Votación ponderada entre métodos de clasificación.
+
+        Cada método "vota" por un tipo espectral con un peso proporcional a su
+        peso configurado y la confianza de su predicción.
+
+        Fórmula de voto:
+            voto[tipo] += peso_método × (confianza_método / 100.0)
+
+        Pesos por defecto (cuando hay modelo neural):
+            físico=0.10, árbol_decisión=0.40, template=0.10, neural=0.40
+
+        Pesos sin modelo neural:
+            físico=0.15, árbol_decisión=0.70, template=0.15
+
+        La confianza global final se calcula como:
+            confianza = (voto_ganador / suma_votos_posible) × 100
 
         Returns
         -------
         tipo_final : str
+            Tipo espectral ganador (mayor voto ponderado)
         alternativas : list
-            Top 3 con justificación
+            Top 3 tipos con detalle: tipo, voto, confianza promedio, qué métodos lo votaron
         confianza : float
+            Confianza global (0-100%)
         """
-        # Acumular votos ponderados
+        # Acumular votos ponderados — dict tipo → suma de pesos×confianza
         votes = defaultdict(float)
+        # Para cada tipo, guardar las confianzas de cada método que lo votó
         confidences = defaultdict(list)
 
-        # Votos del clasificador físico
+        # ── Votos del clasificador físico (reglas espectroscópicas) ──────────
         if 'physical' in results and results['physical']:
             tipo = results['physical']['tipo']
             conf = results['physical']['confianza']
             weight = self.weights['physical']
+            # Voto ponderado: peso × confianza normalizada (0-1)
             votes[tipo] += weight * (conf / 100.0)
             confidences[tipo].append(conf)
 
-        # Votos del árbol de decisión
+        # ── Votos del árbol de decisión (ML entrenado con catálogo) ──────────
         if results.get('decision_tree'):
             tipo = results['decision_tree']['tipo']
             conf = results['decision_tree']['confianza']
@@ -689,7 +708,7 @@ class SpectralValidator:
             votes[tipo] += weight * (conf / 100.0)
             confidences[tipo].append(conf)
 
-        # Votos de template matching
+        # ── Votos de template matching (chi-cuadrado con templates de referencia)
         if 'template_matching' in results and results['template_matching']:
             tipo = results['template_matching']['tipo']
             conf = results['template_matching']['confianza']
@@ -697,7 +716,9 @@ class SpectralValidator:
             votes[tipo] += weight * (conf / 100.0)
             confidences[tipo].append(conf)
 
-        # Votos de clasificadores neuronales (KNN/CNN)
+        # ── Votos de clasificadores neuronales (KNN/CNN) si están disponibles ─
+        # El modelo neural puede ser KNN (usa EWs como features) o CNN 1D (usa
+        # el espectro completo). Solo vota si está activo y tiene peso asignado.
         if results.get('neural') and 'neural' in self.weights:
             tipo = results['neural']['tipo']
             conf = results['neural']['confianza']
@@ -705,35 +726,39 @@ class SpectralValidator:
             votes[tipo] += weight * (conf / 100.0)
             confidences[tipo].append(conf)
 
-        # Ordenar por votos
+        # ── Ordenar tipos por votos acumulados (mayor primero) ───────────────
         sorted_votes = sorted(votes.items(), key=lambda x: x[1], reverse=True)
 
-        # Tipo con más votos
+        # El tipo con mayor suma de votos ponderados gana
         tipo_final = sorted_votes[0][0] if sorted_votes else 'Unknown'
 
-        # Top 3 alternativas
+        # ── Construir lista de top 3 alternativas con justificación ──────────
         alternativas = []
         for i, (tipo, vote_score) in enumerate(sorted_votes[:3]):
-            # Confianza promedio de los métodos que votaron por este tipo
+            # Confianza del tipo: promedio de confianzas de métodos que lo votaron
             avg_conf = np.mean(confidences[tipo]) if confidences[tipo] else 0.0
 
-            # Justificación
+            # Texto explicando qué métodos votaron por este tipo y con qué prob.
             justification = self._generate_justification(tipo, results)
 
             alternativas.append({
                 'tipo': tipo,
                 'confianza': avg_conf,
-                'votos_ponderados': vote_score * 100,
+                'votos_ponderados': vote_score * 100,  # escalar a %
                 'justificacion': justification
             })
 
-        # Confianza global basada en consenso
+        # ── Confianza global basada en nivel de consenso entre métodos ───────
+        # Si el ganador tiene el doble de votos que el segundo → alto consenso
+        # → se incrementa la confianza en 10%. Si hay disputa (ratio < 2) → se
+        # reduce la confianza un 15% para reflejar la incertidumbre.
         if len(sorted_votes) >= 2:
-            # Si hay consenso (top voto >> segundo voto), alta confianza
             ratio = sorted_votes[0][1] / (sorted_votes[1][1] + 0.01)
             if ratio > 2.0:
+                # Consenso fuerte: todos los métodos importantes coinciden
                 confianza_global = min(95.0, alternativas[0]['confianza'] * 1.1)
             else:
+                # Consenso débil: los métodos no coinciden, penalizar confianza
                 confianza_global = alternativas[0]['confianza'] * 0.85
         else:
             confianza_global = alternativas[0]['confianza'] if alternativas else 0.0

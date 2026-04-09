@@ -385,7 +385,17 @@ def train_decision_tree(X_train, y_train, X_test, y_test, max_depth=10):
     print("ENTRENAMIENTO DE ÁRBOL DE DECISIÓN")
     print(f"{'='*70}")
 
-    # Entrenar
+    # Entrenar el árbol de decisión
+    # Parámetros clave:
+    #   max_depth: profundidad máxima del árbol
+    #     - Más profundo → aprende más detalles pero riesgo de sobreajuste (overfitting)
+    #     - Más corto → más generalizable, pero puede perder detalles
+    #     - Valor típico: 5-15 para este dominio (7 tipos × 10 subtipos)
+    #   min_samples_split: mínimo de muestras para dividir un nodo
+    #     - Evita crear ramas con muy pocas muestras (ruido)
+    #   min_samples_leaf: mínimo de muestras en cada hoja final
+    #     - Evita predicciones basadas en muy pocos espectros
+    #   random_state: semilla para reproducibilidad exacta
     model = DecisionTreeClassifier(
         max_depth=max_depth,
         min_samples_split=10,
@@ -395,7 +405,10 @@ def train_decision_tree(X_train, y_train, X_test, y_test, max_depth=10):
 
     model.fit(X_train, y_train)
 
-    # Evaluar
+    # Evaluar accuracy en entrenamiento Y prueba
+    # Si acc_train >> acc_test → overfitting (memoriza en lugar de generalizar)
+    # Si ambos son bajos → underfitting (modelo muy simple)
+    # Ideal: acc_train ≈ acc_test con ambos altos
     y_pred_train = model.predict(X_train)
     y_pred_test = model.predict(X_test)
 
@@ -407,7 +420,9 @@ def train_decision_tree(X_train, y_train, X_test, y_test, max_depth=10):
     print(f"Profundidad del árbol: {model.get_depth()}")
     print(f"Número de hojas: {model.get_n_leaves()}")
 
-    # Feature importance
+    # Feature importance: qué líneas espectrales son más útiles para clasificar
+    # feature_importances_ = reducción de impureza (Gini) aportada por cada feature
+    # Los EWs de He II, He I, Balmer y Ca II K suelen dominar
     feature_names = X_train.columns if hasattr(X_train, 'columns') else [f'f{i}' for i in range(X_train.shape[1])]
     importances = pd.DataFrame({
         'feature': feature_names,
@@ -453,6 +468,14 @@ def cross_validate_model(X, y, model, k=5):
 def validate_physical_classifier(df, catalog_dir=None):
     """
     Valida el clasificador físico actual con el catálogo.
+
+    El "clasificador físico" usa reglas espectroscópicas (árbol de decisión físico):
+    - Si He II fuerte → tipo O
+    - Si He I presente, He II ausente → tipo B
+    - Si Balmer domina → tipo A o F
+    - Si metales dominan → tipo G, K o M
+    Estas reglas NO requieren entrenamiento; están codificadas en spectral_classification_corrected.py.
+    Esta función mide qué tan bien funciona antes de usar el modelo ML.
 
     Returns
     -------
@@ -699,22 +722,27 @@ def main():
     print(f"Datos de prueba: {len(X_test)} espectros")
     print(f"Tipo de modelo: {args.model}")
 
-    # 4. Entrenar modelo según tipo seleccionado
+    # ── PASO 4: Entrenar modelo ML según tipo seleccionado ───────────────────
+    # Árbol de decisión: simple, interpretable, muestra reglas → ideal para este dominio
+    # Random Forest: conjunto de árboles, más preciso pero menos interpretable
+    # Gradient Boosting: árboles en secuencia correctiva, más preciso pero más lento
     if args.model == 'decision_tree':
         model_dt, acc_dt, importances = train_decision_tree(
             X_train, y_train, X_test, y_test, max_depth=args.tree_depth
         )
     elif args.model == 'random_forest':
         from sklearn.ensemble import RandomForestClassifier
+        # n_jobs=-1 usa todos los núcleos disponibles para acelerar
         model_dt = RandomForestClassifier(
-            n_estimators=args.n_estimators,
-            max_depth=args.tree_depth,
-            random_state=42,
-            n_jobs=-1
+            n_estimators=args.n_estimators,   # cuántos árboles combinar
+            max_depth=args.tree_depth,         # profundidad máxima de cada árbol
+            random_state=42,                   # semilla para reproducibilidad
+            n_jobs=-1                          # paralelismo máximo
         )
         model_dt.fit(X_train, y_train)
         y_pred = model_dt.predict(X_test)
         acc_dt = accuracy_score(y_test, y_pred)
+        # feature_importances_: cuánto contribuye cada feature a las decisiones
         importances = pd.Series(model_dt.feature_importances_, index=feature_cols).sort_values(ascending=False)
         print(f"\n{'='*50}")
         print(f"RANDOM FOREST ({args.n_estimators} árboles)")
@@ -722,9 +750,10 @@ def main():
         print(f"Accuracy en test: {acc_dt*100:.2f}%")
     elif args.model == 'gradient_boosting':
         from sklearn.ensemble import GradientBoostingClassifier
+        # Cada estimador aprende de los errores del anterior (boosting secuencial)
         model_dt = GradientBoostingClassifier(
-            n_estimators=args.n_estimators,
-            max_depth=args.tree_depth,
+            n_estimators=args.n_estimators,  # número de pasos de boosting
+            max_depth=args.tree_depth,        # profundidad de árboles base
             random_state=42
         )
         model_dt.fit(X_train, y_train)
@@ -736,25 +765,32 @@ def main():
         print(f"{'='*50}")
         print(f"Accuracy en test: {acc_dt*100:.2f}%")
 
-    # 5. Validación cruzada
+    # ── PASO 5: Validación cruzada k-fold ────────────────────────────────────
+    # Divide todos los datos en k grupos, entrena k veces dejando un grupo fuera
+    # como test en cada iteración. Mide la variabilidad del accuracy (std).
+    # Más confiable que un solo split train/test.
     scores_cv, mean_cv = cross_validate_model(X, y, model_dt, k=args.k_folds)
 
-    # 6. Guardar modelo
+    # ── PASO 6: Guardar modelo entrenado (.pkl) ───────────────────────────────
+    # El modelo se guarda con pickle para cargarlo en el servidor Flask
+    # sin necesidad de volver a entrenar en cada inicio.
     model_path = os.path.join(args.output_dir, 'decision_tree.pkl')
     with open(model_path, 'wb') as f:
         pickle.dump(model_dt, f)
     print(f"[OK] Modelo guardado: {model_path}")
 
-    # 7. Guardar metadata
+    # ── PASO 7: Guardar metadata del entrenamiento (.json) ────────────────────
+    # Permite al servidor saber la accuracy, número de muestras y fecha del modelo
+    # sin necesidad de cargarlo completo (útil para el banner de "modelo activo").
     metadata = {
-        'n_train': len(X_train),
-        'n_test': len(X_test),
-        'accuracy_test': acc_dt,
-        'accuracy_cv_mean': mean_cv,
-        'accuracy_cv_std': scores_cv.std(),
-        'accuracy_physical': acc_physical,
-        'feature_names': feature_cols,
-        'timestamp': datetime.now().isoformat()
+        'n_train': len(X_train),              # muestras de entrenamiento
+        'n_test': len(X_test),                # muestras de evaluación
+        'accuracy_test': acc_dt,              # accuracy en conjunto de test (0-1)
+        'accuracy_cv_mean': mean_cv,          # accuracy promedio en validación cruzada
+        'accuracy_cv_std': scores_cv.std(),   # variabilidad del accuracy
+        'accuracy_physical': acc_physical,    # accuracy del clasificador físico (referencia)
+        'feature_names': feature_cols,        # lista de features usadas (para debugging)
+        'timestamp': datetime.now().isoformat()  # fecha y hora de entrenamiento
     }
 
     metadata_path = os.path.join(args.output_dir, 'metadata.json')
@@ -762,17 +798,21 @@ def main():
         json.dump(metadata, f, indent=2)
     print(f"[OK] Metadata guardada: {metadata_path}")
 
-    # 8. Visualizaciones
+    # ── PASO 8: Visualizaciones ───────────────────────────────────────────────
     y_pred = model_dt.predict(X_test)
 
+    # Matriz de confusión: filas = tipo real, columnas = tipo predicho
+    # La diagonal muestra aciertos; fuera de diagonal = errores
     cm_path = os.path.join(args.output_dir, 'confusion_matrix.png')
     plot_confusion_matrix(y_test, y_pred, MAIN_TYPES, cm_path)
 
+    # Diagrama del árbol: solo para árbol de decisión (RF/GB no son visualizables)
     if args.model == 'decision_tree':
         tree_path = os.path.join(args.output_dir, 'decision_tree.png')
+        # max_depth=3 muestra solo los 3 primeros niveles (más legible)
         plot_decision_tree_diagram(model_dt, feature_cols, tree_path, max_depth=3)
 
-    # 9. Reporte
+    # ── PASO 9: Reporte de validación (.txt) ─────────────────────────────────
     generate_report(df, results_physical, model_dt, acc_dt, importances, args.output_dir)
 
     print(f"\n{'='*70}")

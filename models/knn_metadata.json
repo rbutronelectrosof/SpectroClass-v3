@@ -1,22 +1,23 @@
 {
   "model_type": "knn",
-  "n_samples": 861,
-  "n_classes": 6,
+  "n_samples": 1350,
+  "n_classes": 7,
   "classes": [
     "A",
     "B",
     "F",
+    "G",
     "K",
     "M",
     "O"
   ],
   "test_size": 0.2,
-  "timestamp": "2026-03-23T10:50:11.838414",
-  "accuracy_test": 0.884393063583815,
-  "accuracy_cv_mean": 0.8780548460814626,
-  "accuracy_cv_std": 0.020761366924566253,
-  "n_neighbors": 3,
+  "timestamp": "2026-04-08T23:21:33.919548",
+  "accuracy_test": 0.7962962962962963,
+  "accuracy_cv_mean": 0.797037037037037,
+  "accuracy_cv_std": 0.02347108076704422,
+  "n_neighbors": 5,
   "weights": "uniform",
   "metric": "euclidean",
-  "training_time_seconds": 111.05176782608032
+  "training_time_seconds": 157.85487818717957
 }

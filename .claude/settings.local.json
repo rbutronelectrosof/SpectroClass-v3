@@ -14,7 +14,10 @@
       "Read(//home/roberto/.local/bin/**)",
       "Bash(\"/mnt/c/Users/Eduardo/AppData/Local/Programs/Python/Python313/python.exe\" -c \"\nimport sys, zipfile, re\nsys.stdout.reconfigure\\(encoding='utf-8'\\)\n\ndocx = r'C:\\\\Users\\\\Eduardo\\\\Desktop\\\\Clasificacion espectral1.docx'\nwith zipfile.ZipFile\\(docx\\) as z:\n    with z.open\\('word/document.xml'\\) as f:\n        content = f.read\\(\\).decode\\('utf-8'\\)\n\ntext = re.sub\\(r'<[^>]+>', ' ', content\\)\ntext = re.sub\\(r'\\\\s+', ' ', text\\).strip\\(\\)\nprint\\(text[24000:]\\)\n\" 2>&1)",
       "Bash(node:*)",
-      "Bash(pdflatex -interaction=nonstopmode arbol_decision_28nodos.tex)"
+      "Bash(pdflatex -interaction=nonstopmode arbol_decision_28nodos.tex)",
+      "Bash(pip install:*)",
+      "Bash(pip3 install:*)",
+      "Bash(grep -v \"^$\")"
     ]
   }
 }

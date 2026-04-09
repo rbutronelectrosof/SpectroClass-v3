@@ -464,42 +464,44 @@ body {
 #alternativesList {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.35rem;
 }
 
-.alternative-item {
-    background: #f8f9fa;
-    padding: 1rem;
-    border-radius: 8px;
-    border-left: 4px solid var(--primary);
-}
-
-.alternative-item.rank-1 { border-left-color: #FFD700; }
-.alternative-item.rank-2 { border-left-color: #C0C0C0; }
-.alternative-item.rank-3 { border-left-color: #CD7F32; }
-
-.alternative-header {
+.alt-chip {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 5px 12px;
+    border-radius: 6px;
+    border-left: 3px solid #334155;
+    background: #f1f5f9;
+    font-size: 0.88rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
+.alt-chip.rank-1 { border-left-color: #ca8a04; background: #fefce8; }
+.alt-chip.rank-2 { border-left-color: #94a3b8; background: #f8fafc; }
+.alt-chip.rank-3 { border-left-color: #b45309; background: #fffbeb; }
 
-.alternative-type {
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: var(--dark);
+.alt-chip-tipo {
+    font-weight: 700;
+    color: #1e293b;
+    font-family: monospace;
+    font-size: 1rem;
+    flex-shrink: 0;
 }
-
-.alternative-confidence {
-    font-size: 1.2rem;
+.alt-chip-pct {
+    color: #3b82f6;
+    font-size: 0.85rem;
     font-weight: 600;
-    color: var(--primary);
+    flex-shrink: 0;
 }
-
-.alternative-justification {
-    color: var(--gray);
-    font-size: 0.9rem;
+.alt-chip-just {
+    color: #64748b;
+    font-size: 0.78rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* ========================================================================
@@ -1436,6 +1438,61 @@ details[open] summary {
 .tl-warn  { color: #f39c12; }
 .tl-head  { color: #74b9ff; font-weight: bold; }
 .tl-pct   { color: #a29bfe; }
+
+/* ─── Banner "Modelo Actual" ─────────────────────────────────────────────── */
+.current-model-banner {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    background: linear-gradient(135deg, #1e3a5f 0%, #0f2744 100%);
+    border: 1px solid #2d5a8e;
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+}
+.cmb-left   { display: flex; align-items: center; gap: 0.5rem; color: #94a3b8; font-size: 0.9rem; }
+.cmb-icon   { font-size: 1.4rem; }
+.cmb-label  { color: #94a3b8; }
+.cmb-type   { color: #60a5fa; font-weight: 700; font-size: 1rem; }
+.cmb-stats  { display: flex; gap: 1.5rem; flex: 1; justify-content: center; }
+.cmb-stat   { text-align: center; }
+.cmb-stat-value { display: block; font-size: 1.6rem; font-weight: 800; color: #f0f4ff; line-height: 1; }
+.cmb-stat-label { font-size: 0.72rem; color: #7da4d0; text-transform: uppercase; letter-spacing: .5px; }
+.cmb-stat:first-child .cmb-stat-value { color: #34d399; font-size: 2rem; }
+.cmb-bar-wrap   { width: 100%; }
+.cmb-bar-track  { background: #1e3352; border-radius: 6px; height: 8px; overflow: hidden; }
+.cmb-bar-fill   { height: 100%; border-radius: 6px; transition: width .6s ease; }
+
+/* ─── Accuracy Hero (resultado de entrenamiento) ────────────────────────── */
+.accuracy-hero {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+    border: 1px solid #059669;
+    border-radius: 14px;
+    padding: 1.25rem 1.75rem;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+}
+.accuracy-hero-circle {
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+}
+.accuracy-hero-value {
+    font-size: 3.2rem;
+    font-weight: 900;
+    color: #34d399;
+    line-height: 1;
+}
+.accuracy-hero-pct  { font-size: 1.5rem; font-weight: 700; color: #6ee7b7; }
+.accuracy-hero-label { color: #a7f3d0; font-size: 0.95rem; line-height: 1.4; flex: 1; }
+.accuracy-hero-label small { color: #6ee7b7; font-size: 0.8rem; }
+.accuracy-hero-bar-wrap { width: 100%; }
+.accuracy-hero-bar-track { background: #022c22; border-radius: 6px; height: 10px; overflow: hidden; }
+.accuracy-hero-bar-fill  { height: 100%; border-radius: 6px; transition: width .8s ease; }
 
 .train-results {
     background: white;
@@ -3463,6 +3520,12 @@ details[open] summary {
     font-weight: 600;
     font-family: monospace;
 }
+/* Badge especial para features del árbol de decisión */
+.linea-dt-badge {
+    background: #fef3c7;
+    border: 1px solid #f59e0b;
+    color: #92400e;
+}
 
 /* Lista de pasos (justificación) */
 .justificacion-list {
@@ -3638,25 +3701,73 @@ details[open] summary {
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
     gap: 0.7rem;
 }
+
+/* Título de sección dentro del grid — ocupa toda la fila */
+.preambulo-info-section-title {
+    grid-column: 1 / -1;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #94a3b8;
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid #334155;
+    margin-top: 0.4rem;
+}
+.preambulo-info-section-title:first-child {
+    margin-top: 0;
+}
+
+/* Sección calculada — color diferente */
+.preambulo-info-section-calc {
+    color: #a78bfa;
+    border-bottom-color: #4c1d95;
+}
+
+/* Item base — datos del archivo */
 .preambulo-info-item {
     background: #1e293b;
+    border-left: 3px solid #334155;
     border-radius: 6px;
     padding: 0.55rem 0.9rem;
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
 }
+
+/* Item calculado — fondo y borde distintos */
+.preambulo-info-item.preambulo-info-calc {
+    background: #1e1535;
+    border-left: 3px solid #7c3aed;
+}
+
 .preambulo-info-label {
     font-size: 0.72rem;
     color: #64748b;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
 }
 .preambulo-info-value {
     font-size: 0.92rem;
     color: #e2e8f0;
     font-family: monospace;
     word-break: break-all;
+}
+
+/* Badge "calculado" */
+.calc-badge {
+    font-size: 0.62rem;
+    background: #4c1d95;
+    color: #c4b5fd;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0;
 }
 
 /* Tabla FITS header */
@@ -3794,6 +3905,37 @@ details[open] summary {
     font-size: 0.72rem;
     color: #64748b;
     white-space: nowrap;
+}
+
+/* Botón zoom espectro en tabla de líneas */
+.btn-ll-zoom {
+    background: transparent;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    color: #64748b;
+    font-size: 0.75rem;
+    padding: 2px 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.btn-ll-zoom::after {
+    content: ' ver';
+    font-size: 0.65rem;
+    color: #475569;
+}
+.btn-ll-zoom:hover {
+    background: #1e3a5f;
+    border-color: #3b82f6;
+    color: #93c5fd;
+}
+.btn-ll-zoom.active {
+    background: #1e3a5f;
+    border-color: #3b82f6;
+    color: #93c5fd;
+}
+.btn-ll-zoom.active::after {
+    content: ' cerrar';
 }
 
 /* Drop zone dentro del Preámbulo */
@@ -4960,4 +5102,87 @@ details[open] summary {
     color: #475569;
     font-family: monospace;
     text-align: right;
+}
+
+/* ── Barra exportar líneas espectrales ── */
+.lines-export-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 0.8rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid #1e293b;
+}
+.lines-export-label {
+    font-size: 0.8rem;
+    color: #64748b;
+}
+.btn-export {
+    padding: 4px 14px;
+    font-size: 0.8rem;
+    border-radius: 5px;
+    border: 1px solid #334155;
+    background: #0f172a;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.btn-export:hover {
+    background: #1e3a5f;
+    border-color: #3b82f6;
+    color: #93c5fd;
+}
+
+/* ── Sección Exportar Datos ── */
+.export-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+.export-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 0.8rem 1rem;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+.export-card:hover {
+    background: #1e3a5f;
+    border-color: #3b82f6;
+}
+.export-icon {
+    font-size: 1.6rem;
+    flex-shrink: 0;
+}
+.export-info {
+    flex: 1;
+}
+.export-name {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    margin-bottom: 0.15rem;
+}
+.export-desc {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+.export-btn {
+    flex-shrink: 0;
+    padding: 5px 14px;
+    font-size: 0.8rem;
+    border-radius: 5px;
+    border: 1px solid #3b82f6;
+    background: transparent;
+    color: #93c5fd;
+    cursor: pointer;
+    pointer-events: none;
+}
+.export-card:hover .export-btn {
+    background: #3b82f6;
+    color: #fff;
 }
