@@ -12,12 +12,12 @@
     "O"
   ],
   "test_size": 0.2,
-  "timestamp": "2026-04-08T23:21:33.919548",
-  "accuracy_test": 0.7962962962962963,
-  "accuracy_cv_mean": 0.797037037037037,
-  "accuracy_cv_std": 0.02347108076704422,
-  "n_neighbors": 5,
-  "weights": "uniform",
-  "metric": "euclidean",
-  "training_time_seconds": 157.85487818717957
+  "timestamp": "2026-04-12T17:52:08.756013",
+  "accuracy_test": 0.825925925925926,
+  "accuracy_cv_mean": 0.7837037037037037,
+  "accuracy_cv_std": 0.02452288201073607,
+  "n_neighbors": 7,
+  "weights": "distance",
+  "metric": "cosine",
+  "training_time_seconds": 177.39597845077515
 }

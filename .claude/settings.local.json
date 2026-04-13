@@ -17,7 +17,8 @@
       "Bash(pdflatex -interaction=nonstopmode arbol_decision_28nodos.tex)",
       "Bash(pip install:*)",
       "Bash(pip3 install:*)",
-      "Bash(grep -v \"^$\")"
+      "Bash(grep -v \"^$\")",
+      "Bash(find \"/mnt/c/Users/Eduardo/Desktop/suppnet-main\" -maxdepth 2 -type d -exec ls -ld {} \\\\;)"
     ]
   }
 }

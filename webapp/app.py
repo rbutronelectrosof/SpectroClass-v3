@@ -29,6 +29,91 @@ import io
 import base64
 from datetime import datetime
 
+# ── Módulo de normalización de espectros crudos ────────────────────────────
+_NORMALIZADOR_PATH = r"C:\Users\Eduardo\Desktop\suppnet-main"
+_normalizador_nn = None          # Se carga una vez al arranque
+NORMALIZADOR_DISPONIBLE = False
+
+try:
+    import sys as _sys
+    if _NORMALIZADOR_PATH not in _sys.path:
+        _sys.path.insert(0, _NORMALIZADOR_PATH)
+
+    # ── Parche de compatibilidad TF 2.13+ / Keras 3 ──────────────────────
+    # En versiones nuevas de Keras, tf.reshape() no puede recibir un
+    # KerasTensor directamente dentro del grafo funcional. Se reemplaza la
+    # función UpSampling1D_layers del módulo original por una versión que usa
+    # capas Keras (Lambda + expand_dims/squeeze) en lugar de tf.reshape().
+    import suppnet.SUPPNet as _suppnet_mod
+    import tensorflow as _tf
+
+    def _UpSampling1D_layers_compat(inputs, size=2):
+        """Versión compatible con Keras 3 / TF ≥ 2.13."""
+        x = _tf.keras.layers.Lambda(
+            lambda t: _tf.expand_dims(t, axis=2))(inputs)
+        x = _tf.keras.layers.UpSampling2D(
+            size=(size, 1), data_format=None, interpolation="bilinear")(x)
+        x = _tf.keras.layers.Lambda(
+            lambda t: _tf.squeeze(t, axis=2))(x)
+        return x
+
+    _suppnet_mod.UpSampling1D_layers = _UpSampling1D_layers_compat
+
+    # ── Parche de carga de pesos para Keras 3 ────────────────────────────
+    # Keras 3 ya no acepta checkpoints TF2 en model.load_weights().
+    # Se reemplaza get_suppnet_model por una versión que usa
+    # tf.train.load_checkpoint y asigna los tensores variable a variable.
+    import os as _os
+
+    def _load_weights_keras3(model, path):
+        """Carga un checkpoint TF2 en un modelo Keras 3 variable por variable."""
+        reader = _tf.train.load_checkpoint(path)
+        ckpt_keys = set(reader.get_variable_to_shape_map().keys())
+        loaded = 0
+        for var in model.variables:
+            base = var.name.split(':')[0]   # p.ej. "conv1d/kernel"
+            key  = base + '/.ATTRIBUTES/VARIABLE_VALUE'
+            if key in ckpt_keys:
+                var.assign(reader.get_tensor(key))
+                loaded += 1
+        print(f"[Normalización] Pesos cargados: {loaded}/{len(model.variables)}")
+        return loaded
+
+    def _get_suppnet_model_compat(norm_only=True, which_weights="active"):
+        """Versión de get_suppnet_model compatible con Keras 3."""
+        _tf.keras.backend.clear_session()
+        print("Construyendo modelo de normalización…")
+        model = _suppnet_mod.create_SUPPNet_model(input_shape=(8192, 1))
+        print("Modelo construido. Cargando pesos…")
+
+        suppnet_dir = _os.path.join(_NORMALIZADOR_PATH, "suppnet")
+        weight_map = {
+            "active":   "supp_weights/SUPPNet_active",
+            "synth":    "supp_weights/SUPPNet_synth",
+            "emission": "supp_weights/SUPPNet_18_powr",
+        }
+        rel_path = weight_map.get(which_weights, "supp_weights/SUPPNet_active")
+        full_path = _os.path.join(suppnet_dir, rel_path)
+
+        _load_weights_keras3(model, full_path)
+        print("Pesos cargados correctamente.")
+        return _suppnet_mod.modelWrapper(model, norm_only=norm_only)
+
+    _suppnet_mod.get_suppnet_model = _get_suppnet_model_compat
+
+    # NN_utility.py importa get_suppnet_model en su propio namespace al
+    # cargarse (via suppnet/__init__.py). Hay que parchear esa referencia
+    # local también, o seguirá usando la función original.
+    import suppnet.NN_utility as _nn_utility_mod
+    _nn_utility_mod.get_suppnet_model = _get_suppnet_model_compat
+    # ─────────────────────────────────────────────────────────────────────
+
+    from suppnet.NN_utility import get_suppnet, get_smoothed_continuum
+    NORMALIZADOR_DISPONIBLE = True
+except ImportError:
+    pass
+# ───────────────────────────────────────────────────────────────────────────
+
 # Importar módulos de clasificación (desde src/)
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(project_root, 'src'))
@@ -2289,6 +2374,151 @@ def too_large(e):
 @app.errorhandler(500)
 def server_error(e):
     return jsonify({'success': False, 'error': f'Error interno del servidor: {str(e)}'}), 500
+
+
+# ── NORMALIZACIÓN DE ESPECTROS CRUDOS ─────────────────────────────────────
+
+def _cargar_normalizador(which_weights='active'):
+    """Carga el modelo de normalización (lento, ~10 s). Se llama una vez."""
+    global _normalizador_nn
+    _normalizador_nn = get_suppnet(
+        resampling_step=0.05,
+        step_size=256,
+        norm_only=True,
+        which_weights=which_weights
+    )
+
+
+@app.route('/normalizacion_estado')
+def normalizacion_estado():
+    """Devuelve si el módulo de normalización está disponible y cargado."""
+    return jsonify({
+        'disponible': NORMALIZADOR_DISPONIBLE,
+        'modelo_cargado': _normalizador_nn is not None
+    })
+
+
+@app.route('/normalizacion_cargar', methods=['POST'])
+def normalizacion_cargar():
+    """Carga (o recarga) el modelo de normalización con el modelo indicado."""
+    if not NORMALIZADOR_DISPONIBLE:
+        return jsonify({'success': False, 'error': 'Módulo de normalización no encontrado. Verifica la ruta de instalación.'}), 503
+    modelo = request.json.get('modelo', 'active')
+    try:
+        _cargar_normalizador(which_weights=modelo)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/normalizacion_procesar', methods=['POST'])
+def normalizacion_procesar():
+    """
+    Recibe un espectro (.txt dos columnas λ flux), lo normaliza con la red
+    neuronal y devuelve: imagen base64 del espectro original+continuo,
+    imagen base64 del espectro normalizado, y el texto del archivo descargable.
+    """
+    if not NORMALIZADOR_DISPONIBLE:
+        return jsonify({'error': 'Módulo de normalización no disponible'}), 503
+    if _normalizador_nn is None:
+        return jsonify({'error': 'Modelo no cargado. Haz clic en "Cargar modelo" primero.'}), 503
+
+    f = request.files.get('archivo')
+    if f is None:
+        return jsonify({'error': 'No se recibió ningún archivo'}), 400
+
+    try:
+        import tempfile
+        ext = (f.filename or '').rsplit('.', 1)[-1].lower()
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.' + ext)
+        f.save(tmp.name)
+        tmp.close()
+
+        try:
+            if ext in ('fits', 'fit'):
+                # Leer FITS: extraer flujo y reconstruir eje λ con WCS estándar
+                from astropy.io import fits as _fits
+                with _fits.open(tmp.name, memmap=False) as hdul:
+                    data_fits = hdul[0].data
+                    header   = hdul[0].header
+                crval1 = float(header.get('CRVAL1', 0))
+                crpix1 = float(header.get('CRPIX1', 1))
+                cdelt1 = float(header.get('CDELT1', 1))
+                pixels = np.arange(1, len(data_fits) + 1)
+                wave = crval1 + (pixels - crpix1) * cdelt1
+                flux = data_fits.astype(float)
+            else:
+                # Leer texto: dos columnas λ flux
+                data = np.loadtxt(tmp.name, comments='#')
+                if data.ndim != 2 or data.shape[1] < 2:
+                    return jsonify({'error': 'El archivo debe tener dos columnas: longitud de onda y flujo'}), 400
+                wave = data[:, 0]
+                flux = data[:, 1]
+        finally:
+            os.unlink(tmp.name)
+
+        # Normalizar al mediano antes de pasar a la red (igual que el script original)
+        mediana = np.nanmedian(flux)
+        if mediana > 0:
+            flux = flux / mediana
+
+        # Predecir continuo
+        continuum, continuum_std = _normalizador_nn.normalize(wave, flux)
+
+        # Suavizar continuo con spline ponderado
+        continuum_suave = get_smoothed_continuum(wave, continuum, continuum_std)
+
+        # Espectro normalizado
+        flux_norm = flux / np.where(continuum_suave > 0, continuum_suave, 1.0)
+
+        # ── Gráfica 1: espectro original + continuo ───────────────────────
+        fig1, ax1 = plt.subplots(figsize=(9, 3.5))
+        ax1.plot(wave, flux, color='#4a9eff', linewidth=0.8, label='Espectro original', alpha=0.9)
+        ax1.plot(wave, continuum_suave, color='#ff6b35', linewidth=1.5, label='Continuo estimado')
+        ax1.set_xlabel('Longitud de onda (Å)')
+        ax1.set_ylabel('Flujo relativo')
+        ax1.set_title('Espectro crudo + continuo estimado')
+        ax1.legend(fontsize=9)
+        ax1.grid(True, alpha=0.2)
+        fig1.tight_layout()
+        buf1 = io.BytesIO()
+        fig1.savefig(buf1, format='png', dpi=110, bbox_inches='tight')
+        plt.close(fig1)
+        img1_b64 = base64.b64encode(buf1.getvalue()).decode('utf-8')
+
+        # ── Gráfica 2: espectro normalizado ──────────────────────────────
+        fig2, ax2 = plt.subplots(figsize=(9, 3.5))
+        ax2.plot(wave, flux_norm, color='#4a9eff', linewidth=0.8, alpha=0.9)
+        ax2.axhline(1.0, color='#ff6b35', linewidth=1.0, linestyle='--', label='Continuo = 1.0')
+        ax2.set_xlabel('Longitud de onda (Å)')
+        ax2.set_ylabel('Flujo normalizado')
+        ax2.set_title('Espectro normalizado')
+        ax2.legend(fontsize=9)
+        ax2.grid(True, alpha=0.2)
+        fig2.tight_layout()
+        buf2 = io.BytesIO()
+        fig2.savefig(buf2, format='png', dpi=110, bbox_inches='tight')
+        plt.close(fig2)
+        img2_b64 = base64.b64encode(buf2.getvalue()).decode('utf-8')
+
+        # ── Texto descargable ─────────────────────────────────────────────
+        lineas = ['# Longitud_de_onda(A)  Flujo_normalizado  Continuo']
+        for w, fn, c in zip(wave, flux_norm, continuum_suave):
+            lineas.append(f'{w:.4f}\t{fn:.6f}\t{c:.6f}')
+        texto_descarga = '\n'.join(lineas)
+
+        return jsonify({
+            'imagen_original': img1_b64,
+            'imagen_normalizado': img2_b64,
+            'texto_descarga': texto_descarga,
+            'n_puntos': int(len(wave)),
+            'rango_lambda': f'{wave[0]:.1f} – {wave[-1]:.1f} Å'
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Error al procesar: {str(e)}'}), 500
+
+# ──────────────────────────────────────────────────────────────────────────
 
 
 if __name__ == '__main__':

@@ -36,6 +36,9 @@
             <button class="tab-btn" data-tab="arbol">
                 🌿 Árbol Interactivo
             </button>
+            <button class="tab-btn" data-tab="normalizacion">
+                📈 Espectros Crudos
+            </button>
             <button class="tab-btn" data-tab="ayuda">
                 ❓ Ayuda
             </button>
@@ -1586,10 +1589,10 @@
                                             <ul>
                                                 <li><b>Euclidiana:</b> Distancia en línea recta. Estándar y efectiva.</li>
                                                 <li><b>Manhattan:</b> Suma de diferencias absolutas. Más robusta a outliers.</li>
-                                                <li><b>Coseno:</b> Ángulo entre vectores. Buena para comparar formas de espectros.</li>
+                                                <li><b>Coseno:</b> Ángulo entre vectores. Compara la <em>forma</em> del espectro ignorando la escala. ⭐ <b>Mejor resultado en este catálogo.</b></li>
                                                 <li><b>Minkowski:</b> Generalización (p=2 es Euclidiana).</li>
                                             </ul>
-                                            <p style="margin-top:8px"><b>Para espectros:</b> Euclidiana o Coseno funcionan bien.</p>
+                                            <p style="margin-top:8px"><b>Recomendación:</b> Prueba <b>Coseno</b> primero — en espectros estelares normalizados supera a Euclidiana porque compara patrones de líneas independientemente de la amplitud residual.</p>
                                         </div>
                                     </span>
                                 </div>
@@ -1600,6 +1603,9 @@
                                     <option value="minkowski">Minkowski</option>
                                 </select>
                                 <small>Euclidiana es el estándar para la mayoría de casos</small>
+                                <small style="display:block; margin-top:4px; color:#14a876;">
+                                    💡 <b>Sugerencia:</b> La métrica <b>Coseno</b> dio los mejores resultados de entrenamiento en este catálogo — se recomienda probarla.
+                                </small>
                             </div>
                         </div>
                     </div>
@@ -2194,7 +2200,203 @@
                 </div><!-- /arbol-container -->
             </section>
 
-            <!-- TAB 6: AYUDA -->
+            <!-- TAB 6: NORMALIZACIÓN DE ESPECTROS CRUDOS -->
+            <section id="tab-normalizacion" class="tab-content">
+                <div class="help-container">
+                    <div class="label-with-help">
+                        <h2 style="margin:0;">📈 Normalización de Espectros Crudos</h2>
+                        <span class="help-icon">?
+                            <div class="tooltip">
+                                <div class="tooltip-title">¿Qué es la normalización del continuo?</div>
+                                <p>Un espectro crudo tiene una forma de fondo no plana (el <b>continuo</b>) causada por la temperatura de la estrella, la respuesta del detector y la extinción atmosférica.</p>
+                                <p>Normalizar consiste en dividir el flujo observado por ese continuo estimado:</p>
+                                <p style="text-align:center; font-family:monospace; background:#1a2a3a; color:#e8f0f8; padding:0.4rem 0.8rem; border-radius:6px; margin:0.5rem 0;">
+                                    F<sub>norm</sub>(λ) = F<sub>obs</sub>(λ) / F<sub>c</sub>(λ)
+                                </p>
+                                <p>El resultado es un espectro con continuo ≈ 1.0, donde solo se ven las líneas de absorción/emisión. Este formato es el que usan todos los métodos de clasificación de SpectroClass.</p>
+                            </div>
+                        </span>
+                    </div>
+                    <p style="color:#666; margin-bottom:1.5rem; margin-top:0.5rem;">
+                        Normalización automática del continuo estelar mediante red neuronal profunda.
+                        Carga tu espectro crudo (dos columnas: longitud de onda y flujo) y obtén el
+                        espectro normalizado listo para clasificación.
+                    </p>
+
+                    <!-- Estado del modelo -->
+                    <div id="norm-status-bar" style="
+                        padding: 0.6rem 1rem;
+                        border-radius: 8px;
+                        margin-bottom: 1.2rem;
+                        background: #1e2a3a;
+                        color: #aac4e0;
+                        font-size: 0.9rem;
+                        border-left: 3px solid #4a9eff;
+                    ">⏳ Verificando módulo de normalización…</div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:1.5rem;">
+
+                        <!-- Panel izquierdo: carga y modelo -->
+                        <div class="card" style="padding:1.2rem;">
+                            <div class="label-with-help" style="margin-bottom:0.8rem;">
+                                <h3 style="margin:0; color:#4a9eff;">1. Seleccionar modelo</h3>
+                                <span class="help-icon">?
+                                    <div class="tooltip">
+                                        <div class="tooltip-title">¿Qué modelo usar?</div>
+                                        <p>Elige el modelo según el tipo de espectro que tienes:</p>
+                                        <ul>
+                                            <li><b>Active</b> — Entrenado con espectros reales observados. <b>Recomendado para uso general</b> (estrellas O a M).</li>
+                                            <li><b>Synth</b> — Entrenado con espectros teóricos generados por síntesis espectral.</li>
+                                            <li><b>Emission</b> — Optimizado para estrellas con líneas de emisión (Be, WR, nebulosas).</li>
+                                        </ul>
+                                        <p>Si no estás seguro, usa <b>Active</b>.</p>
+                                    </div>
+                                </span>
+                            </div>
+                            <div style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:1rem;">
+                                <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                                    <input type="radio" name="norm-modelo" value="active" checked>
+                                    <span><b>Active</b> — espectros reales observados</span>
+                                </label>
+                                <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                                    <input type="radio" name="norm-modelo" value="synth">
+                                    <span><b>Synth</b> — espectros sintéticos</span>
+                                </label>
+                                <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                                    <input type="radio" name="norm-modelo" value="emission">
+                                    <span><b>Emission</b> — espectros con líneas de emisión</span>
+                                </label>
+                            </div>
+                            <button class="btn-primary" id="norm-btn-cargar" onclick="normCargarModelo()" style="width:100%; margin-bottom:0.5rem;">
+                                Cargar modelo
+                            </button>
+                            <small style="color:#888;">El primer cargado puede tardar ~10 segundos.</small>
+
+                            <div class="label-with-help" style="margin-top:1.2rem; margin-bottom:0.6rem;">
+                                <h3 style="margin:0; color:#4a9eff;">2. Cargar espectro</h3>
+                                <span class="help-icon">?
+                                    <div class="tooltip">
+                                        <div class="tooltip-title">Formato del archivo de entrada</div>
+                                        <p><b>Opción A — Texto (.txt / .dat)</b><br>
+                                        Dos columnas separadas por espacios o tabulaciones:</p>
+                                        <p style="font-family:monospace; background:#1a2a3a; color:#e8f0f8; padding:0.4rem 0.8rem; border-radius:6px; margin:0.5rem 0; font-size:0.85rem;">
+                                            # comentario opcional<br>
+                                            3900.0 &nbsp; 1523.4<br>
+                                            3900.5 &nbsp; 1541.2<br>
+                                            …
+                                        </p>
+                                        <ul>
+                                            <li>Columna 1: <b>longitud de onda</b> en Å</li>
+                                            <li>Columna 2: <b>flujo</b> (cualquier unidad)</li>
+                                        </ul>
+                                        <p><b>Opción B — FITS (.fits / .fit)</b><br>
+                                        El eje de longitud de onda se reconstruye automáticamente desde la cabecera WCS usando:<br>
+                                        <code>λ = CRVAL1 + (px − CRPIX1) × CDELT1</code></p>
+                                        <p>El flujo se normaliza al mediano internamente antes de procesarlo.</p>
+                                    </div>
+                                </span>
+                            </div>
+                            <div id="norm-drop-area" style="
+                                border: 2px dashed #4a9eff44;
+                                border-radius: 10px;
+                                padding: 1rem;
+                                text-align: center;
+                                cursor: pointer;
+                                transition: border-color 0.2s;
+                            " onclick="document.getElementById('norm-file-input').click()"
+                               ondragover="event.preventDefault(); this.style.borderColor='#4a9eff';"
+                               ondragleave="this.style.borderColor='#4a9eff44';"
+                               ondrop="normDropFile(event)">
+                                <div style="font-size:1.8rem; margin-bottom:0.4rem;">📂</div>
+                                <div style="color:#888; font-size:0.9rem;">Arrastra un .txt o .fits / haz clic</div>
+                                <input type="file" id="norm-file-input" accept=".txt,.dat,.fits,.fit" style="display:none"
+                                       onchange="normArchivoSeleccionado(this)">
+                            </div>
+                            <div id="norm-filename" style="margin-top:0.5rem; color:#aac4e0; font-size:0.85rem; text-align:center;">
+                                Ningún archivo seleccionado
+                            </div>
+
+                            <button class="btn-primary" id="norm-btn-procesar" onclick="normProcesar()"
+                                    disabled style="width:100%; margin-top:1rem;">
+                                Normalizar espectro
+                            </button>
+                        </div>
+
+                        <!-- Panel derecho: información teórica -->
+                        <div class="card" style="padding:1.2rem;">
+                            <h3 style="margin-top:0; color:#4a9eff;">¿Qué hace la normalización?</h3>
+                            <p style="font-size:0.9rem; line-height:1.6; color:#6b8099;">
+                                Los espectros crudos tienen forma de continuo no plana debida a la
+                                respuesta instrumental, extinción atmosférica y temperatura estelar.
+                                La normalización divide el flujo por el continuo estimado, dejando
+                                el espectro centrado en <b style="color:#7a9ab8;">F/F<sub>c</sub> = 1.0</b>.
+                            </p>
+                            <p style="font-size:0.9rem; line-height:1.6; color:#6b8099;">
+                                El módulo emplea una <b style="color:#7a9ab8;">red neuronal profunda con codificador–decodificador
+                                convolucional</b> entrenada sobre miles de espectros estelares de alta resolución.
+                            </p>
+                            <h4 style="color:#7a9ab8;">Modelos disponibles:</h4>
+                            <ul style="font-size:0.88rem; color:#6b8099; line-height:1.8;">
+                                <li><b style="color:#7a9ab8;">Active</b> — Recomendado para espectros reales de estrellas de tipo O–M.</li>
+                                <li><b style="color:#7a9ab8;">Synth</b> — Para espectros generados por síntesis espectral teórica.</li>
+                                <li><b style="color:#7a9ab8;">Emission</b> — Para estrellas Be, WR y nebulosas con líneas de emisión.</li>
+                            </ul>
+                            <h4 style="color:#7a9ab8;">Formato de entrada:</h4>
+                            <p style="font-size:0.88rem; color:#6b8099;">
+                                Archivo de texto con <b style="color:#7a9ab8;">dos columnas</b>: longitud de onda (Å) y flujo.
+                                Las líneas que comiencen con <code>#</code> se ignoran.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Resultados -->
+                    <div id="norm-resultados" style="display:none;">
+                        <div class="card" style="padding:1.2rem; margin-bottom:1rem;">
+                            <div class="label-with-help" style="margin-bottom:0.8rem;">
+                                <h3 style="margin:0; color:#4a9eff;">Espectro original + continuo estimado</h3>
+                                <span class="help-icon">?
+                                    <div class="tooltip">
+                                        <div class="tooltip-title">Línea naranja: continuo estimado</div>
+                                        <p>La curva azul es tu espectro crudo. La curva naranja es el <b>continuo predicho por la red neuronal</b>, suavizado con una spline de mínimos cuadrados ponderada por la incertidumbre de cada punto.</p>
+                                        <p>Un buen continuo debe pasar por las regiones <em>sin líneas de absorción</em>, siguiendo la envolvente superior del espectro. Si ves que la curva naranja entra dentro de líneas profundas, prueba con el modelo <b>Synth</b> o <b>Emission</b>.</p>
+                                    </div>
+                                </span>
+                            </div>
+                            <img id="norm-img-original" src="" alt="Espectro original con continuo"
+                                 style="width:100%; border-radius:8px;">
+                        </div>
+                        <div class="card" style="padding:1.2rem; margin-bottom:1rem;">
+                            <div class="label-with-help" style="margin-bottom:0.8rem;">
+                                <h3 style="margin:0; color:#4a9eff;">Espectro normalizado</h3>
+                                <span class="help-icon">?
+                                    <div class="tooltip">
+                                        <div class="tooltip-title">Espectro listo para clasificación</div>
+                                        <p>Este es el espectro resultante de dividir el flujo original por el continuo estimado. La <b>línea naranja discontinua</b> marca el continuo ideal (F/F<sub>c</sub> = 1.0).</p>
+                                        <p>Un espectro bien normalizado tiene:</p>
+                                        <ul>
+                                            <li>Regiones continuas centradas en <b>≈ 1.0</b></li>
+                                            <li>Líneas de absorción que bajan <b>por debajo de 1.0</b></li>
+                                            <li>Líneas de emisión que suben <b>por encima de 1.0</b></li>
+                                        </ul>
+                                        <p>Este archivo puedes cargarlo directamente en la pestaña <b>Clasificar</b> de SpectroClass.</p>
+                                    </div>
+                                </span>
+                            </div>
+                            <img id="norm-img-normalizado" src="" alt="Espectro normalizado"
+                                 style="width:100%; border-radius:8px;">
+                        </div>
+                        <div class="card" style="padding:1rem; display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+                            <div id="norm-info" style="color:#aac4e0; font-size:0.9rem; flex:1;"></div>
+                            <button class="btn-secondary" onclick="normDescargar()">
+                                ⬇ Descargar espectro normalizado (.txt)
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- TAB 7: AYUDA -->
             <section id="tab-ayuda" class="tab-content">
                 <div class="help-container">
 
@@ -2215,6 +2417,7 @@
                         <a href="#grupo-arbol"      class="help-nav-btn hng-orange">🌳 Árbol Interactivo</a>
                         <a href="#grupo-ml"         class="help-nav-btn hng-indigo">🧠 ML / IA</a>
                         <a href="#grupo-tablas"     class="help-nav-btn hng-red">📋 Tablas MK</a>
+                        <a href="#grupo-normalizacion" class="help-nav-btn" style="background:linear-gradient(135deg,#0e7c5a,#14a876); color:#fff;">🔬 Normalización</a>
                         <a href="#grupo-referencia" class="help-nav-btn hng-gray">📖 Referencia</a>
                     </nav>
 
@@ -2675,47 +2878,142 @@
                             </span>
                         </div>
 
-                        <!-- Diagrama SVG del EW -->
+                        <!-- Diagrama SVG del EW — mejorado -->
                         <div class="help-ew-diagram">
-                            <svg viewBox="0 0 520 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:520px;display:block;margin:0 auto;">
-                                <!-- Fondo -->
-                                <rect width="520" height="200" fill="#1a1a2e" rx="10"/>
-                                <!-- Continuo -->
-                                <line x1="30" y1="50" x2="490" y2="50" stroke="#aaa" stroke-width="1.5" stroke-dasharray="6,4"/>
-                                <text x="494" y="54" fill="#aaa" font-size="11" font-family="monospace">Fc=1</text>
-                                <!-- Área EW (sombreado) -->
-                                <polygon points="190,50 200,52 215,62 230,95 240,118 250,128 260,125 270,110 280,82 292,60 305,51 190,50"
-                                         fill="#4ecdc4" opacity="0.25"/>
-                                <!-- Rectángulo equivalente -->
-                                <rect x="222" y="50" width="38" height="32" fill="#f7ca18" opacity="0.22" rx="2"/>
-                                <line x1="222" y1="50" x2="222" y2="82" stroke="#f7ca18" stroke-width="1.5" opacity="0.8"/>
-                                <line x1="260" y1="50" x2="260" y2="82" stroke="#f7ca18" stroke-width="1.5" opacity="0.8"/>
-                                <!-- Flecha EW -->
-                                <line x1="222" y1="92" x2="260" y2="92" stroke="#f7ca18" stroke-width="1.5" marker-end="url(#arr)" marker-start="url(#arrl)"/>
+                            <svg viewBox="0 0 640 270" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:660px;display:block;margin:0 auto;">
                                 <defs>
-                                    <marker id="arr"  markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#f7ca18"/></marker>
-                                    <marker id="arrl" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto-start-reverse"><path d="M0,0 L6,3 L0,6 Z" fill="#f7ca18"/></marker>
+                                    <!-- Marcadores de flecha amarilla (EW) -->
+                                    <marker id="ew-r" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+                                        <polygon points="0,0 8,3 0,6" fill="#f7ca18"/>
+                                    </marker>
+                                    <marker id="ew-l" markerWidth="8" markerHeight="6" refX="1" refY="3" orient="auto">
+                                        <polygon points="8,0 0,3 8,6" fill="#f7ca18"/>
+                                    </marker>
+                                    <!-- Marcadores de flecha magenta (profundidad) -->
+                                    <marker id="dep-t" markerWidth="6" markerHeight="7" refX="3" refY="1" orient="auto">
+                                        <polygon points="0,7 3,0 6,7" fill="#c084fc"/>
+                                    </marker>
+                                    <marker id="dep-b" markerWidth="6" markerHeight="7" refX="3" refY="6" orient="auto">
+                                        <polygon points="0,0 3,7 6,0" fill="#c084fc"/>
+                                    </marker>
+                                    <!-- Gradiente de fondo sutil -->
+                                    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stop-color="#0f0f23"/>
+                                        <stop offset="100%" stop-color="#1a1a2e"/>
+                                    </linearGradient>
                                 </defs>
-                                <text x="241" y="105" text-anchor="middle" fill="#f7ca18" font-size="11" font-family="monospace">EW</text>
-                                <!-- Perfil de la línea -->
-                                <polyline points="190,50 200,52 215,62 230,95 240,118 250,128 260,125 270,110 280,82 292,60 305,51"
-                                          fill="none" stroke="#4ecdc4" stroke-width="2.5"/>
+
+                                <!-- ── Fondo ── -->
+                                <rect width="640" height="270" fill="url(#bgGrad)" rx="12"/>
+
+                                <!-- ── Guías de cuadrícula (muy tenues) ── -->
+                                <line x1="70" y1="130" x2="590" y2="130" stroke="#1e1e40" stroke-width="1"/>
+                                <line x1="70" y1="175" x2="590" y2="175" stroke="#1e1e40" stroke-width="1"/>
+
+                                <!-- ══════════════════════════════════════════════════ -->
+                                <!--  ÁREA COLOREADA = EW (integración trapezoidal)   -->
+                                <!-- El polígono va: continuo → perfil → continuo     -->
+                                <!-- Perfil Gaussiano centrado en x=330, sigma≈55px   -->
+                                <!-- y = 72 + 108·exp(−(x−330)²/6050)                -->
+                                <!--   x=165→72  x=185→73  x=205→75  x=225→80        -->
+                                <!--   x=245→90  x=265→107 x=285→130 x=305→155       -->
+                                <!--   x=325→177 x=330→180 x=335→177 x=355→155       -->
+                                <!--   x=375→130 x=395→107 x=415→90  x=435→80        -->
+                                <!--   x=455→75  x=475→73  x=495→72                  -->
+                                <polygon points="
+                                    165,72 185,73 205,75 225,80
+                                    245,90 265,107 285,130 305,155
+                                    325,177 330,180 335,177
+                                    355,155 375,130 395,107 415,90
+                                    435,80 455,75 475,73 495,72
+                                    495,72 165,72"
+                                    fill="#4ecdc4" opacity="0.22"/>
+
+                                <!-- ══════════════════════════════════════════════════ -->
+                                <!--  RECTÁNGULO EQUIVALENTE (misma área que la absorción) -->
+                                <!--  Ancho EW ≈ 120px, altura = profundidad = 108px       -->
+                                <rect x="270" y="72" width="120" height="108"
+                                      fill="#f7ca18" opacity="0.14" rx="3"/>
+                                <!-- Bordes del rectángulo (línea discontinua) -->
+                                <line x1="270" y1="72"  x2="270" y2="180" stroke="#f7ca18" stroke-width="1.8" stroke-dasharray="5,3" opacity="0.85"/>
+                                <line x1="390" y1="72"  x2="390" y2="180" stroke="#f7ca18" stroke-width="1.8" stroke-dasharray="5,3" opacity="0.85"/>
+                                <line x1="270" y1="180" x2="390" y2="180" stroke="#f7ca18" stroke-width="1.2" opacity="0.5"/>
+
+                                <!-- ══════════════════════════════════════════════════ -->
+                                <!--  LÍNEA DE CONTINUO (F_c = 1.0)                   -->
+                                <line x1="70" y1="72" x2="590" y2="72"
+                                      stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="9,5"/>
+
+                                <!-- ══════════════════════════════════════════════════ -->
+                                <!--  PERFIL ESPECTRAL (toda la curva)                 -->
+                                <!-- Espectro plano a los lados, con absorción en centro -->
+                                <polyline points="
+                                    70,72 165,72 185,73 205,75 225,80
+                                    245,90 265,107 285,130 305,155
+                                    325,177 330,180 335,177
+                                    355,155 375,130 395,107 415,90
+                                    435,80 455,75 475,73 495,72 590,72"
+                                    fill="none" stroke="#4ecdc4" stroke-width="2.8" stroke-linejoin="round"/>
+
+                                <!-- ══════════════════════════════════════════════════ -->
+                                <!--  LÍNEA CENTRAL λ₀ (vertical punteada)             -->
+                                <line x1="330" y1="35" x2="330" y2="220"
+                                      stroke="#4ecdc4" stroke-width="1.2" stroke-dasharray="4,4" opacity="0.55"/>
+
+                                <!-- ══════════════════════════════════════════════════ -->
+                                <!--  FLECHA DOBLE ← EW → (bajo el rectángulo)         -->
+                                <line x1="275" y1="200" x2="385" y2="200"
+                                      stroke="#f7ca18" stroke-width="2"
+                                      marker-start="url(#ew-l)" marker-end="url(#ew-r)"/>
+                                <text x="330" y="215" text-anchor="middle"
+                                      fill="#f7ca18" font-size="13" font-family="monospace" font-weight="bold">EW (Å)</text>
+
+                                <!-- ══════════════════════════════════════════════════ -->
+                                <!--  FLECHA PROFUNDIDAD (vertical, lado izquierdo)    -->
+                                <line x1="245" y1="77" x2="245" y2="175"
+                                      stroke="#c084fc" stroke-width="1.8"
+                                      marker-start="url(#dep-t)" marker-end="url(#dep-b)"/>
+                                <text x="232" y="130" text-anchor="middle"
+                                      fill="#c084fc" font-size="10" font-family="monospace"
+                                      transform="rotate(-90,232,130)">profundidad</text>
+
+                                <!-- ══════════════════════════════════════════════════ -->
+                                <!--  EJES                                              -->
                                 <!-- Eje X -->
-                                <line x1="30" y1="160" x2="490" y2="160" stroke="#555" stroke-width="1"/>
-                                <text x="255" y="178" text-anchor="middle" fill="#778" font-size="11" font-family="monospace">Longitud de onda (Å)</text>
+                                <line x1="70" y1="220" x2="590" y2="220" stroke="#334155" stroke-width="1.5"/>
+                                <!-- Tick λ₀ en eje X -->
+                                <line x1="330" y1="218" x2="330" y2="224" stroke="#4ecdc4" stroke-width="1.5"/>
                                 <!-- Eje Y -->
-                                <line x1="30" y1="20" x2="30" y2="160" stroke="#555" stroke-width="1"/>
-                                <text x="14" y="107" text-anchor="middle" fill="#778" font-size="11" font-family="monospace" transform="rotate(-90,14,107)">Flujo</text>
-                                <!-- Curva espectral de fondo -->
-                                <polyline points="30,52 100,50 165,50 190,50 305,51 380,50 490,50"
-                                          fill="none" stroke="#4ecdc4" stroke-width="1.5" opacity="0.5"/>
-                                <!-- Etiquetas -->
-                                <text x="155" y="45" fill="#4ecdc4" font-size="10" font-family="monospace">λ₀</text>
-                                <line x1="248" y1="20" x2="248" y2="158" stroke="#4ecdc4" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
-                                <text x="60"  y="44" fill="#aaa" font-size="10" font-family="monospace">continuo</text>
-                                <text x="310" y="70" fill="#4ecdc4" font-size="10" font-family="monospace">área = EW</text>
-                                <text x="170" y="135" fill="#f7ca18" font-size="10" font-family="monospace">rectángulo</text>
-                                <text x="162" y="148" fill="#f7ca18" font-size="10" font-family="monospace">equivalente</text>
+                                <line x1="70" y1="30"  x2="70"  y2="220" stroke="#334155" stroke-width="1.5"/>
+                                <!-- Tick F=1 en eje Y -->
+                                <line x1="67" y1="72" x2="73" y2="72" stroke="#94a3b8" stroke-width="1.5"/>
+                                <!-- Tick F=0 en eje Y -->
+                                <line x1="67" y1="220" x2="73" y2="220" stroke="#334155" stroke-width="1.5"/>
+
+                                <!-- ══════════════════════════════════════════════════ -->
+                                <!--  ETIQUETAS                                         -->
+                                <!-- Continuo -->
+                                <text x="82" y="66" fill="#94a3b8" font-size="11" font-family="monospace">F꜀ = 1.0 — continuo</text>
+                                <!-- λ₀ bajo el eje X -->
+                                <text x="330" y="234" text-anchor="middle" fill="#4ecdc4" font-size="13" font-family="monospace" font-weight="bold">λ₀</text>
+                                <!-- Etiqueta rectángulo equivalente (dentro) -->
+                                <text x="330" y="117" text-anchor="middle" fill="#f7ca18" font-size="10" font-family="monospace" opacity="0.9">rectángulo</text>
+                                <text x="330" y="130" text-anchor="middle" fill="#f7ca18" font-size="10" font-family="monospace" opacity="0.9">equivalente</text>
+                                <text x="330" y="147" text-anchor="middle" fill="#f7ca18" font-size="10" font-family="monospace" opacity="0.7">misma área</text>
+                                <!-- Etiqueta área = EW (apunta al área cyan) -->
+                                <text x="505" y="92" fill="#4ecdc4" font-size="11" font-family="monospace">área</text>
+                                <text x="505" y="106" fill="#4ecdc4" font-size="11" font-family="monospace">= EW</text>
+                                <line x1="503" y1="108" x2="480" y2="115" stroke="#4ecdc4" stroke-width="1" opacity="0.6"/>
+                                <!-- Etiqueta "absorción" apunta al mínimo -->
+                                <text x="410" y="188" fill="#7dd3c8" font-size="10" font-family="monospace">mínimo</text>
+                                <line x1="408" y1="184" x2="368" y2="175" stroke="#7dd3c8" stroke-width="1" opacity="0.6"/>
+                                <!-- Etiqueta eje X -->
+                                <text x="330" y="252" text-anchor="middle" fill="#64748b" font-size="11" font-family="monospace">Longitud de onda λ (Å)</text>
+                                <!-- Etiqueta eje Y -->
+                                <text x="22" y="128" text-anchor="middle" fill="#64748b" font-size="11" font-family="monospace" transform="rotate(-90,22,128)">Flujo normalizado F/F꜀</text>
+                                <!-- Valores eje Y -->
+                                <text x="62" y="76"  text-anchor="end" fill="#94a3b8" font-size="10" font-family="monospace">1</text>
+                                <text x="62" y="224" text-anchor="end" fill="#64748b" font-size="10" font-family="monospace">0</text>
                             </svg>
                             <p class="help-ew-formula">
                                 <strong>EW = ∫ (1 − F<sub>λ</sub> / F<sub>c</sub>) dλ</strong>
@@ -3994,6 +4292,257 @@ print(<span class="mlc-str">"✅ Modelo CNN 2D guardado en models/cnn2d_model.h5
                         </div>
 
                     </div><!-- /grupo-tablas -->
+
+                    <!-- ══════════════════════════════════════════════════════════ -->
+                    <!-- GRUPO G — NORMALIZACIÓN DE ESPECTROS CRUDOS               -->
+                    <!-- ══════════════════════════════════════════════════════════ -->
+                    <div class="help-group" id="grupo-normalizacion">
+                        <div class="help-group-header" style="background:linear-gradient(135deg,#0e7c5a22,#14a87622); border-left:4px solid #14a876;">
+                            <span class="help-group-icon">🔬</span>
+                            <div>
+                                <div class="help-group-title">Normalización de Espectros Crudos</div>
+                                <div class="help-group-subtitle">Qué es · Por qué es necesaria · Modelos · Interpretación de resultados</div>
+                            </div>
+                        </div>
+
+                        <!-- ─── ¿QUÉ ES UN ESPECTRO CRUDO? ─────────────────────── -->
+                        <div class="help-section">
+                            <div class="help-section-title-row">
+                                <h3>📡 ¿Qué es un Espectro Crudo?</h3>
+                                <span class="help-icon tooltip-left">?
+                                    <div class="tooltip">Un espectro crudo es la señal tal como la entrega el detector, antes de ningún procesado de continuo.</div>
+                                </span>
+                            </div>
+                            <p>Cuando un telescopio registra la luz de una estrella, el resultado no es el espectro puro de la estrella, sino una <b>mezcla de varias contribuciones</b>:</p>
+                            <div class="help-pipeline" style="margin-top:0.8rem;">
+                                <div class="help-pipe-step">
+                                    <div class="help-pipe-num">1</div>
+                                    <div><strong>Distribución de energía de la estrella</strong><br>
+                                    <span style="color:#888; font-size:0.88rem;">Cuerpo negro modificado según temperatura efectiva T<sub>eff</sub>. Forma una curva suave que sube y baja con la longitud de onda.</span></div>
+                                </div>
+                                <div class="help-pipe-step">
+                                    <div class="help-pipe-num">2</div>
+                                    <div><strong>Respuesta instrumental</strong><br>
+                                    <span style="color:#888; font-size:0.88rem;">El detector (CCD) tiene eficiencia variable con λ. El espejo, la red de difracción y la óptica atenúan de forma no uniforme.</span></div>
+                                </div>
+                                <div class="help-pipe-step">
+                                    <div class="help-pipe-num">3</div>
+                                    <div><strong>Extinción atmosférica</strong><br>
+                                    <span style="color:#888; font-size:0.88rem;">La atmósfera absorbe más en el azul que en el rojo. Las observaciones a mayor masa de aire muestran el continuo más inclinado.</span></div>
+                                </div>
+                                <div class="help-pipe-step">
+                                    <div class="help-pipe-num">4</div>
+                                    <div><strong>Líneas de absorción y emisión</strong><br>
+                                    <span style="color:#888; font-size:0.88rem;">La señal astrofísica que nos interesa: líneas de Balmer, He, Ca, etc.</span></div>
+                                </div>
+                            </div>
+                            <p style="margin-top:0.8rem;">El resultado es que el espectro crudo tiene un <b>continuo no plano</b>, típicamente con una forma curvada o inclinada que enmascara las líneas. Para clasificar la estrella necesitamos eliminar esa forma de fondo.</p>
+                        </div>
+
+                        <!-- ─── ¿QUÉ ES LA NORMALIZACIÓN? ──────────────────────── -->
+                        <div class="help-section">
+                            <div class="help-section-title-row">
+                                <h3>📐 ¿Qué es la Normalización del Continuo?</h3>
+                            </div>
+                            <p>Normalizar consiste en <b>estimar el nivel del continuo F<sub>c</sub>(λ)</b> y dividir el espectro por él:</p>
+                            <div style="text-align:center; font-size:1.1rem; font-family:monospace; background:#1a2a3a; color:#e8f0f8; padding:0.7rem 1rem; border-radius:8px; margin:0.8rem 0; border-left:3px solid #14a876;">
+                                F<sub>norm</sub>(λ) = F<sub>obs</sub>(λ) / F<sub>c</sub>(λ)
+                            </div>
+                            <p>El resultado ideal es un espectro donde:</p>
+                            <ul>
+                                <li>Las regiones sin líneas tienen flujo <b>≈ 1.0</b></li>
+                                <li>Las <b>líneas de absorción</b> aparecen como depresiones <b>por debajo de 1.0</b></li>
+                                <li>Las <b>líneas de emisión</b> aparecen como picos <b>por encima de 1.0</b></li>
+                            </ul>
+                            <p>Este formato es el estándar en espectroscopía estelar y el que utilizan todos los métodos de clasificación de SpectroClass para medir los anchos equivalentes (EW).</p>
+                            <div style="background:#1a2a3a; color:#e8f0f8; border-radius:8px; padding:0.8rem 1rem; margin-top:0.8rem; border-left:3px solid #4a9eff;">
+                                <b style="color:#4a9eff;">Importante:</b> si cargas un espectro crudo directamente en el clasificador sin normalizar, los EW serán incorrectos y la clasificación fallará o será poco fiable. Usa primero la pestaña <b>Espectros Crudos</b> y luego carga el archivo normalizado en <b>Clasificar</b>.
+                            </div>
+                        </div>
+
+                        <!-- ─── CÓMO FUNCIONA EL MÓDULO ────────────────────────── -->
+                        <div class="help-section">
+                            <div class="help-section-title-row">
+                                <h3>🧠 Cómo Funciona el Módulo de Normalización</h3>
+                                <span class="help-icon tooltip-left">?
+                                    <div class="tooltip">El módulo usa una red neuronal profunda entrenada específicamente para esta tarea, más robusta que los métodos polinomiales clásicos.</div>
+                                </span>
+                            </div>
+                            <p>El módulo emplea una <b>red neuronal profunda convolucional con arquitectura codificador–decodificador</b>. A diferencia de los métodos clásicos (ajuste polinomial, sigma-clipping), la red aprende directamente de miles de espectros reales qué regiones pertenecen al continuo y cuáles son líneas, sin necesidad de reglas manuales.</p>
+
+                            <div class="help-pipeline" style="margin-top:0.8rem;">
+                                <div class="help-pipe-step">
+                                    <div class="help-pipe-num">1</div>
+                                    <div><strong>Remuestreo uniforme</strong><br>
+                                    <span style="color:#888; font-size:0.88rem;">El espectro se interpola a un paso fijo de 0.05 Å/píxel para estandarizar la escala de entrada.</span></div>
+                                </div>
+                                <div class="help-pipe-step">
+                                    <div class="help-pipe-num">2</div>
+                                    <div><strong>Normalización interna (min-max)</strong><br>
+                                    <span style="color:#888; font-size:0.88rem;">El flujo se escala entre 0 y 1 antes de entrar en la red. El proceso es reversible para recuperar las unidades originales.</span></div>
+                                </div>
+                                <div class="help-pipe-step">
+                                    <div class="help-pipe-num">3</div>
+                                    <div><strong>Predicción del continuo</strong><br>
+                                    <span style="color:#888; font-size:0.88rem;">La red procesa ventanas de 8192 píxeles con solapamiento y promedia los resultados con pesos gaussianos para suavizar los bordes.</span></div>
+                                </div>
+                                <div class="help-pipe-step">
+                                    <div class="help-pipe-num">4</div>
+                                    <div><strong>Suavizado final con spline</strong><br>
+                                    <span style="color:#888; font-size:0.88rem;">El continuo predicho se suaviza con una spline cúbica ponderada por la incertidumbre de cada punto, eliminando artefactos residuales.</span></div>
+                                </div>
+                                <div class="help-pipe-step">
+                                    <div class="help-pipe-num">5</div>
+                                    <div><strong>División y resultado</strong><br>
+                                    <span style="color:#888; font-size:0.88rem;">F<sub>obs</sub> / F<sub>continuo</sub> → espectro normalizado listo para clasificar.</span></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ─── MODELOS DISPONIBLES ───────────────────────────── -->
+                        <div class="help-section">
+                            <h3>🗂️ Modelos Disponibles</h3>
+                            <p>El módulo incluye tres variantes entrenadas para distintos tipos de espectros. Elige el que mejor se ajuste a tu observación:</p>
+                            <table class="help-table" style="margin-top:0.8rem;">
+                                <thead>
+                                    <tr><th>Modelo</th><th>Cuándo usarlo</th><th>Tipos estelares</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><b style="color:#14a876;">Active</b></td>
+                                        <td>Espectros reales observados con telescopio. <b>Opción recomendada por defecto.</b></td>
+                                        <td>O, B, A, F, G, K, M</td>
+                                    </tr>
+                                    <tr>
+                                        <td><b style="color:#4a9eff;">Synth</b></td>
+                                        <td>Espectros generados por síntesis espectral teórica (no observados).</td>
+                                        <td>O, B, A, F, G, K, M</td>
+                                    </tr>
+                                    <tr>
+                                        <td><b style="color:#ff6b35;">Emission</b></td>
+                                        <td>Espectros con líneas en emisión fuertes. Evita que el modelo interprete una emisión como continuo.</td>
+                                        <td>Be, WR, nebulosas</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <p style="margin-top:0.8rem; color:#888; font-size:0.9rem;">Si no estás seguro de qué modelo usar, prueba <b>Active</b> primero y examina visualmente si el continuo (línea naranja) sigue bien la envolvente del espectro. Si entra dentro de líneas profundas, prueba con otro modelo.</p>
+                        </div>
+
+                        <!-- ─── GUÍA PASO A PASO ──────────────────────────────── -->
+                        <div class="help-section">
+                            <h3>🚀 Guía Paso a Paso</h3>
+                            <div class="help-pipeline">
+                                <div class="help-pipe-step">
+                                    <div class="help-pipe-num">1</div>
+                                    <div><strong>Ir a la pestaña "Espectros Crudos"</strong><br>
+                                    <span style="color:#888; font-size:0.88rem;">Haz clic en <b>📈 Espectros Crudos</b> en la barra de navegación.</span></div>
+                                </div>
+                                <div class="help-pipe-step">
+                                    <div class="help-pipe-num">2</div>
+                                    <div><strong>Seleccionar el modelo</strong><br>
+                                    <span style="color:#888; font-size:0.88rem;">Elige <b>Active</b> para espectros observados reales (recomendado). El modelo se carga una sola vez y queda disponible para múltiples espectros.</span></div>
+                                </div>
+                                <div class="help-pipe-step">
+                                    <div class="help-pipe-num">3</div>
+                                    <div><strong>Hacer clic en "Cargar modelo"</strong><br>
+                                    <span style="color:#888; font-size:0.88rem;">La primera carga tarda ~10–30 segundos mientras la red neuronal se inicializa en memoria. Las siguientes normalizaciones son inmediatas.</span></div>
+                                </div>
+                                <div class="help-pipe-step">
+                                    <div class="help-pipe-num">4</div>
+                                    <div><strong>Cargar el espectro crudo</strong><br>
+                                    <span style="color:#888; font-size:0.88rem;">Arrastra o selecciona un archivo <b>.txt</b> (dos columnas: λ flujo) o <b>.fits</b> con cabecera WCS válida.</span></div>
+                                </div>
+                                <div class="help-pipe-step">
+                                    <div class="help-pipe-num">5</div>
+                                    <div><strong>Hacer clic en "Normalizar espectro"</strong><br>
+                                    <span style="color:#888; font-size:0.88rem;">Aparecen dos gráficas: espectro original con el continuo superpuesto, y el espectro normalizado.</span></div>
+                                </div>
+                                <div class="help-pipe-step">
+                                    <div class="help-pipe-num">6</div>
+                                    <div><strong>Verificar y descargar</strong><br>
+                                    <span style="color:#888; font-size:0.88rem;">Revisa que el continuo (línea naranja) sigue la envolvente correctamente. Luego descarga el archivo <b>_normalizado.txt</b> y cárgalo en la pestaña <b>Clasificar</b>.</span></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ─── INTERPRETACIÓN DE RESULTADOS ─────────────────── -->
+                        <div class="help-section">
+                            <h3>📊 Interpretación de los Resultados</h3>
+
+                            <h4 style="color:#4a9eff; margin-bottom:0.4rem;">Gráfica 1 — Espectro original + continuo estimado</h4>
+                            <ul>
+                                <li><b style="color:#4a9eff;">Curva azul</b> — flujo observado crudo (normalizado internamente al mediano)</li>
+                                <li><b style="color:#ff6b35;">Curva naranja</b> — continuo estimado por la red neuronal, suavizado con spline</li>
+                            </ul>
+                            <p>Un continuo <b>bien estimado</b> pasa por las regiones fuera de las líneas y sigue la forma general de la curva sin entrar en las absorciones. Un continuo <b>mal estimado</b> se mete dentro de las líneas profundas (corrígelo cambiando de modelo) o tiene saltos bruscos (normalmente por zonas de flujo cero o NaN en los extremos).</p>
+
+                            <h4 style="color:#4a9eff; margin-bottom:0.4rem; margin-top:1rem;">Gráfica 2 — Espectro normalizado</h4>
+                            <ul>
+                                <li><b style="color:#4a9eff;">Curva azul</b> — F<sub>obs</sub> / F<sub>continuo</sub></li>
+                                <li><b style="color:#ff6b35;">Línea naranja discontinua</b> — nivel de continuo ideal = 1.0</li>
+                            </ul>
+                            <p>Señales de un buen resultado:</p>
+                            <ul>
+                                <li>Regiones sin líneas centradas en <b>1.0 ± 0.02</b></li>
+                                <li>Las líneas de Balmer (Hα 6563 Å, Hβ 4861 Å…) bajan claramente por debajo de 1.0</li>
+                                <li>No hay tendencias sistemáticas (el espectro no se aleja de 1.0 hacia los extremos)</li>
+                            </ul>
+
+                            <details style="margin-top:0.8rem;">
+                                <summary><b>Problemas frecuentes y soluciones</b></summary>
+                                <table class="help-table" style="margin-top:0.6rem;">
+                                    <thead><tr><th>Síntoma</th><th>Causa probable</th><th>Solución</th></tr></thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>Continuo sube/baja en los extremos</td>
+                                            <td>Píxeles con flujo ≈ 0 en los bordes (vigñeteo)</td>
+                                            <td>Recortar el espectro antes de normalizar</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Continuo entra dentro de las líneas</td>
+                                            <td>Modelo inadecuado para el tipo de espectro</td>
+                                            <td>Probar con otro modelo (Active / Synth / Emission)</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Espectro normalizado muy ruidoso</td>
+                                            <td>S/N bajo en el original</td>
+                                            <td>Mejorar la observación o aplicar suavizado previo</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Líneas de emisión aparecen cortadas</td>
+                                            <td>Modelo Active interpreta la emisión como continuo</td>
+                                            <td>Usar modelo <b>Emission</b></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </details>
+                        </div>
+
+                        <!-- ─── FORMATO DE ARCHIVOS ──────────────────────────── -->
+                        <div class="help-section">
+                            <h3>📄 Formato de Archivos de Entrada</h3>
+                            <details open>
+                                <summary><b>Texto plano (.txt / .dat)</b></summary>
+                                <p>Dos columnas separadas por espacios o tabulaciones. Las líneas que empiezan por <code>#</code> se ignoran:</p>
+                                <pre style="background:#1a2a3a; color:#e8f0f8; padding:0.8rem; border-radius:8px; font-size:0.85rem; overflow-x:auto;"># Espectro de HD001835
+# lambda(A)   flujo
+3900.00       1523.4
+3900.05       1541.2
+3900.10       1498.7
+…</pre>
+                            </details>
+                            <details style="margin-top:0.6rem;">
+                                <summary><b>FITS (.fits / .fit)</b></summary>
+                                <p>El módulo extrae el flujo del HDU primario y reconstruye el eje de longitud de onda usando la cabecera WCS estándar:</p>
+                                <div style="font-family:monospace; background:#1a2a3a; color:#e8f0f8; padding:0.7rem 1rem; border-radius:8px; margin:0.5rem 0; font-size:0.88rem;">
+                                    λ(px) = CRVAL1 + (px − CRPIX1) × CDELT1
+                                </div>
+                                <p>Cabeceras mínimas necesarias: <code>CRVAL1</code> (λ del píxel de referencia en Å), <code>CDELT1</code> (dispersión en Å/px). <code>CRPIX1</code> es opcional (por defecto = 1).</p>
+                            </details>
+                            <p style="margin-top:0.8rem; color:#888; font-size:0.88rem;">El flujo se normaliza internamente al valor mediano antes de procesarse, por lo que las unidades absolutas no importan.</p>
+                        </div>
+
+                    </div><!-- /grupo-normalizacion -->
 
                     <!-- ══════════════════════════════════════════════════════════ -->
                     <!-- GRUPO F — REFERENCIA                                       -->

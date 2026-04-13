@@ -882,18 +882,30 @@ def train_and_save_model(model_type, catalog_path, output_dir, **kwargs):
         print(f"\nInterpolando espectros a longitud {target_length}...")
 
         X = []
+        n_omitidos = 0
         for i, spec in enumerate(spectra):
             try:
-                if len(spec) != target_length:
-                    x_old = np.linspace(0, 1, len(spec))
+                # Convertir a float64 explícitamente — algunos espectros pueden
+                # tener dtype='O' si el archivo fuente tenía valores no numéricos
+                spec_f = np.asarray(spec, dtype=np.float64)
+
+                # Reemplazar NaN/Inf por 0 para no corromper la interpolación
+                spec_f = np.nan_to_num(spec_f, nan=0.0, posinf=0.0, neginf=0.0)
+
+                if len(spec_f) != target_length:
+                    x_old = np.linspace(0, 1, len(spec_f))
                     x_new = np.linspace(0, 1, target_length)
-                    spec_interp = np.interp(x_new, x_old, spec)
+                    spec_interp = np.interp(x_new, x_old, spec_f)
                     X.append(spec_interp)
                 else:
-                    X.append(spec)
+                    X.append(spec_f)
             except Exception as e:
-                print(f"  Error interpolando espectro {i}: {e}")
+                n_omitidos += 1
+                print(f"  Espectro {i} omitido ({e})")
                 continue
+
+        if n_omitidos:
+            print(f"  Espectros omitidos por datos no numéricos: {n_omitidos}")
 
         X = np.array(X, dtype=np.float32)
         print(f"  Shape de datos: {X.shape}")

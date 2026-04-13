@@ -2,8 +2,8 @@
   "n_train": 1076,
   "n_test": 269,
   "accuracy_test": 0.8438661710037175,
-  "accuracy_cv_mean": 0.8148698884758364,
-  "accuracy_cv_std": 0.031138128760404345,
+  "accuracy_cv_mean": 0.8104089219330856,
+  "accuracy_cv_std": 0.03349852885076226,
   "accuracy_physical": 0.07806691449814127,
   "feature_names": [
     "ew_He_II_4686",
@@ -31,5 +31,5 @@
     "ratio_Ca_I_H_gamma",
     "H_avg"
   ],
-  "timestamp": "2026-04-08T22:50:10.919381"
+  "timestamp": "2026-04-12T19:24:33.577111"
 }

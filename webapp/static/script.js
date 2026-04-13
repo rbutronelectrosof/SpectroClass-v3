@@ -5824,3 +5824,158 @@ function setupFitsExtractor() {
         });
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NORMALIZACIÓN DE ESPECTROS CRUDOS
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _normTextoDescarga = null;  // Guarda el texto para el botón de descarga
+
+/** Verifica el estado del módulo y actualiza la barra de estado */
+function normVerificarEstado() {
+    fetch('/normalizacion_estado')
+        .then(r => r.json())
+        .then(d => {
+            const bar = document.getElementById('norm-status-bar');
+            if (!d.disponible) {
+                bar.textContent = '❌ Módulo de normalización no encontrado. Verifica la ruta de instalación.';
+                bar.style.borderLeftColor = '#ff4444';
+                document.getElementById('norm-btn-cargar').disabled = true;
+            } else if (d.modelo_cargado) {
+                bar.textContent = '✅ Modelo de normalización cargado y listo.';
+                bar.style.borderLeftColor = '#44bb44';
+            } else {
+                bar.textContent = '⚠️ Módulo disponible. Haz clic en "Cargar modelo" para inicializarlo.';
+                bar.style.borderLeftColor = '#ffaa00';
+            }
+        })
+        .catch(() => {
+            document.getElementById('norm-status-bar').textContent =
+                '⚠️ No se pudo contactar con el servidor.';
+        });
+}
+
+/** Carga (o recarga) el modelo de normalización en el servidor */
+function normCargarModelo() {
+    const modelo = document.querySelector('input[name="norm-modelo"]:checked').value;
+    const bar    = document.getElementById('norm-status-bar');
+    const btn    = document.getElementById('norm-btn-cargar');
+
+    bar.textContent = '⏳ Cargando modelo… esto puede tardar ~10 segundos.';
+    bar.style.borderLeftColor = '#4a9eff';
+    btn.disabled = true;
+
+    fetch('/normalizacion_cargar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ modelo })
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) {
+            bar.textContent = '✅ Modelo cargado correctamente. Ya puedes normalizar espectros.';
+            bar.style.borderLeftColor = '#44bb44';
+        } else {
+            bar.textContent = '❌ Error al cargar: ' + (d.error || 'desconocido');
+            bar.style.borderLeftColor = '#ff4444';
+        }
+    })
+    .catch(e => {
+        bar.textContent = '❌ Error de red: ' + e.message;
+        bar.style.borderLeftColor = '#ff4444';
+    })
+    .finally(() => { btn.disabled = false; });
+}
+
+/** Maneja drag-and-drop en el área de carga */
+function normDropFile(event) {
+    event.preventDefault();
+    document.getElementById('norm-drop-area').style.borderColor = '#4a9eff44';
+    const file = event.dataTransfer.files[0];
+    if (file) _normSetArchivo(file);
+}
+
+/** Maneja la selección de archivo desde el input */
+function normArchivoSeleccionado(input) {
+    if (input.files[0]) _normSetArchivo(input.files[0]);
+}
+
+function _normSetArchivo(file) {
+    document.getElementById('norm-filename').textContent = file.name;
+    document.getElementById('norm-btn-procesar').disabled = false;
+    document.getElementById('norm-resultados').style.display = 'none';
+    _normTextoDescarga = null;
+    // Guardar referencia al archivo
+    window._normArchivoActual = file;
+}
+
+/** Envía el archivo al servidor y muestra los resultados */
+function normProcesar() {
+    const file = window._normArchivoActual;
+    if (!file) return;
+
+    const bar = document.getElementById('norm-status-bar');
+    const btn = document.getElementById('norm-btn-procesar');
+
+    bar.textContent = '⏳ Normalizando espectro…';
+    bar.style.borderLeftColor = '#4a9eff';
+    btn.disabled = true;
+    document.getElementById('norm-resultados').style.display = 'none';
+
+    const fd = new FormData();
+    fd.append('archivo', file);
+
+    fetch('/normalizacion_procesar', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+            if (d.error) {
+                bar.textContent = '❌ ' + d.error;
+                bar.style.borderLeftColor = '#ff4444';
+                return;
+            }
+            // Mostrar imágenes
+            document.getElementById('norm-img-original').src =
+                'data:image/png;base64,' + d.imagen_original;
+            document.getElementById('norm-img-normalizado').src =
+                'data:image/png;base64,' + d.imagen_normalizado;
+
+            // Info del espectro
+            document.getElementById('norm-info').innerHTML =
+                `<b>${d.n_puntos}</b> puntos &nbsp;|&nbsp; rango: <b>${d.rango_lambda}</b>`;
+
+            // Guardar texto para descarga
+            _normTextoDescarga = d.texto_descarga;
+
+            document.getElementById('norm-resultados').style.display = 'block';
+            bar.textContent = '✅ Normalización completada correctamente.';
+            bar.style.borderLeftColor = '#44bb44';
+        })
+        .catch(e => {
+            bar.textContent = '❌ Error de red: ' + e.message;
+            bar.style.borderLeftColor = '#ff4444';
+        })
+        .finally(() => { btn.disabled = false; });
+}
+
+/** Descarga el espectro normalizado como archivo .txt */
+function normDescargar() {
+    if (!_normTextoDescarga) return;
+    const nombre  = (window._normArchivoActual?.name || 'espectro').replace(/\.[^.]+$/, '');
+    const blob    = new Blob([_normTextoDescarga], { type: 'text/plain;charset=utf-8;' });
+    const url     = URL.createObjectURL(blob);
+    const a       = document.createElement('a');
+    a.href        = url;
+    a.download    = nombre + '_normalizado.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// Inicializar verificación de estado cuando se active la pestaña de normalización
+document.addEventListener('DOMContentLoaded', () => {
+    // Conectar al switch de pestañas existente
+    document.querySelectorAll('.tab-btn[data-tab="normalizacion"]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            normVerificarEstado();
+        });
+    });
+});
