@@ -21,7 +21,14 @@
       "Bash(find \"/mnt/c/Users/Eduardo/Desktop/suppnet-main\" -maxdepth 2 -type d -exec ls -ld {} \\\\;)",
       "Read(//mnt/c/Users/Eduardo/Desktop/suppnet-main/**)",
       "Read(//mnt/c/Users/Eduardo/Desktop/suppnet-main/app_components/**)",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "Bash(apt-get install *)",
+      "Bash(pdftotext \"/mnt/c/Users/Eduardo/Desktop/knn.pdf\" -)",
+      "Bash(ls /mnt/c/Users/Eduardo/Desktop/knn*)",
+      "Bash(sudo apt-get *)",
+      "Bash(cp /mnt/c/Users/Eduardo/Desktop/knn_imgs/render_page1.png '/mnt/c/Users/Eduardo/Desktop/crreccion espestrocopiv3 -final/webapp/static/knn_p1.png')",
+      "Bash(cp /mnt/c/Users/Eduardo/Desktop/knn_imgs/render_page2.png '/mnt/c/Users/Eduardo/Desktop/crreccion espestrocopiv3 -final/webapp/static/knn_p2.png')",
+      "Bash(cp /mnt/c/Users/Eduardo/Desktop/knn_imgs/render_page3.png '/mnt/c/Users/Eduardo/Desktop/crreccion espestrocopiv3 -final/webapp/static/knn_p3.png')"
     ]
   }
 }

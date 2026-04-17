@@ -3689,6 +3689,97 @@ print(<span class="mlc-str">"✅ Modelo KNN guardado en models/knn_model.pkl"</s
 <span class="mlc-comment"># tipo = knn_cargado.predict(x_nuevo)[0]          # → 'G'</span>
 <span class="mlc-comment"># proba = knn_cargado.predict_proba(x_nuevo)[0]   # → [0.0, 0.0, 0.0, 0.05, 0.90, 0.05, 0.0]</span></code></pre>
                                 </div>
+                                <!-- ── Teoría formal KNN (FCEyN) ── -->
+                                <div class="ml-theory-block">
+                                    <div class="ml-theory-header">
+                                        <span class="ml-theory-badge">📐 Teoría Formal</span>
+                                        <span style="color:#94a3b8; font-size:0.82rem;">Aprendizaje Supervisado I · FCEyN</span>
+                                    </div>
+
+                                    <!-- Diapositiva 1: Idea + Formalización -->
+                                    <div class="ml-theory-slide">
+                                        <div class="ml-theory-img-wrap">
+                                            <img src="{{ url_for('static', filename='knn_p1.png') }}"
+                                                 alt="KNN — Idea y formalización general"
+                                                 class="ml-theory-img"
+                                                 loading="lazy">
+                                        </div>
+                                        <div class="ml-theory-caption">
+                                            <h5>Idea y formalización general</h5>
+                                            <p>Para clasificar <strong>x ∈ ℝ<sup>d</sup></strong>, KNN busca los <em>k</em> ejemplos de entrenamiento más cercanos (distancia geométrica). La predicción se decide por <strong>votación de clases</strong> entre esos vecinos.</p>
+                                            <div class="ml-formula-block">
+                                                <div class="ml-formula-row">
+                                                    <span class="ml-formula-label">Puntuación por clase:</span>
+                                                    <code class="ml-formula-eq">f<sub>c</sub>(x) = #{vecinos de clase c} / k</code>
+                                                </div>
+                                                <div class="ml-formula-row">
+                                                    <span class="ml-formula-label">Regla de decisión:</span>
+                                                    <code class="ml-formula-eq">ŷ = arg max<sub>c</sub> f<sub>c</sub>(x)</code>
+                                                </div>
+                                            </div>
+                                            <p style="color:#94a3b8; font-size:0.83rem; margin-top:0.6rem;">
+                                                La clase predicha es la <strong>más frecuente</strong> entre los k vecinos más cercanos.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <!-- Diapositiva 2: Aprendizaje + tabla k pequeño/grande -->
+                                    <div class="ml-theory-slide">
+                                        <div class="ml-theory-img-wrap">
+                                            <img src="{{ url_for('static', filename='knn_p2.png') }}"
+                                                 alt="KNN — Aprendizaje del modelo, tabla k pequeño vs grande"
+                                                 class="ml-theory-img"
+                                                 loading="lazy">
+                                        </div>
+                                        <div class="ml-theory-caption">
+                                            <h5>Aprendizaje del modelo — efecto de k</h5>
+                                            <p>KNN es un modelo <strong>no paramétrico</strong>: no ajusta pesos ni coeficientes. "Aprender" significa memorizar el dataset de entrenamiento junto a la regla de #(vecinos).</p>
+                                            <table class="ml-theory-table">
+                                                <thead>
+                                                    <tr><th>k pequeño</th><th>k grande</th></tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr><td>Modelo más flexible</td><td>Modelo más estable</td></tr>
+                                                    <tr><td>Sensible al ruido</td><td>Menos sensible al ruido</td></tr>
+                                                    <tr><td>Riesgo de <strong>sobreajuste</strong></td><td>Riesgo de <strong>subajuste</strong></td></tr>
+                                                    <tr><td>Frontera irregular</td><td>Frontera más suave</td></tr>
+                                                </tbody>
+                                            </table>
+                                            <p style="color:#fbbf24; font-size:0.83rem; margin-top:0.7rem;">
+                                                ⚠️ <strong>Importante en la práctica:</strong> la elección de la distancia importa, y la escala de las variables importa → conviene normalizar (StandardScaler).
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <!-- Diapositiva 3: Ejemplo numérico k=4 vs k=9 -->
+                                    <div class="ml-theory-slide">
+                                        <div class="ml-theory-img-wrap">
+                                            <img src="{{ url_for('static', filename='knn_p3.png') }}"
+                                                 alt="KNN — Ejemplo con k=4 y k=9, clases A B C"
+                                                 class="ml-theory-img"
+                                                 loading="lazy">
+                                        </div>
+                                        <div class="ml-theory-caption">
+                                            <h5>Ejemplo numérico: k=4 vs k=9</h5>
+                                            <p>El punto rojo (■) es una nueva instancia de test. Dependiendo del k elegido, la clase cambia:</p>
+                                            <div class="ml-formula-block">
+                                                <div class="ml-formula-row">
+                                                    <span class="ml-formula-label">k = 4:</span>
+                                                    <code class="ml-formula-eq">f(■) = (1/4, 1/4, 2/4) → ŷ = C</code>
+                                                </div>
+                                                <div class="ml-formula-row">
+                                                    <span class="ml-formula-label">k = 9:</span>
+                                                    <code class="ml-formula-eq">f(■) = (2/9, 4/9, 3/9) → ŷ = B</code>
+                                                </div>
+                                            </div>
+                                            <p style="color:#94a3b8; font-size:0.83rem; margin-top:0.6rem;">
+                                                El mismo punto se clasifica diferente con k=4 (clase C) que con k=9 (clase B). Esto ilustra por qué la elección de k es el <strong>hiperparámetro más crítico</strong>.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                </div><!-- /ml-theory-block -->
+
                             </div><!-- /ml-model-body -->
                         </div><!-- /ml-model-card KNN -->
 
