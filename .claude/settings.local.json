@@ -18,7 +18,10 @@
       "Bash(pip install:*)",
       "Bash(pip3 install:*)",
       "Bash(grep -v \"^$\")",
-      "Bash(find \"/mnt/c/Users/Eduardo/Desktop/suppnet-main\" -maxdepth 2 -type d -exec ls -ld {} \\\\;)"
+      "Bash(find \"/mnt/c/Users/Eduardo/Desktop/suppnet-main\" -maxdepth 2 -type d -exec ls -ld {} \\\\;)",
+      "Read(//mnt/c/Users/Eduardo/Desktop/suppnet-main/**)",
+      "Read(//mnt/c/Users/Eduardo/Desktop/suppnet-main/app_components/**)",
+      "Bash(python -c ' *)"
     ]
   }
 }

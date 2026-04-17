@@ -4127,7 +4127,9 @@ details[open] summary {
 .wm-preview-seg.physical { background: #6c5ce7; }
 .wm-preview-seg.dt       { background: #00b894; }
 .wm-preview-seg.template { background: #fdcb6e; }
-.wm-preview-seg.neural   { background: #0984e3; }
+.wm-preview-seg.knn      { background: #0984e3; }
+.wm-preview-seg.cnn1d    { background: #74b9ff; }
+.wm-preview-seg.cnn2d    { background: #a29bfe; }
 
 .wm-preview-legend {
     display: flex;
@@ -4148,7 +4150,9 @@ details[open] summary {
 .wm-legend-dot.physical { background: #6c5ce7; }
 .wm-legend-dot.dt       { background: #00b894; }
 .wm-legend-dot.template { background: #fdcb6e; }
-.wm-legend-dot.neural   { background: #0984e3; }
+.wm-legend-dot.knn      { background: #0984e3; }
+.wm-legend-dot.cnn1d    { background: #74b9ff; }
+.wm-legend-dot.cnn2d    { background: #a29bfe; }
 
 /* ============================================================
    LEYENDA EW - Clasificación Espectral Interactiva

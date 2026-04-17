@@ -12,7 +12,9 @@ let globalWeights = {
     physical:      0.10,
     decision_tree: 0.40,
     template:      0.10,
-    neural:        0.40
+    knn:           0.20,
+    cnn_1d:        0.20,
+    cnn_2d:        0.00,
 };
 
 // ===========================
@@ -198,16 +200,18 @@ async function analyzeSingleSpectrum() {
     processingDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
     // Leer configuración de votación (usa pesos globales si ya fueron configurados)
-    const includeNeural  = document.getElementById('nnIncludeInVoting')?.checked ?? true;
-    const neuralWeight   = globalWeights.neural;
-    const neuralModel    = document.getElementById('nnModelSelect')?.value ?? 'auto';
+    const includeNeural = document.getElementById('nnIncludeInVoting')?.checked ?? true;
 
     // Create form data
     const formData = new FormData();
     formData.append('files[]', currentFile);
-    formData.append('include_neural', includeNeural ? '1' : '0');
-    formData.append('neural_weight',  neuralWeight.toString());
-    formData.append('neural_model',   neuralModel);
+    formData.append('include_neural',  includeNeural ? '1' : '0');
+    formData.append('physical_weight', globalWeights.physical.toString());
+    formData.append('dt_weight',       globalWeights.decision_tree.toString());
+    formData.append('template_weight', globalWeights.template.toString());
+    formData.append('knn_weight',      globalWeights.knn.toString());
+    formData.append('cnn_1d_weight',   globalWeights.cnn_1d.toString());
+    formData.append('cnn_2d_weight',   globalWeights.cnn_2d.toString());
 
     try {
         const response = await fetch('/upload', {
@@ -1917,12 +1921,17 @@ async function processBatch() {
 
         const formData = new FormData();
         formData.append('files[]', file);
-        formData.append('neural_weight', globalWeights.neural.toString());
+        formData.append('physical_weight', globalWeights.physical.toString());
+        formData.append('dt_weight',       globalWeights.decision_tree.toString());
+        formData.append('template_weight', globalWeights.template.toString());
+        formData.append('knn_weight',      globalWeights.knn.toString());
+        formData.append('cnn_1d_weight',   globalWeights.cnn_1d.toString());
+        formData.append('cnn_2d_weight',   globalWeights.cnn_2d.toString());
 
         try {
             appendLog(`PASO 2: Normalizando al continuo (sigma-clipping)...`);
             appendLog(`PASO 3: Midiendo anchos equivalentes (EW)...`);
-            appendLog(`PASO 4: Clasificando espectro (pesos: Fís=${globalWeights.physical.toFixed(2)} Árbol=${globalWeights.decision_tree.toFixed(2)} Tmpl=${globalWeights.template.toFixed(2)} Neural=${globalWeights.neural.toFixed(2)})...`);
+            appendLog(`PASO 4: Clasificando espectro (pesos: Fís=${globalWeights.physical.toFixed(2)} Árbol=${globalWeights.decision_tree.toFixed(2)} Tmpl=${globalWeights.template.toFixed(2)} KNN=${globalWeights.knn.toFixed(2)} CNN1D=${globalWeights.cnn_1d.toFixed(2)} CNN2D=${globalWeights.cnn_2d.toFixed(2)})...`);
 
             const response = await fetch('/upload', {
                 method: 'POST',
@@ -5418,10 +5427,12 @@ function toggleWeightsPanel() {
     if (isHidden) {
         panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
         // Sincronizar sliders con pesos globales actuales
-        document.getElementById('sliderPhysical').value = Math.round(globalWeights.physical * 100);
-        document.getElementById('sliderDT').value       = Math.round(globalWeights.decision_tree * 100);
-        document.getElementById('sliderTemplate').value = Math.round(globalWeights.template * 100);
-        document.getElementById('sliderNeural').value   = Math.round(globalWeights.neural * 100);
+        document.getElementById('sliderPhysical').value = Math.round(globalWeights.physical       * 100);
+        document.getElementById('sliderDT').value       = Math.round(globalWeights.decision_tree  * 100);
+        document.getElementById('sliderTemplate').value = Math.round(globalWeights.template        * 100);
+        document.getElementById('sliderKNN').value      = Math.round(globalWeights.knn             * 100);
+        document.getElementById('sliderCNN1D').value    = Math.round(globalWeights.cnn_1d          * 100);
+        document.getElementById('sliderCNN2D').value    = Math.round(globalWeights.cnn_2d          * 100);
         refreshWeightsUI();
     }
 }
@@ -5431,57 +5442,61 @@ function onWeightSlider() {
 }
 
 function refreshWeightsUI() {
-    const p  = parseInt(document.getElementById('sliderPhysical').value) / 100;
-    const dt = parseInt(document.getElementById('sliderDT').value)       / 100;
-    const t  = parseInt(document.getElementById('sliderTemplate').value) / 100;
-    const n  = parseInt(document.getElementById('sliderNeural').value)   / 100;
-    const total = p + dt + t + n;
+    const p    = parseInt(document.getElementById('sliderPhysical').value) / 100;
+    const dt   = parseInt(document.getElementById('sliderDT').value)       / 100;
+    const t    = parseInt(document.getElementById('sliderTemplate').value) / 100;
+    const knn  = parseInt(document.getElementById('sliderKNN').value)      / 100;
+    const c1d  = parseInt(document.getElementById('sliderCNN1D').value)    / 100;
+    const c2d  = parseInt(document.getElementById('sliderCNN2D').value)    / 100;
+    const total = p + dt + t + knn + c1d + c2d;
 
     // Badges con valor actual
-    document.getElementById('badgePhysical').textContent = p.toFixed(2);
-    document.getElementById('badgeDT').textContent       = dt.toFixed(2);
-    document.getElementById('badgeTemplate').textContent = t.toFixed(2);
-    document.getElementById('badgeNeural').textContent   = n.toFixed(2);
+    document.getElementById('badgePhysical').textContent  = p.toFixed(2);
+    document.getElementById('badgeDT').textContent        = dt.toFixed(2);
+    document.getElementById('badgeTemplate').textContent  = t.toFixed(2);
+    document.getElementById('badgeKNN').textContent       = knn.toFixed(2);
+    document.getElementById('badgeCNN1D').textContent     = c1d.toFixed(2);
+    document.getElementById('badgeCNN2D').textContent     = c2d.toFixed(2);
 
     // Barras de progreso individuales (relativas a 1.0)
-    document.getElementById('barPhysical').style.width = (p  * 100).toFixed(1) + '%';
-    document.getElementById('barDT').style.width       = (dt * 100).toFixed(1) + '%';
-    document.getElementById('barTemplate').style.width = (t  * 100).toFixed(1) + '%';
-    document.getElementById('barNeural').style.width   = (n  * 100).toFixed(1) + '%';
+    document.getElementById('barPhysical').style.width  = (p   * 100).toFixed(1) + '%';
+    document.getElementById('barDT').style.width        = (dt  * 100).toFixed(1) + '%';
+    document.getElementById('barTemplate').style.width  = (t   * 100).toFixed(1) + '%';
+    document.getElementById('barKNN').style.width       = (knn * 100).toFixed(1) + '%';
+    document.getElementById('barCNN1D').style.width     = (c1d * 100).toFixed(1) + '%';
+    document.getElementById('barCNN2D').style.width     = (c2d * 100).toFixed(1) + '%';
 
     // Suma total
-    const totalStr = total.toFixed(2);
-    document.getElementById('wm-total-value').textContent = totalStr;
+    document.getElementById('wm-total-value').textContent = total.toFixed(2);
     const valid = Math.abs(total - 1.0) < 0.011;
     document.getElementById('wm-total-ok').style.display   = valid ? 'inline' : 'none';
     document.getElementById('wm-total-warn').style.display = valid ? 'none'   : 'inline';
     document.getElementById('btnApplyWeights').disabled = !valid;
 
-    // Preview proporcional (% del total, para que siempre ocupe el 100% de la barra)
+    // Preview proporcional (% del total)
     const safeTotal = total > 0 ? total : 1;
-    document.getElementById('previewPhysical').style.width = ((p  / safeTotal) * 100).toFixed(1) + '%';
-    document.getElementById('previewDT').style.width       = ((dt / safeTotal) * 100).toFixed(1) + '%';
-    document.getElementById('previewTemplate').style.width = ((t  / safeTotal) * 100).toFixed(1) + '%';
-    document.getElementById('previewNeural').style.width   = ((n  / safeTotal) * 100).toFixed(1) + '%';
+    document.getElementById('previewPhysical').style.width = ((p   / safeTotal) * 100).toFixed(1) + '%';
+    document.getElementById('previewDT').style.width       = ((dt  / safeTotal) * 100).toFixed(1) + '%';
+    document.getElementById('previewTemplate').style.width = ((t   / safeTotal) * 100).toFixed(1) + '%';
+    document.getElementById('previewKNN').style.width      = ((knn / safeTotal) * 100).toFixed(1) + '%';
+    document.getElementById('previewCNN1D').style.width    = ((c1d / safeTotal) * 100).toFixed(1) + '%';
+    document.getElementById('previewCNN2D').style.width    = ((c2d / safeTotal) * 100).toFixed(1) + '%';
 }
 
 function applyWeights() {
-    const p  = parseInt(document.getElementById('sliderPhysical').value) / 100;
-    const dt = parseInt(document.getElementById('sliderDT').value)       / 100;
-    const t  = parseInt(document.getElementById('sliderTemplate').value) / 100;
-    const n  = parseInt(document.getElementById('sliderNeural').value)   / 100;
+    const p   = parseInt(document.getElementById('sliderPhysical').value) / 100;
+    const dt  = parseInt(document.getElementById('sliderDT').value)       / 100;
+    const t   = parseInt(document.getElementById('sliderTemplate').value) / 100;
+    const knn = parseInt(document.getElementById('sliderKNN').value)      / 100;
+    const c1d = parseInt(document.getElementById('sliderCNN1D').value)    / 100;
+    const c2d = parseInt(document.getElementById('sliderCNN2D').value)    / 100;
 
     globalWeights.physical      = p;
     globalWeights.decision_tree = dt;
     globalWeights.template      = t;
-    globalWeights.neural        = n;
-
-    // Sincronizar también el slider de neural de la pestaña de redes neuronales
-    const nnSlider = document.getElementById('nnVotingWeight');
-    if (nnSlider) {
-        nnSlider.value = n;
-        updateWeightsDisplay(n);
-    }
+    globalWeights.knn           = knn;
+    globalWeights.cnn_1d        = c1d;
+    globalWeights.cnn_2d        = c2d;
 
     const btn = document.getElementById('btnApplyWeights');
     btn.textContent = '✓ Aplicado';
@@ -5496,7 +5511,9 @@ function resetWeights() {
     document.getElementById('sliderPhysical').value = 10;
     document.getElementById('sliderDT').value       = 40;
     document.getElementById('sliderTemplate').value = 10;
-    document.getElementById('sliderNeural').value   = 40;
+    document.getElementById('sliderKNN').value      = 20;
+    document.getElementById('sliderCNN1D').value    = 20;
+    document.getElementById('sliderCNN2D').value    = 0;
     refreshWeightsUI();
 }
 
@@ -5830,6 +5847,8 @@ function setupFitsExtractor() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 let _normTextoDescarga = null;  // Guarda el texto para el botón de descarga
+let _normSpectrumId    = null;  // ID del espectro en caché del servidor
+let _normSmoothTimer   = null;  // Timer para debounce del slider
 
 /** Verifica el estado del módulo y actualiza la barra de estado */
 function normVerificarEstado() {
@@ -5905,6 +5924,12 @@ function _normSetArchivo(file) {
     document.getElementById('norm-btn-procesar').disabled = false;
     document.getElementById('norm-resultados').style.display = 'none';
     _normTextoDescarga = null;
+    _normSpectrumId    = null;
+    // Resetear slider al default
+    const slider = document.getElementById('norm-smooth-slider');
+    if (slider) { slider.value = 20; }
+    const val = document.getElementById('norm-smooth-val');
+    if (val) val.textContent = '1.00';
     // Guardar referencia al archivo
     window._normArchivoActual = file;
 }
@@ -5943,11 +5968,20 @@ function normProcesar() {
             document.getElementById('norm-info').innerHTML =
                 `<b>${d.n_puntos}</b> puntos &nbsp;|&nbsp; rango: <b>${d.rango_lambda}</b>`;
 
-            // Guardar texto para descarga
+            // Guardar texto para descarga y el ID de caché
             _normTextoDescarga = d.texto_descarga;
+            _normSpectrumId    = d.spectrum_id;
+
+            // Resetear slider a 1.0
+            const slider = document.getElementById('norm-smooth-slider');
+            if (slider) slider.value = 20;
+            const val = document.getElementById('norm-smooth-val');
+            if (val) val.textContent = '1.00';
+            const status = document.getElementById('norm-smooth-status');
+            if (status) status.textContent = '';
 
             document.getElementById('norm-resultados').style.display = 'block';
-            bar.textContent = '✅ Normalización completada correctamente.';
+            bar.textContent = '✅ Normalización completada. Ajusta el factor de suavizado si es necesario.';
             bar.style.borderLeftColor = '#44bb44';
         })
         .catch(e => {
@@ -5968,6 +6002,51 @@ function normDescargar() {
     a.download    = nombre + '_normalizado.txt';
     a.click();
     URL.revokeObjectURL(url);
+}
+
+/** Convierte posición del slider (1-200) a smooth_factor (0.05-10.0) y actualiza el label */
+function normSmoothInput(sliderPos) {
+    // Escala logarítmica: pos=20 → factor=1.0, rango 0.05–10
+    const factor = Math.exp((sliderPos - 20) / 20 * Math.log(10));
+    const clamped = Math.max(0.05, Math.min(factor, 10.0));
+    const val = document.getElementById('norm-smooth-val');
+    if (val) val.textContent = clamped.toFixed(2);
+}
+
+/** Se dispara al soltar el slider (debounce de 300 ms) */
+function normSmoothAplicar() {
+    if (!_normSpectrumId) return;
+    clearTimeout(_normSmoothTimer);
+    _normSmoothTimer = setTimeout(() => {
+        const sliderPos = parseInt(document.getElementById('norm-smooth-slider').value, 10);
+        const factor    = Math.exp((sliderPos - 20) / 20 * Math.log(10));
+        const clamped   = Math.max(0.05, Math.min(factor, 10.0));
+
+        const status = document.getElementById('norm-smooth-status');
+        if (status) status.textContent = '⏳ Recalculando continuo…';
+
+        fetch('/normalizacion_ajustar_smooth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ spectrum_id: _normSpectrumId, smooth_factor: clamped })
+        })
+        .then(r => r.json())
+        .then(d => {
+            if (d.error) {
+                if (status) status.textContent = '❌ ' + d.error;
+                return;
+            }
+            document.getElementById('norm-img-original').src =
+                'data:image/png;base64,' + d.imagen_original;
+            document.getElementById('norm-img-normalizado').src =
+                'data:image/png;base64,' + d.imagen_normalizado;
+            _normTextoDescarga = d.texto_descarga;
+            if (status) status.textContent = '✅ Continuo actualizado.';
+        })
+        .catch(e => {
+            if (status) status.textContent = '❌ Error de red: ' + e.message;
+        });
+    }, 300);
 }
 
 // Inicializar verificación de estado cuando se active la pestaña de normalización

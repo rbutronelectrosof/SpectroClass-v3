@@ -1387,42 +1387,114 @@
                                     </div>
                                 </div>
 
-                                <!-- Neural -->
+                                <!-- KNN -->
                                 <div class="wm-card">
                                     <div class="wm-card-header">
-                                        <span class="wm-icon">🧠</span>
+                                        <span class="wm-icon">📍</span>
                                         <div>
                                             <div class="label-with-help" style="margin:0">
-                                                <h4 style="margin:0">Neural (KNN / CNN)</h4>
+                                                <h4 style="margin:0">KNN</h4>
                                                 <span class="help-icon">?
                                                     <div class="tooltip">
-                                                        <div class="tooltip-title">Clasificador Neural — Peso por defecto: 0.40</div>
-                                                        <p>Modelos de aprendizaje automático entrenados desde la pestaña <b>Redes Neuronales</b>:</p>
+                                                        <div class="tooltip-title">K-Nearest Neighbors — Peso por defecto: 0.20</div>
+                                                        <p><b>K-Nearest Neighbors</b> busca los K espectros más similares en el catálogo de entrenamiento usando anchos equivalentes (EWs) como features.</p>
                                                         <ul>
-                                                            <li><b>KNN (~84%):</b> K-Nearest Neighbors. Usa EWs como features. Rápido de entrenar, muy preciso.</li>
-                                                            <li><b>CNN 1D (~45%+):</b> Red convolucional. Usa el espectro completo. Necesita más datos para superar al KNN.</li>
+                                                            <li>Precisión en validación: <b>~84%</b></li>
+                                                            <li>Entrada: 17 EWs + 3 ratios de líneas diagnóstico</li>
+                                                            <li>Rápido de entrenar y muy interpretable</li>
                                                         </ul>
-                                                        <p style="margin-top:6px"><b>Peso 0.40 (40%)</b> — igual al Árbol de Decisión. Si no hay modelo neural entrenado, este peso se redistribuye automáticamente entre los otros métodos.</p>
-                                                        <p>Si tienes KNN entrenado, es el método más recomendado junto con el Árbol.</p>
+                                                        <p>Si no hay modelo KNN entrenado, su peso se ignora en la votación.</p>
                                                     </div>
                                                 </span>
                                             </div>
-                                            <span class="wm-accuracy">KNN: ~84% · CNN: ~45%</span>
+                                            <span class="wm-accuracy">~84% accuracy</span>
                                         </div>
-                                        <span class="wm-badge" id="badgeNeural">0.40</span>
+                                        <span class="wm-badge" id="badgeKNN">0.20</span>
                                     </div>
-                                    <p class="wm-desc">Modelo de aprendizaje automático entrenado con el catálogo.
-                                    KNN (K-Nearest Neighbors) alcanza ~84% usando anchos equivalentes como features.
-                                    CNN 1D usa el espectro completo pero requiere más datos para superar al KNN.</p>
+                                    <p class="wm-desc">K-Nearest Neighbors usando anchos equivalentes de líneas espectrales. Rápido de entrenar y muy preciso para espectros de buena calidad.</p>
                                     <div class="wm-slider-row">
                                         <span class="wm-slider-min">0.00</span>
-                                        <input type="range" id="sliderNeural" class="wm-slider"
-                                               min="0" max="100" step="1" value="40"
+                                        <input type="range" id="sliderKNN" class="wm-slider"
+                                               min="0" max="100" step="1" value="20"
                                                oninput="onWeightSlider()">
                                         <span class="wm-slider-max">1.00</span>
                                     </div>
                                     <div class="wm-pct-bar-wrap">
-                                        <div class="wm-pct-bar" id="barNeural" style="width:40%"></div>
+                                        <div class="wm-pct-bar" id="barKNN" style="width:20%"></div>
+                                    </div>
+                                </div>
+
+                                <!-- CNN 1D -->
+                                <div class="wm-card">
+                                    <div class="wm-card-header">
+                                        <span class="wm-icon">〰️</span>
+                                        <div>
+                                            <div class="label-with-help" style="margin:0">
+                                                <h4 style="margin:0">CNN 1D</h4>
+                                                <span class="help-icon">?
+                                                    <div class="tooltip">
+                                                        <div class="tooltip-title">Red Convolucional 1D — Peso por defecto: 0.20</div>
+                                                        <p><b>CNN 1D</b> procesa el espectro completo como señal unidimensional mediante capas convolucionales.</p>
+                                                        <ul>
+                                                            <li>Entrada: espectro completo remuestreado a 1000 puntos</li>
+                                                            <li>Detecta patrones locales (grupos de líneas) automáticamente</li>
+                                                            <li>Necesita más datos de entrenamiento que el KNN para alcanzar su máximo potencial</li>
+                                                        </ul>
+                                                        <p>Si no hay modelo CNN 1D entrenado, su peso se ignora en la votación.</p>
+                                                    </div>
+                                                </span>
+                                            </div>
+                                            <span class="wm-accuracy">~45%+ accuracy</span>
+                                        </div>
+                                        <span class="wm-badge" id="badgeCNN1D">0.20</span>
+                                    </div>
+                                    <p class="wm-desc">Red neuronal convolucional sobre el espectro completo. Aprende patrones de líneas directamente sin extracción manual de features.</p>
+                                    <div class="wm-slider-row">
+                                        <span class="wm-slider-min">0.00</span>
+                                        <input type="range" id="sliderCNN1D" class="wm-slider"
+                                               min="0" max="100" step="1" value="20"
+                                               oninput="onWeightSlider()">
+                                        <span class="wm-slider-max">1.00</span>
+                                    </div>
+                                    <div class="wm-pct-bar-wrap">
+                                        <div class="wm-pct-bar" id="barCNN1D" style="width:20%"></div>
+                                    </div>
+                                </div>
+
+                                <!-- CNN 2D -->
+                                <div class="wm-card">
+                                    <div class="wm-card-header">
+                                        <span class="wm-icon">🖼️</span>
+                                        <div>
+                                            <div class="label-with-help" style="margin:0">
+                                                <h4 style="margin:0">CNN 2D</h4>
+                                                <span class="help-icon">?
+                                                    <div class="tooltip">
+                                                        <div class="tooltip-title">Red Convolucional 2D — Peso por defecto: 0.00</div>
+                                                        <p><b>CNN 2D</b> trata el espectro como imagen bidimensional (gráfico del espectro).</p>
+                                                        <ul>
+                                                            <li>Entrada: imagen PNG del espectro redimensionada</li>
+                                                            <li>Captura relaciones espaciales entre regiones del espectro</li>
+                                                            <li>Modelo experimental — menos común que CNN 1D</li>
+                                                        </ul>
+                                                        <p>Peso 0 por defecto. Actívalo si tienes un modelo CNN 2D entrenado.</p>
+                                                    </div>
+                                                </span>
+                                            </div>
+                                            <span class="wm-accuracy">experimental</span>
+                                        </div>
+                                        <span class="wm-badge" id="badgeCNN2D">0.00</span>
+                                    </div>
+                                    <p class="wm-desc">Red convolucional 2D que trata el espectro como imagen. Modelo experimental, peso 0 por defecto.</p>
+                                    <div class="wm-slider-row">
+                                        <span class="wm-slider-min">0.00</span>
+                                        <input type="range" id="sliderCNN2D" class="wm-slider"
+                                               min="0" max="100" step="1" value="0"
+                                               oninput="onWeightSlider()">
+                                        <span class="wm-slider-max">1.00</span>
+                                    </div>
+                                    <div class="wm-pct-bar-wrap">
+                                        <div class="wm-pct-bar" id="barCNN2D" style="width:0%"></div>
                                     </div>
                                 </div>
 
@@ -1449,13 +1521,17 @@
                                     <div class="wm-preview-seg physical"  id="previewPhysical"  title="Físico"></div>
                                     <div class="wm-preview-seg dt"        id="previewDT"        title="Árbol"></div>
                                     <div class="wm-preview-seg template"  id="previewTemplate"  title="Template"></div>
-                                    <div class="wm-preview-seg neural"    id="previewNeural"    title="Neural"></div>
+                                    <div class="wm-preview-seg knn"       id="previewKNN"       title="KNN"></div>
+                                    <div class="wm-preview-seg cnn1d"     id="previewCNN1D"     title="CNN 1D"></div>
+                                    <div class="wm-preview-seg cnn2d"     id="previewCNN2D"     title="CNN 2D"></div>
                                 </div>
                                 <div class="wm-preview-legend">
                                     <span class="wm-legend-dot physical"></span>Físico
                                     <span class="wm-legend-dot dt"></span>Árbol
                                     <span class="wm-legend-dot template"></span>Template
-                                    <span class="wm-legend-dot neural"></span>Neural
+                                    <span class="wm-legend-dot knn"></span>KNN
+                                    <span class="wm-legend-dot cnn1d"></span>CNN 1D
+                                    <span class="wm-legend-dot cnn2d"></span>CNN 2D
                                 </div>
                             </div>
 
@@ -2385,6 +2461,38 @@
                             <img id="norm-img-normalizado" src="" alt="Espectro normalizado"
                                  style="width:100%; border-radius:8px;">
                         </div>
+
+                        <!-- Slider de smooth factor -->
+                        <div class="card" style="padding:1.2rem; margin-bottom:1rem;">
+                            <div class="label-with-help" style="margin-bottom:0.8rem;">
+                                <h3 style="margin:0; color:#4a9eff;">Factor de suavizado del continuo</h3>
+                                <span class="help-icon">?
+                                    <div class="tooltip">
+                                        <div class="tooltip-title">Factor de suavizado del continuo</div>
+                                        <p>Controla cuánto se suaviza la spline que ajusta el continuo predicho por la red neuronal.</p>
+                                        <ul>
+                                            <li><b>Valores bajos</b> (0.05–0.5): continuo más flexible, sigue mejor las variaciones locales. Útil para espectros con continuo muy curvo.</li>
+                                            <li><b>Valor 1.0</b>: comportamiento estándar (por defecto).</li>
+                                            <li><b>Valores altos</b> (2–10): continuo más rígido y suave. Reduce el impacto de regiones ruidosas.</li>
+                                        </ul>
+                                        <p>Las gráficas se actualizan automáticamente al soltar el slider.</p>
+                                    </div>
+                                </span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:0.8rem;">
+                                <span style="color:#aac4e0; font-size:0.85rem; white-space:nowrap;">Flexible</span>
+                                <input type="range" id="norm-smooth-slider"
+                                       min="1" max="200" value="20" step="1"
+                                       style="flex:1; accent-color:#4a9eff; cursor:pointer;"
+                                       oninput="normSmoothInput(this.value); normSmoothAplicar()">
+                                <span style="color:#aac4e0; font-size:0.85rem; white-space:nowrap;">Rígido</span>
+                                <span id="norm-smooth-val"
+                                      style="min-width:3.5rem; text-align:right; color:#4a9eff;
+                                             font-weight:bold; font-size:1rem;">1.00</span>
+                            </div>
+                            <div id="norm-smooth-status" style="margin-top:0.5rem; font-size:0.82rem; color:#888; min-height:1.1em;"></div>
+                        </div>
+
                         <div class="card" style="padding:1rem; display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
                             <div id="norm-info" style="color:#aac4e0; font-size:0.9rem; flex:1;"></div>
                             <button class="btn-secondary" onclick="normDescargar()">

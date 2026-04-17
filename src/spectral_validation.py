@@ -59,17 +59,19 @@ MAIN_TYPES = ['O', 'B', 'A', 'F', 'G', 'K', 'M']
 # El árbol de decisión tiene 84% accuracy con el catálogo elodie
 # Los clasificadores neuronales (KNN/CNN) pueden mejorar la clasificación si están entrenados
 DEFAULT_WEIGHTS = {
-    'physical': 0.10,  # Clasificador físico - bajo peso por problemas con tipos tardíos
-    'decision_tree': 0.40,  # Árbol de decisión (ML) - mejor accuracy con catálogo elodie
-    'template_matching': 0.10,  # Template matching
-    'neural': 0.40  # KNN/CNN - si está disponible (ajustable desde UI)
+    'physical':         0.10,  # Clasificador físico
+    'decision_tree':    0.40,  # Árbol de decisión (ML) — ~84% accuracy
+    'template_matching':0.10,  # Template matching (chi-cuadrado)
+    'knn':              0.20,  # KNN independiente — ~84% accuracy
+    'cnn_1d':           0.20,  # CNN 1D independiente — espectro completo
+    'cnn_2d':           0.00,  # CNN 2D independiente — imagen espectral
 }
 
-# Pesos cuando neural NO está disponible (se redistribuyen)
+# Pesos cuando los modelos neuronales NO están disponibles
 DEFAULT_WEIGHTS_NO_NEURAL = {
-    'physical': 0.15,
-    'decision_tree': 0.70,
-    'template_matching': 0.15
+    'physical':          0.15,
+    'decision_tree':     0.70,
+    'template_matching': 0.15,
 }
 
 
@@ -329,58 +331,51 @@ class SpectralValidator:
         templates_path : str, optional
             Ruta a templates JSON
         weights : dict, optional
-            Pesos personalizados para votación
+            Pesos personalizados para votación. Puede incluir 'knn', 'cnn_1d', 'cnn_2d'
+            como claves independientes.
         use_neural : bool
             Si intentar cargar clasificadores neuronales (KNN/CNN)
         preferred_neural : str
-            'auto' = elegir el de mayor accuracy disponible
-            'knn'  = forzar KNN
-            'cnn_1d' = forzar CNN 1D
+            Ignorado — todos los modelos disponibles votan de forma independiente.
         """
         self.models_dir = models_dir
 
-        # Inicializar clasificadores
+        # Inicializar clasificadores clásicos
         self.template_classifier = TemplateMatchingClassifier(templates_path)
 
         dt_path = os.path.join(models_dir, 'decision_tree.pkl') if models_dir else None
         self.dt_classifier = DecisionTreeClassifier(dt_path)
 
-        # Inicializar clasificadores neuronales
+        # Cargar TODOS los modelos neuronales disponibles (votan independientemente)
         self.neural_manager = None
-        self.neural_type = None  # 'knn', 'cnn_1d', o 'cnn_2d'
 
         if use_neural and NEURAL_AVAILABLE:
             try:
                 self.neural_manager = NeuralClassifierManager(models_dir)
                 available_models = self.neural_manager.get_available_models()
-                if available_models:
-                    if preferred_neural != 'auto' and preferred_neural in available_models:
-                        # Usar el modelo que eligió el usuario
-                        self.neural_type = preferred_neural
-                    else:
-                        # Elegir automáticamente el de mayor accuracy
-                        self.neural_type, _ = self.neural_manager.get_best_available()
+                if not available_models:
+                    self.neural_manager = None
             except Exception as e:
                 print(f"[!] Error cargando clasificadores neuronales: {e}")
                 self.neural_manager = None
 
-        # Ajustar pesos según disponibilidad de neural
+        # Pesos: usar los pasados externamente, o los defaults según disponibilidad
         if weights:
             self.weights = weights
-        elif self.neural_manager and self.neural_manager.get_available_models():
+        elif self.neural_manager:
             self.weights = DEFAULT_WEIGHTS.copy()
         else:
             self.weights = DEFAULT_WEIGHTS_NO_NEURAL.copy()
 
         print(f"[OK] SpectralValidator inicializado")
-        print(f"   - Clasificador físico: Activo")
-        print(f"   - Árbol de decisión: {'Activo' if self.dt_classifier.is_trained else 'Inactivo (modelo no encontrado)'}")
-        print(f"   - Template matching: Activo")
-        if self.neural_manager and self.neural_manager.get_available_models():
-            models = self.neural_manager.get_available_models()
-            print(f"   - Neural ({self.neural_type}): Activo ({', '.join(models)} disponibles)")
+        print(f"   - Clasificador físico:  Activo")
+        print(f"   - Árbol de decisión:    {'Activo' if self.dt_classifier.is_trained else 'Inactivo'}")
+        print(f"   - Template matching:    Activo")
+        if self.neural_manager:
+            for m in self.neural_manager.get_available_models():
+                print(f"   - {m.upper():8s}:          Activo (peso={self.weights.get(m, 0):.2f})")
         else:
-            print(f"   - Neural: Inactivo (entrena modelos KNN/CNN en pestaña Redes Neuronales)")
+            print(f"   - KNN / CNN 1D / CNN 2D: Inactivos (entrena modelos en pestaña Redes Neuronales)")
 
     def classify_physical(self, wavelengths, flux_normalized, measurements):
         """
@@ -531,36 +526,50 @@ class SpectralValidator:
             'confianza': conf_tm
         }
 
-        # Clasificadores neuronales (KNN/CNN)
-        if self.neural_manager and self.neural_type:
+        # ── KNN (independiente) ──────────────────────────────────────────────
+        results['knn'] = None
+        if self.neural_manager and self.neural_manager.has_model('knn'):
             try:
-                model_type = self.neural_type
-
-                if model_type == 'knn' and self.neural_manager.has_model('knn'):
-                    # KNN usa features extraídas de las mediciones
-                    neural_result = self.neural_manager.predict('knn', measurements=measurements)
-                elif model_type == 'cnn_1d' and self.neural_manager.has_model('cnn_1d'):
-                    # CNN 1D usa el espectro normalizado directamente
-                    neural_result = self.neural_manager.predict('cnn_1d', spectrum=flux_normalized)
-                else:
-                    # CNN 2D requeriría una imagen (no aplicable en este contexto)
-                    neural_result = None
-
-                if neural_result:
-                    results['neural'] = {
-                        'tipo': neural_result['tipo'],
-                        'confianza': neural_result['confianza'],
-                        'probabilidades': neural_result.get('probabilidades', {}),
-                        'metodo': neural_result.get('metodo', model_type)
+                r = self.neural_manager.predict('knn', measurements=measurements)
+                if r:
+                    results['knn'] = {
+                        'tipo': r['tipo'],
+                        'confianza': r['confianza'],
+                        'probabilidades': r.get('probabilidades', {}),
+                        'metodo': 'knn',
                     }
-                else:
-                    results['neural'] = None
-
             except Exception as e:
-                print(f"[!] Error en clasificacion neural: {e}")
-                results['neural'] = None
-        else:
-            results['neural'] = None
+                print(f"[!] Error KNN: {e}")
+
+        # ── CNN 1D (independiente) ────────────────────────────────────────────
+        results['cnn_1d'] = None
+        if self.neural_manager and self.neural_manager.has_model('cnn_1d'):
+            try:
+                r = self.neural_manager.predict('cnn_1d', spectrum=flux_normalized)
+                if r:
+                    results['cnn_1d'] = {
+                        'tipo': r['tipo'],
+                        'confianza': r['confianza'],
+                        'probabilidades': r.get('probabilidades', {}),
+                        'metodo': 'cnn_1d',
+                    }
+            except Exception as e:
+                print(f"[!] Error CNN 1D: {e}")
+
+        # ── CNN 2D (independiente) ────────────────────────────────────────────
+        results['cnn_2d'] = None
+        if self.neural_manager and self.neural_manager.has_model('cnn_2d'):
+            try:
+                r = self.neural_manager.predict('cnn_2d', spectrum=flux_normalized)
+                if r:
+                    results['cnn_2d'] = {
+                        'tipo': r['tipo'],
+                        'confianza': r['confianza'],
+                        'probabilidades': r.get('probabilidades', {}),
+                        'metodo': 'cnn_2d',
+                    }
+            except Exception as e:
+                print(f"[!] Error CNN 2D: {e}")
 
         # 4. Votación ponderada
         tipo_final, alternativas, confianza_global = self._weighted_vote(results)
@@ -716,13 +725,27 @@ class SpectralValidator:
             votes[tipo] += weight * (conf / 100.0)
             confidences[tipo].append(conf)
 
-        # ── Votos de clasificadores neuronales (KNN/CNN) si están disponibles ─
-        # El modelo neural puede ser KNN (usa EWs como features) o CNN 1D (usa
-        # el espectro completo). Solo vota si está activo y tiene peso asignado.
-        if results.get('neural') and 'neural' in self.weights:
-            tipo = results['neural']['tipo']
-            conf = results['neural']['confianza']
-            weight = self.weights['neural']
+        # ── Votos de KNN (independiente) ─────────────────────────────────────
+        if results.get('knn') and self.weights.get('knn', 0) > 0:
+            tipo   = results['knn']['tipo']
+            conf   = results['knn']['confianza']
+            weight = self.weights['knn']
+            votes[tipo] += weight * (conf / 100.0)
+            confidences[tipo].append(conf)
+
+        # ── Votos de CNN 1D (independiente) ──────────────────────────────────
+        if results.get('cnn_1d') and self.weights.get('cnn_1d', 0) > 0:
+            tipo   = results['cnn_1d']['tipo']
+            conf   = results['cnn_1d']['confianza']
+            weight = self.weights['cnn_1d']
+            votes[tipo] += weight * (conf / 100.0)
+            confidences[tipo].append(conf)
+
+        # ── Votos de CNN 2D (independiente) ──────────────────────────────────
+        if results.get('cnn_2d') and self.weights.get('cnn_2d', 0) > 0:
+            tipo   = results['cnn_2d']['tipo']
+            conf   = results['cnn_2d']['confianza']
+            weight = self.weights['cnn_2d']
             votes[tipo] += weight * (conf / 100.0)
             confidences[tipo].append(conf)
 
@@ -783,11 +806,17 @@ class SpectralValidator:
             chi2 = results['template_matching']['chi2'].get(tipo, 999)
             justifications.append(f"Template (χ²={chi2:.1f})")
 
-        # Neural (KNN/CNN)
-        if results.get('neural') and results['neural']['tipo'] == tipo:
-            metodo = results['neural'].get('metodo', 'neural')
-            conf = results['neural']['confianza']
-            justifications.append(f"{metodo.upper()} ({conf:.0f}%)")
+        # KNN
+        if results.get('knn') and results['knn']['tipo'] == tipo:
+            justifications.append(f"KNN ({results['knn']['confianza']:.0f}%)")
+
+        # CNN 1D
+        if results.get('cnn_1d') and results['cnn_1d']['tipo'] == tipo:
+            justifications.append(f"CNN-1D ({results['cnn_1d']['confianza']:.0f}%)")
+
+        # CNN 2D
+        if results.get('cnn_2d') and results['cnn_2d']['tipo'] == tipo:
+            justifications.append(f"CNN-2D ({results['cnn_2d']['confianza']:.0f}%)")
 
         if not justifications:
             return "Clasificación alternativa"
@@ -826,10 +855,11 @@ class SpectralValidator:
         if tm:
             print(f"   Template: {tm['tipo']} - {tm['confianza']:.1f}%")
 
-        # Neural
-        nn = result['detalles'].get('neural')
-        if nn:
-            print(f"   Neural ({nn.get('metodo', 'knn')}): {nn['tipo']} - {nn['confianza']:.1f}%")
+        # Métodos neuronales independientes
+        for key in ('knn', 'cnn_1d', 'cnn_2d'):
+            nn = result['detalles'].get(key)
+            if nn:
+                print(f"   {key.upper():8s}: {nn['tipo']} - {nn['confianza']:.1f}%")
 
         print(f"{'='*70}\n")
 

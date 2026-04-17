@@ -33,6 +33,7 @@ from datetime import datetime
 _NORMALIZADOR_PATH = r"C:\Users\Eduardo\Desktop\suppnet-main"
 _normalizador_nn = None          # Se carga una vez al arranque
 NORMALIZADOR_DISPONIBLE = False
+_norm_cache = {}                 # {spectrum_id: {wave, flux, continuum, continuum_std}}
 
 try:
     import sys as _sys
@@ -66,17 +67,65 @@ try:
     import os as _os
 
     def _load_weights_keras3(model, path):
-        """Carga un checkpoint TF2 en un modelo Keras 3 variable por variable."""
-        reader = _tf.train.load_checkpoint(path)
-        ckpt_keys = set(reader.get_variable_to_shape_map().keys())
+        """Carga un checkpoint TF2 en un modelo Keras 3 variable por variable.
+
+        Estrategias en orden de preferencia:
+          1. layer_with_weights-N/vars/M  — formato estándar TF2 / Keras ≥2.12
+          2. nombre de variable Keras2     — formato antiguo conv1d/kernel/…
+          3. emparejamiento por posición+forma como último recurso
+        """
+        reader   = _tf.train.load_checkpoint(path)
+        ckpt_map = reader.get_variable_to_shape_map()
+
         loaded = 0
-        for var in model.variables:
-            base = var.name.split(':')[0]   # p.ej. "conv1d/kernel"
-            key  = base + '/.ATTRIBUTES/VARIABLE_VALUE'
-            if key in ckpt_keys:
-                var.assign(reader.get_tensor(key))
-                loaded += 1
+
+        # ── Estrategia 1: layer_with_weights-N/vars/M ─────────────────────
+        weight_layers = [l for l in model.layers if l.weights]
+        for layer_idx, layer in enumerate(weight_layers):
+            for var_idx, var in enumerate(layer.weights):
+                key = (f'layer_with_weights-{layer_idx}'
+                       f'/vars/{var_idx}/.ATTRIBUTES/VARIABLE_VALUE')
+                if key in ckpt_map:
+                    tensor = reader.get_tensor(key)
+                    if list(tensor.shape) == list(var.shape):
+                        var.assign(tensor)
+                        loaded += 1
+
+        # ── Estrategia 2: nombre de variable Keras 2 ──────────────────────
+        if loaded == 0:
+            ckpt_keys = set(ckpt_map.keys())
+            for var in model.variables:
+                base = var.name.split(':')[0]
+                key  = base + '/.ATTRIBUTES/VARIABLE_VALUE'
+                if key in ckpt_keys:
+                    tensor = reader.get_tensor(key)
+                    if list(tensor.shape) == list(var.shape):
+                        var.assign(tensor)
+                        loaded += 1
+
+        # ── Estrategia 3: posición + forma ────────────────────────────────
+        if loaded == 0:
+            weight_keys = sorted(
+                k for k in ckpt_map if '.ATTRIBUTES/VARIABLE_VALUE' in k)
+            model_vars  = [v for l in weight_layers for v in l.weights]
+            for var, key in zip(model_vars, weight_keys):
+                tensor = reader.get_tensor(key)
+                if list(tensor.shape) == list(var.shape):
+                    try:
+                        var.assign(tensor)
+                        loaded += 1
+                    except Exception:
+                        pass
+
         print(f"[Normalización] Pesos cargados: {loaded}/{len(model.variables)}")
+        if loaded == 0:
+            print("[Normalización] AVISO: ningún peso cargado. "
+                  "Claves disponibles en checkpoint (primeras 5):")
+            for k in list(ckpt_map)[:5]:
+                print(f"  {k}")
+            print("[Normalización] Variables del modelo (primeras 5):")
+            for v in list(model.variables)[:5]:
+                print(f"  {v.name}  shape={v.shape}")
         return loaded
 
     def _get_suppnet_model_compat(norm_only=True, which_weights="active"):
@@ -389,7 +438,10 @@ def load_spectrum_file(filepath):
 
 
 def process_spectrum(filepath, filename, use_multi_method=True,
-                     include_neural=True, neural_weight=0.40, preferred_neural='auto'):
+                     include_neural=True,
+                     knn_weight=0.20, cnn_1d_weight=0.20, cnn_2d_weight=0.00,
+                     physical_weight=0.10, dt_weight=0.40, template_weight=0.10,
+                     preferred_neural='auto'):
     """
     Procesa un espectro completo: carga, normaliza, mide, clasifica
 
@@ -401,13 +453,14 @@ def process_spectrum(filepath, filename, use_multi_method=True,
         Nombre del archivo
     use_multi_method : bool
         Si True, usar validación multi-método
-        Si False, solo clasificador físico
     include_neural : bool
-        Si incluir el modelo neural en la votación
-    neural_weight : float
-        Peso del modelo neural (0.0–0.5)
+        Si incluir los modelos neuronales en la votación
+    knn_weight / cnn_1d_weight / cnn_2d_weight : float
+        Pesos individuales para cada modelo neural (0.0–1.0)
+    physical_weight / dt_weight / template_weight : float
+        Pesos para los métodos clásicos
     preferred_neural : str
-        'auto', 'knn' o 'cnn_1d'
+        Ignorado (todos los modelos votan independientemente)
 
     Returns
     -------
@@ -418,32 +471,28 @@ def process_spectrum(filepath, filename, use_multi_method=True,
     if error:
         return {'error': error}
 
-    # Construir pesos personalizados según configuración del usuario
-    # Los pesos determinan cuánto "vale" cada método en la votación final.
-    # La suma de todos los pesos debe ser 1.0.
-    #
-    # Cuando hay modelo neural disponible con peso neural_weight (ej. 0.40):
-    #   - El peso restante (1.0 - 0.40 = 0.60) se reparte entre los 3 métodos
-    #     clásicos manteniendo sus proporciones originales (10%, 40%, 10%).
-    #   - Fórmula: peso_método_nuevo = (peso_orig / 0.60) × (1 - neural_weight)
-    #
-    # Cuando NO hay modelo neural:
-    #   - Los 3 métodos clásicos se reparten el 100%
-    if include_neural and neural_weight > 0:
-        remaining = 1.0 - neural_weight
+    # Construir pesos personalizados — cada método tiene su propio peso
+    if include_neural:
         custom_weights = {
-            'physical':         round((0.10 / 0.60) * remaining, 4),
-            'decision_tree':    round((0.40 / 0.60) * remaining, 4),
-            'template_matching':round((0.10 / 0.60) * remaining, 4),
-            'neural':           neural_weight
+            'physical':          physical_weight,
+            'decision_tree':     dt_weight,
+            'template_matching': template_weight,
+            'knn':               knn_weight,
+            'cnn_1d':            cnn_1d_weight,
+            'cnn_2d':            cnn_2d_weight,
         }
     else:
-        # Sin neural: el árbol de decisión domina (70%) por su alta accuracy
-        custom_weights = {
-            'physical': 0.15,
-            'decision_tree': 0.70,
-            'template_matching': 0.15
-        }
+        # Sin neural: normalizar los pesos clásicos para que sumen 1.0
+        total_classic = physical_weight + dt_weight + template_weight
+        if total_classic > 0:
+            f = 1.0 / total_classic
+            custom_weights = {
+                'physical':          round(physical_weight  * f, 4),
+                'decision_tree':     round(dt_weight        * f, 4),
+                'template_matching': round(template_weight  * f, 4),
+            }
+        else:
+            custom_weights = {'physical': 0.15, 'decision_tree': 0.70, 'template_matching': 0.15}
 
     # Valores por defecto (se sobreescriben en los bloques siguientes)
     tipo_fisico    = None
@@ -458,7 +507,6 @@ def process_spectrum(filepath, filename, use_multi_method=True,
                 models_dir=models_dir,
                 weights=custom_weights,
                 use_neural=include_neural,
-                preferred_neural=preferred_neural
             )
             result_multimethod = validator.classify(wavelengths, flux, verbose=False)
 
@@ -695,10 +743,14 @@ def upload_file():
     if len(files) == 0:
         return jsonify({'error': 'No se seleccionaron archivos'}), 400
 
-    # Parámetros de votación neural enviados desde el frontend
-    include_neural  = request.form.get('include_neural', '1') == '1'
-    neural_weight   = float(request.form.get('neural_weight', 0.40))
-    neural_model    = request.form.get('neural_model', 'auto')   # 'auto', 'knn', 'cnn_1d'
+    # Pesos de votación enviados desde el frontend (cada método independiente)
+    include_neural   = request.form.get('include_neural', '1') == '1'
+    physical_weight  = float(request.form.get('physical_weight',  0.10))
+    dt_weight        = float(request.form.get('dt_weight',         0.40))
+    template_weight  = float(request.form.get('template_weight',   0.10))
+    knn_weight       = float(request.form.get('knn_weight',        0.20))
+    cnn_1d_weight    = float(request.form.get('cnn_1d_weight',     0.20))
+    cnn_2d_weight    = float(request.form.get('cnn_2d_weight',     0.00))
 
     results = []
     errors = []
@@ -713,8 +765,12 @@ def upload_file():
             result = process_spectrum(
                 filepath, filename,
                 include_neural=include_neural,
-                neural_weight=neural_weight,
-                preferred_neural=neural_model
+                physical_weight=physical_weight,
+                dt_weight=dt_weight,
+                template_weight=template_weight,
+                knn_weight=knn_weight,
+                cnn_1d_weight=cnn_1d_weight,
+                cnn_2d_weight=cnn_2d_weight,
             )
 
             if 'error' in result:
@@ -2378,13 +2434,78 @@ def server_error(e):
 
 # ── NORMALIZACIÓN DE ESPECTROS CRUDOS ─────────────────────────────────────
 
+def _norm_generar_imagenes(wave, flux, continuum, continuum_std, smooth_factor=1.0):
+    """Genera las dos gráficas PNG (base64) y el texto descargable dado un smooth_factor."""
+    from scipy.interpolate import UnivariateSpline
+
+    # Aplicar smooth_factor a continuum_std para controlar suavizado de la spline
+    std_scaled = continuum_std * smooth_factor
+
+    # Misma lógica que get_smoothed_continuum pero con smooth_factor aplicado
+    try:
+        mask = ~(np.isclose(std_scaled, 0) | np.isclose(continuum, 0) |
+                 np.isnan(std_scaled) | np.isnan(continuum))
+        if mask.sum() >= 4:
+            w_spl = wave[mask]
+            c_spl = continuum[mask]
+            s_spl = std_scaled[mask]
+            weights = 1.0 / np.where(s_spl > 0, s_spl, 1e-6)
+            spl = UnivariateSpline(w_spl, c_spl, w=weights, k=3, ext=3)
+            continuum_suave = spl(wave)
+        else:
+            continuum_suave = continuum.copy()
+    except Exception:
+        continuum_suave = continuum.copy()
+
+    continuum_suave = np.where(continuum_suave > 0, continuum_suave, 1.0)
+    flux_norm = flux / continuum_suave
+
+    # ── Gráfica 1: espectro original + continuo ──────────────────────────────
+    fig1, ax1 = plt.subplots(figsize=(9, 3.5))
+    ax1.plot(wave, flux, color='#4a9eff', linewidth=0.8, label='Espectro original', alpha=0.9)
+    ax1.plot(wave, continuum_suave, color='#ff6b35', linewidth=1.5, label='Continuo estimado')
+    ax1.set_xlabel('Longitud de onda (Å)')
+    ax1.set_ylabel('Flujo relativo')
+    ax1.set_title(f'Espectro crudo + continuo estimado  (smooth={smooth_factor:.2f})')
+    ax1.legend(fontsize=9)
+    ax1.grid(True, alpha=0.2)
+    fig1.tight_layout()
+    buf1 = io.BytesIO()
+    fig1.savefig(buf1, format='png', dpi=110, bbox_inches='tight')
+    plt.close(fig1)
+    img1_b64 = base64.b64encode(buf1.getvalue()).decode('utf-8')
+
+    # ── Gráfica 2: espectro normalizado ──────────────────────────────────────
+    fig2, ax2 = plt.subplots(figsize=(9, 3.5))
+    ax2.plot(wave, flux_norm, color='#4a9eff', linewidth=0.8, alpha=0.9)
+    ax2.axhline(1.0, color='#ff6b35', linewidth=1.0, linestyle='--', label='Continuo = 1.0')
+    ax2.set_xlabel('Longitud de onda (Å)')
+    ax2.set_ylabel('Flujo normalizado')
+    ax2.set_title(f'Espectro normalizado  (smooth={smooth_factor:.2f})')
+    ax2.legend(fontsize=9)
+    ax2.grid(True, alpha=0.2)
+    fig2.tight_layout()
+    buf2 = io.BytesIO()
+    fig2.savefig(buf2, format='png', dpi=110, bbox_inches='tight')
+    plt.close(fig2)
+    img2_b64 = base64.b64encode(buf2.getvalue()).decode('utf-8')
+
+    # Texto descargable
+    lineas = ['# Longitud_de_onda(A)  Flujo_normalizado  Continuo']
+    for w, fn, c in zip(wave, flux_norm, continuum_suave):
+        lineas.append(f'{w:.4f}\t{fn:.6f}\t{c:.6f}')
+    texto_descarga = '\n'.join(lineas)
+
+    return img1_b64, img2_b64, texto_descarga
+
+
 def _cargar_normalizador(which_weights='active'):
     """Carga el modelo de normalización (lento, ~10 s). Se llama una vez."""
     global _normalizador_nn
     _normalizador_nn = get_suppnet(
         resampling_step=0.05,
         step_size=256,
-        norm_only=True,
+        norm_only=False,
         which_weights=which_weights
     )
 
@@ -2449,7 +2570,30 @@ def normalizacion_procesar():
                 flux = data_fits.astype(float)
             else:
                 # Leer texto: dos columnas λ flux
-                data = np.loadtxt(tmp.name, comments='#')
+                # Intentar primero con np.loadtxt (rápido); si falla por cabecera
+                # de texto sin '#', reintentar saltando filas iniciales no numéricas.
+                def _leer_columnas_txt(filepath):
+                    try:
+                        return np.loadtxt(filepath, comments='#')
+                    except ValueError:
+                        pass
+                    # Detectar cuántas filas iniciales son no numéricas
+                    skip = 0
+                    with open(filepath, 'r', encoding='utf-8', errors='replace') as fh:
+                        for line in fh:
+                            line = line.strip()
+                            if not line or line.startswith('#'):
+                                skip += 1
+                                continue
+                            try:
+                                parts = line.split()
+                                float(parts[0]); float(parts[1])
+                                break   # primera fila numérica encontrada
+                            except (ValueError, IndexError):
+                                skip += 1
+                    return np.loadtxt(filepath, comments='#', skiprows=skip)
+
+                data = _leer_columnas_txt(tmp.name)
                 if data.ndim != 2 or data.shape[1] < 2:
                     return jsonify({'error': 'El archivo debe tener dos columnas: longitud de onda y flujo'}), 400
                 wave = data[:, 0]
@@ -2463,60 +2607,74 @@ def normalizacion_procesar():
             flux = flux / mediana
 
         # Predecir continuo
-        continuum, continuum_std = _normalizador_nn.normalize(wave, flux)
+        resultado = _normalizador_nn.normalize(wave, flux)
+        if len(resultado) == 4:
+            continuum, continuum_std, segmentation, segmentation_std = resultado
+        else:
+            # Fallback por si el modelo se cargó con norm_only=True
+            continuum, continuum_std = resultado
+            segmentation, segmentation_std = None, None
 
-        # Suavizar continuo con spline ponderado
-        continuum_suave = get_smoothed_continuum(wave, continuum, continuum_std)
+        # Guardar en caché para ajustes de smooth posteriores
+        import uuid as _uuid
+        spectrum_id = str(_uuid.uuid4())
+        # Mantener solo los últimos 5 espectros para no acumular memoria
+        if len(_norm_cache) >= 5:
+            oldest = next(iter(_norm_cache))
+            del _norm_cache[oldest]
+        _norm_cache[spectrum_id] = {
+            'wave': wave,
+            'flux': flux,
+            'continuum': continuum,
+            'continuum_std': continuum_std,
+            'segmentation': segmentation,
+            'segmentation_std': segmentation_std,
+        }
 
-        # Espectro normalizado
-        flux_norm = flux / np.where(continuum_suave > 0, continuum_suave, 1.0)
-
-        # ── Gráfica 1: espectro original + continuo ───────────────────────
-        fig1, ax1 = plt.subplots(figsize=(9, 3.5))
-        ax1.plot(wave, flux, color='#4a9eff', linewidth=0.8, label='Espectro original', alpha=0.9)
-        ax1.plot(wave, continuum_suave, color='#ff6b35', linewidth=1.5, label='Continuo estimado')
-        ax1.set_xlabel('Longitud de onda (Å)')
-        ax1.set_ylabel('Flujo relativo')
-        ax1.set_title('Espectro crudo + continuo estimado')
-        ax1.legend(fontsize=9)
-        ax1.grid(True, alpha=0.2)
-        fig1.tight_layout()
-        buf1 = io.BytesIO()
-        fig1.savefig(buf1, format='png', dpi=110, bbox_inches='tight')
-        plt.close(fig1)
-        img1_b64 = base64.b64encode(buf1.getvalue()).decode('utf-8')
-
-        # ── Gráfica 2: espectro normalizado ──────────────────────────────
-        fig2, ax2 = plt.subplots(figsize=(9, 3.5))
-        ax2.plot(wave, flux_norm, color='#4a9eff', linewidth=0.8, alpha=0.9)
-        ax2.axhline(1.0, color='#ff6b35', linewidth=1.0, linestyle='--', label='Continuo = 1.0')
-        ax2.set_xlabel('Longitud de onda (Å)')
-        ax2.set_ylabel('Flujo normalizado')
-        ax2.set_title('Espectro normalizado')
-        ax2.legend(fontsize=9)
-        ax2.grid(True, alpha=0.2)
-        fig2.tight_layout()
-        buf2 = io.BytesIO()
-        fig2.savefig(buf2, format='png', dpi=110, bbox_inches='tight')
-        plt.close(fig2)
-        img2_b64 = base64.b64encode(buf2.getvalue()).decode('utf-8')
-
-        # ── Texto descargable ─────────────────────────────────────────────
-        lineas = ['# Longitud_de_onda(A)  Flujo_normalizado  Continuo']
-        for w, fn, c in zip(wave, flux_norm, continuum_suave):
-            lineas.append(f'{w:.4f}\t{fn:.6f}\t{c:.6f}')
-        texto_descarga = '\n'.join(lineas)
+        img1_b64, img2_b64, texto_descarga = _norm_generar_imagenes(
+            wave, flux, continuum, continuum_std, smooth_factor=1.0)
 
         return jsonify({
-            'imagen_original': img1_b64,
+            'imagen_original':    img1_b64,
             'imagen_normalizado': img2_b64,
-            'texto_descarga': texto_descarga,
-            'n_puntos': int(len(wave)),
-            'rango_lambda': f'{wave[0]:.1f} – {wave[-1]:.1f} Å'
+            'texto_descarga':     texto_descarga,
+            'spectrum_id':        spectrum_id,
+            'n_puntos':           int(len(wave)),
+            'rango_lambda':       f'{wave[0]:.1f} – {wave[-1]:.1f} Å',
         })
 
     except Exception as e:
         return jsonify({'error': f'Error al procesar: {str(e)}'}), 500
+
+
+@app.route('/normalizacion_ajustar_smooth', methods=['POST'])
+def normalizacion_ajustar_smooth():
+    """
+    Recalcula el continuo y las gráficas con un nuevo smooth_factor sin
+    volver a correr la red neuronal (usa el caché del último espectro).
+    """
+    data = request.json or {}
+    spectrum_id  = data.get('spectrum_id')
+    smooth_factor = float(data.get('smooth_factor', 1.0))
+    smooth_factor = max(0.05, min(smooth_factor, 20.0))  # clamp
+
+    if not spectrum_id or spectrum_id not in _norm_cache:
+        return jsonify({'error': 'Espectro no encontrado en caché. Procesa el espectro primero.'}), 404
+
+    cached = _norm_cache[spectrum_id]
+    try:
+        img1_b64, img2_b64, texto_descarga = _norm_generar_imagenes(
+            cached['wave'], cached['flux'],
+            cached['continuum'], cached['continuum_std'],
+            smooth_factor=smooth_factor,
+        )
+        return jsonify({
+            'imagen_original':   img1_b64,
+            'imagen_normalizado': img2_b64,
+            'texto_descarga':    texto_descarga,
+        })
+    except Exception as e:
+        return jsonify({'error': f'Error al recalcular: {str(e)}'}), 500
 
 # ──────────────────────────────────────────────────────────────────────────
 
