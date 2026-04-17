@@ -1595,6 +1595,16 @@ def train_neural_stream():
             if not line.strip():
                 continue
 
+            # Detectar línea JSON de época (EPOCH_DATA:{...})
+            if line.startswith('EPOCH_DATA:'):
+                try:
+                    ep_data = _json.loads(line[len('EPOCH_DATA:'):])
+                    yield f"data: {_json.dumps({'type': 'epoch', **ep_data})}\n\n"
+                    pct = min(55 + int(ep_data.get('epoch', 0) * 2), 90)
+                except Exception:
+                    pass
+                continue
+
             # Calcular porcentaje según contenido
             if 'Archivos encontrados' in line:
                 pct = 12
@@ -1860,6 +1870,56 @@ def get_neural_metrics():
         'models': models_frontend,
         'metrics': metrics,
         'available_models': available_models
+    })
+
+
+@app.route('/neural_history', methods=['GET'])
+def neural_history():
+    """Devuelve historiales de entrenamiento, matrices de confusión y métricas por clase."""
+    import json as _json
+    models_dir = os.path.join(project_root, 'models')
+
+    def load_json(path):
+        try:
+            with open(path, 'r') as f:
+                return _json.load(f)
+        except Exception:
+            return None
+
+    def load_meta_pcm(model_type):
+        """Carga per_class_metrics del metadata correspondiente."""
+        for name in [f'{model_type}_metadata.json', f'{model_type.replace("_","")}_metadata.json']:
+            p = os.path.join(models_dir, name)
+            if os.path.exists(p):
+                meta = load_json(p)
+                if meta:
+                    return meta.get('per_class_metrics'), meta.get('accuracy_test'), meta.get('classes', [])
+        return None, None, []
+
+    # CNN 1D
+    cnn1d_hist = load_json(os.path.join(models_dir, 'cnn_1d_history.json'))
+    cnn1d_cm   = load_json(os.path.join(models_dir, 'cnn_1d_confusion_matrix.json'))
+    cnn1d_pcm, cnn1d_acc, cnn1d_classes = load_meta_pcm('cnn_1d')
+
+    # KNN
+    knn_cm  = load_json(os.path.join(models_dir, 'knn_confusion_matrix.json'))
+    knn_pcm, knn_acc, knn_classes = load_meta_pcm('knn')
+
+    return jsonify({
+        'success': True,
+        'cnn_1d': {
+            'history':         cnn1d_hist,
+            'confusion_matrix': cnn1d_cm,
+            'per_class':       cnn1d_pcm,
+            'accuracy':        round(cnn1d_acc * 100, 1) if cnn1d_acc else None,
+            'classes':         cnn1d_classes,
+        },
+        'knn': {
+            'confusion_matrix': knn_cm,
+            'per_class':       knn_pcm,
+            'accuracy':        round(knn_acc * 100, 1) if knn_acc else None,
+            'classes':         knn_classes,
+        },
     })
 
 

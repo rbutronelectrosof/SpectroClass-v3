@@ -3228,6 +3228,11 @@ async function trainNeuralModel() {
     progressText.textContent = 'Iniciando...';
     nnLog.innerHTML = '';
 
+    // Inicializar gráficas en vivo para CNN
+    if (type === 'cnn_1d' || type === 'cnn_2d') {
+        _initLiveCharts();
+    }
+
     function lineClass(msg) {
         if (msg.includes('[OK]') || msg.includes('completado') || msg.includes('exitosamente')) return 'tl-ok';
         if (msg.includes('[ERROR]') || msg.includes('Error') || msg.includes('ERROR'))          return 'tl-error';
@@ -3273,7 +3278,12 @@ async function trainNeuralModel() {
                 let event;
                 try { event = JSON.parse(part.slice(6)); } catch { continue; }
 
-                if (event.type === 'line') {
+                if (event.type === 'epoch') {
+                    // Actualizar gráfica en tiempo real
+                    _updateLiveCharts(event);
+                    appendLog(`Época ${event.epoch} — acc: ${(event.acc*100).toFixed(1)}%  val_acc: ${(event.val_acc*100).toFixed(1)}%  loss: ${event.loss}`);
+
+                } else if (event.type === 'line') {
                     progressFill.style.width = `${event.pct}%`;
                     progressText.textContent = event.msg.replace(/^\[.*?\]\s*/, '').substring(0, 60) || progressText.textContent;
                     appendLog(event.msg);
@@ -3296,6 +3306,8 @@ async function trainNeuralModel() {
                             document.getElementById('nnResultsDetails').innerHTML =
                                 `<p>Modelo ${typeNames[type]} guardado correctamente.</p>`;
                             resultsDiv.scrollIntoView({ behavior: 'smooth' });
+                            // Cargar métricas finales (historial completo + CM + per-class)
+                            loadTrainingHistory();
                         }, 800);
                     } else {
                         progressFill.style.width = '100%';
@@ -6058,3 +6070,246 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 });
+
+// ============================================================================
+// MÉTRICAS GRÁFICAS — Redes Neuronales (Chart.js)
+// ============================================================================
+
+let _chartAcc  = null;
+let _chartLoss = null;
+let _currentMetricsModel = 'cnn_1d';
+let _metricsData = null;  // Datos cargados desde /neural_history
+
+function switchMetricsModel(model, btn) {
+    _currentMetricsModel = model;
+    document.querySelectorAll('.nm-tab').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    if (_metricsData) _renderMetrics(_metricsData);
+}
+
+async function loadTrainingHistory() {
+    const panel = document.getElementById('nnMetricsPanel');
+    panel.style.display = 'block';
+
+    try {
+        const res  = await fetch('/neural_history');
+        const data = await res.json();
+        if (!data.success) { _showNoData('Error al cargar métricas.'); return; }
+        _metricsData = data;
+        _renderMetrics(data);
+        panel.scrollIntoView({ behavior: 'smooth' });
+    } catch (e) {
+        _showNoData('No se pudo contactar con el servidor.');
+    }
+}
+
+function _showNoData(msg) {
+    document.getElementById('nmNoData').style.display = 'block';
+    document.getElementById('nmNoData').textContent = msg;
+    document.getElementById('nmChartsSection').style.display = 'none';
+    document.getElementById('nmConfusionSection').style.display = 'none';
+    document.getElementById('nmPerClassSection').style.display = 'none';
+}
+
+function _renderMetrics(data) {
+    const m   = data[_currentMetricsModel] || {};
+    const noD = document.getElementById('nmNoData');
+    const hasAny = m.history || m.confusion_matrix || m.per_class;
+
+    noD.style.display = hasAny ? 'none' : 'block';
+    if (!hasAny) { noD.textContent = 'Aún no hay métricas guardadas para este modelo. Entrena el modelo primero.'; return; }
+
+    // Badge de accuracy
+    const badge = document.getElementById('nmAccuracyBadge');
+    badge.textContent = m.accuracy != null ? `Accuracy: ${m.accuracy}%` : '—';
+
+    // Gráficas de épocas (solo CNN con historial)
+    const chartsSection = document.getElementById('nmChartsSection');
+    if (m.history) {
+        chartsSection.style.display = 'block';
+        _renderAccChart(m.history);
+        _renderLossChart(m.history);
+    } else {
+        chartsSection.style.display = 'none';
+    }
+
+    // Matriz de confusión
+    const confSection = document.getElementById('nmConfusionSection');
+    if (m.confusion_matrix) {
+        confSection.style.display = 'block';
+        _renderConfusionMatrix(m.confusion_matrix, document.getElementById('nmConfusionMatrix'));
+    } else {
+        confSection.style.display = 'none';
+    }
+
+    // Métricas por clase
+    const pcSection = document.getElementById('nmPerClassSection');
+    if (m.per_class) {
+        pcSection.style.display = 'block';
+        _renderPerClass(m.per_class, document.getElementById('nmPerClassTable'));
+    } else {
+        pcSection.style.display = 'none';
+    }
+}
+
+function _chartDefaults() {
+    return {
+        plugins: { legend: { labels: { color: '#a0aec0', font: { size: 11 } } } },
+        scales: {
+            x: { ticks: { color: '#718096' }, grid: { color: '#2d3748' } },
+            y: { ticks: { color: '#718096' }, grid: { color: '#2d3748' } },
+        },
+        animation: { duration: 500 },
+        responsive: true,
+        maintainAspectRatio: false,
+    };
+}
+
+function _renderAccChart(history) {
+    const ctx = document.getElementById('chartAccuracy').getContext('2d');
+    if (_chartAcc) _chartAcc.destroy();
+    const epochs = history.accuracy.map((_, i) => i + 1);
+    _chartAcc = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: epochs,
+            datasets: [
+                { label: 'Train Acc', data: history.accuracy,     borderColor: '#68d391', backgroundColor: 'rgba(104,211,145,0.15)', tension: 0.3, fill: true, pointRadius: 3 },
+                { label: 'Val Acc',   data: history.val_accuracy, borderColor: '#63b3ed', backgroundColor: 'rgba(99,179,237,0.10)',  tension: 0.3, fill: false, borderDash: [5,3], pointRadius: 3 },
+            ],
+        },
+        options: {
+            ..._chartDefaults(),
+            scales: {
+                ..._chartDefaults().scales,
+                y: { ..._chartDefaults().scales.y, min: 0, max: 1,
+                     ticks: { color: '#718096', callback: v => (v * 100).toFixed(0) + '%' } },
+            },
+        },
+    });
+}
+
+function _renderLossChart(history) {
+    const ctx = document.getElementById('chartLoss').getContext('2d');
+    if (_chartLoss) _chartLoss.destroy();
+    const epochs = history.loss.map((_, i) => i + 1);
+    _chartLoss = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: epochs,
+            datasets: [
+                { label: 'Train Loss', data: history.loss,     borderColor: '#fc8181', backgroundColor: 'rgba(252,129,129,0.15)', tension: 0.3, fill: true, pointRadius: 3 },
+                { label: 'Val Loss',   data: history.val_loss, borderColor: '#f6ad55', backgroundColor: 'rgba(246,173,85,0.10)',  tension: 0.3, fill: false, borderDash: [5,3], pointRadius: 3 },
+            ],
+        },
+        options: _chartDefaults(),
+    });
+}
+
+function _renderConfusionMatrix(cmData, container) {
+    const { matrix, labels } = cmData;
+    const maxVal = Math.max(...matrix.flat().filter(v => v > 0));
+
+    let html = '<table class="nm-confusion-table"><thead><tr><th>Real \\ Pred</th>';
+    labels.forEach(l => { html += `<th>${l}</th>`; });
+    html += '</tr></thead><tbody>';
+
+    matrix.forEach((row, ri) => {
+        html += `<tr><th>${labels[ri]}</th>`;
+        row.forEach((val, ci) => {
+            let cls = 'nm-cm-off';
+            if (ri === ci) { cls = 'nm-cm-diag'; }
+            else if (val > 0) {
+                const ratio = val / maxVal;
+                cls = ratio < 0.2 ? 'nm-cm-low' : ratio < 0.5 ? 'nm-cm-mid' : 'nm-cm-high';
+            }
+            html += `<td class="${cls}">${val}</td>`;
+        });
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function _renderPerClass(perClass, container) {
+    const classes = Object.keys(perClass);
+    let html = `<table class="nm-perclass-table">
+        <thead><tr>
+            <th>Clase</th><th>Precisión</th><th>Recall</th><th>F1-Score</th><th>Soporte</th>
+        </tr></thead><tbody>`;
+
+    classes.forEach(cls => {
+        const m = perClass[cls];
+        const f1Pct = Math.round(m.f1 * 100);
+        html += `<tr>
+            <td><b>${cls}</b></td>
+            <td>${(m.precision * 100).toFixed(1)}%</td>
+            <td>${(m.recall    * 100).toFixed(1)}%</td>
+            <td>
+                ${(m.f1 * 100).toFixed(1)}%
+                <span class="nm-f1-bar" style="width:${f1Pct}px"></span>
+            </td>
+            <td>${m.support}</td>
+        </tr>`;
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+// ── Actualización en tiempo real durante entrenamiento CNN ──────────────────
+// Se llama desde trainNeuralModel() cuando llega un evento type='epoch'
+let _liveAccData  = [];
+let _liveLossData = [];
+
+function _initLiveCharts() {
+    _liveAccData  = [];
+    _liveLossData = [];
+    const accCtx  = document.getElementById('chartAccuracy')?.getContext('2d');
+    const lossCtx = document.getElementById('chartLoss')?.getContext('2d');
+    if (!accCtx || !lossCtx) return;
+
+    // Mostrar el panel durante entrenamiento
+    document.getElementById('nnMetricsPanel').style.display = 'block';
+    document.getElementById('nmChartsSection').style.display = 'block';
+    document.getElementById('nmConfusionSection').style.display = 'none';
+    document.getElementById('nmPerClassSection').style.display = 'none';
+    document.getElementById('nmNoData').style.display = 'none';
+
+    if (_chartAcc)  _chartAcc.destroy();
+    if (_chartLoss) _chartLoss.destroy();
+
+    _chartAcc = new Chart(accCtx, {
+        type: 'line',
+        data: { labels: [], datasets: [
+            { label: 'Train Acc', data: [], borderColor: '#68d391', backgroundColor: 'rgba(104,211,145,0.15)', tension: 0.3, fill: true, pointRadius: 3 },
+            { label: 'Val Acc',   data: [], borderColor: '#63b3ed', backgroundColor: 'rgba(99,179,237,0.10)',  tension: 0.3, fill: false, borderDash: [5,3], pointRadius: 3 },
+        ]},
+        options: { ..._chartDefaults(),
+            scales: { ..._chartDefaults().scales,
+                y: { ..._chartDefaults().scales.y, min: 0, max: 1,
+                     ticks: { color: '#718096', callback: v => (v*100).toFixed(0)+'%' } } } },
+    });
+
+    _chartLoss = new Chart(lossCtx, {
+        type: 'line',
+        data: { labels: [], datasets: [
+            { label: 'Train Loss', data: [], borderColor: '#fc8181', backgroundColor: 'rgba(252,129,129,0.15)', tension: 0.3, fill: true, pointRadius: 3 },
+            { label: 'Val Loss',   data: [], borderColor: '#f6ad55', backgroundColor: 'rgba(246,173,85,0.10)',  tension: 0.3, fill: false, borderDash: [5,3], pointRadius: 3 },
+        ]},
+        options: _chartDefaults(),
+    });
+}
+
+function _updateLiveCharts(epochData) {
+    if (!_chartAcc || !_chartLoss) return;
+    const ep = epochData.epoch;
+    _chartAcc.data.labels.push(ep);
+    _chartAcc.data.datasets[0].data.push(epochData.acc);
+    _chartAcc.data.datasets[1].data.push(epochData.val_acc);
+    _chartAcc.update('none');
+
+    _chartLoss.data.labels.push(ep);
+    _chartLoss.data.datasets[0].data.push(epochData.loss);
+    _chartLoss.data.datasets[1].data.push(epochData.val_loss);
+    _chartLoss.update('none');
+}

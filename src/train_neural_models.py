@@ -489,7 +489,20 @@ def train_cnn_1d(X_train, y_train, n_classes, epochs=20, batch_size=32,
     from tensorflow.keras.models import Sequential
     from tensorflow.keras.layers import Conv1D, MaxPooling1D, Dense, Dropout, Flatten, BatchNormalization
     from tensorflow.keras.optimizers import Adam
-    from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+    from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, Callback
+
+    # Callback que imprime una línea JSON por época para SSE
+    class EpochPrintCallback(Callback):
+        def on_epoch_end(self, epoch, logs=None):
+            logs = logs or {}
+            import json as _json
+            print("EPOCH_DATA:" + _json.dumps({
+                "epoch":   epoch + 1,
+                "loss":    round(float(logs.get("loss", 0)), 4),
+                "acc":     round(float(logs.get("accuracy", 0)), 4),
+                "val_loss":round(float(logs.get("val_loss", 0)), 4),
+                "val_acc": round(float(logs.get("val_accuracy", 0)), 4),
+            }), flush=True)
 
     print(f"\n" + "="*50)
     print(f"ENTRENANDO CNN 1D")
@@ -575,22 +588,30 @@ def train_cnn_1d(X_train, y_train, n_classes, epochs=20, batch_size=32,
         metrics=['accuracy']
     )
 
+    # Pesos de clase para dataset desbalanceado (O, M escasas vs F, K abundantes)
+    unique_classes = np.unique(y_train)
+    cw_values = compute_class_weight('balanced', classes=unique_classes, y=y_train)
+    class_weight_dict = dict(zip(unique_classes.tolist(), cw_values.tolist()))
+    print(f"\n  Pesos de clase (balanceo): { {str(k): round(v,2) for k,v in class_weight_dict.items()} }")
+
     # CALLBACKS: Funciones que se ejecutan durante el entrenamiento
     callbacks = [
         # EarlyStopping: Detiene si no mejora en 5 epochs
         # Evita perder tiempo y overfitting
         EarlyStopping(
             monitor='val_loss',      # Monitorear error de validacion
-            patience=5,              # Esperar 5 epochs antes de parar
+            patience=8,              # Esperar 8 epochs antes de parar
             restore_best_weights=True  # Restaurar mejor modelo
         ),
         # ReduceLROnPlateau: Reduce learning rate si se estanca
         ReduceLROnPlateau(
             monitor='val_loss',
             factor=0.5,              # Reducir a la mitad
-            patience=3,              # Despues de 3 epochs sin mejora
+            patience=4,              # Despues de 4 epochs sin mejora
             min_lr=1e-6              # No bajar de este valor
-        )
+        ),
+        # Imprime una línea JSON por época para visualización en tiempo real
+        EpochPrintCallback(),
     ]
 
     print(f"\n  Iniciando entrenamiento...")
@@ -608,6 +629,7 @@ def train_cnn_1d(X_train, y_train, n_classes, epochs=20, batch_size=32,
         validation_data=validation_data,
         validation_split=validation_split,
         callbacks=callbacks,
+        class_weight=class_weight_dict,
         verbose=1  # Mostrar progreso
     )
 
@@ -850,14 +872,33 @@ def train_and_save_model(model_type, catalog_path, output_dir, **kwargs):
         # Divide los datos en 5 partes y entrena/evalua 5 veces
         cv_scores = cross_val_score(model, X_scaled, y, cv=5)
 
+        # Métricas por clase
+        report = classification_report(y_test, y_pred, output_dict=True)
+        cm = confusion_matrix(y_test, y_pred).tolist()
+        class_labels = [str(c) for c in encoder.classes_]
+
         results.update({
             'accuracy_test': float(accuracy),
             'accuracy_cv_mean': float(cv_scores.mean()),
             'accuracy_cv_std': float(cv_scores.std()),
             'n_neighbors': kwargs.get('n_neighbors', 5),
             'weights': kwargs.get('weights', 'uniform'),
-            'metric': kwargs.get('metric', 'euclidean')
+            'metric': kwargs.get('metric', 'euclidean'),
+            'per_class_metrics': {
+                cls: {
+                    'precision': round(float(report[str(i)]['precision']), 4),
+                    'recall':    round(float(report[str(i)]['recall']), 4),
+                    'f1':        round(float(report[str(i)]['f1-score']), 4),
+                    'support':   int(report[str(i)]['support']),
+                } for i, cls in enumerate(class_labels) if str(i) in report
+            },
         })
+
+        # Guardar matriz de confusión
+        cm_path = os.path.join(output_dir, 'knn_confusion_matrix.json')
+        with open(cm_path, 'w') as f:
+            json.dump({'matrix': cm, 'labels': class_labels}, f, indent=2)
+        print(f"Matriz de confusion KNN guardada: {cm_path}")
 
         # Guardar modelo y scaler
         model_path = os.path.join(output_dir, 'knn_model.pkl')
@@ -934,6 +975,12 @@ def train_and_save_model(model_type, catalog_path, output_dir, **kwargs):
         X_test_reshaped = X_test.reshape(X_test.shape[0], X_test.shape[1], 1)
         test_loss, accuracy = model.evaluate(X_test_reshaped, y_test, verbose=0)
 
+        # Métricas por clase
+        y_pred_cnn = np.argmax(model.predict(X_test_reshaped, verbose=0), axis=1)
+        report_cnn = classification_report(y_test, y_pred_cnn, output_dict=True)
+        cm_cnn = confusion_matrix(y_test, y_pred_cnn).tolist()
+        class_labels_cnn = [str(c) for c in encoder.classes_]
+
         results.update({
             'accuracy_test': float(accuracy),
             'final_loss': float(test_loss),
@@ -943,8 +990,34 @@ def train_and_save_model(model_type, catalog_path, output_dir, **kwargs):
             'batch_size': kwargs.get('batch_size', 32),
             'learning_rate': kwargs.get('learning_rate', 0.001),
             'dropout_rate': kwargs.get('dropout_rate', 0.3),
-            'dense_units': kwargs.get('dense_units', 128)
+            'dense_units': kwargs.get('dense_units', 128),
+            'per_class_metrics': {
+                cls: {
+                    'precision': round(float(report_cnn[str(i)]['precision']), 4),
+                    'recall':    round(float(report_cnn[str(i)]['recall']), 4),
+                    'f1':        round(float(report_cnn[str(i)]['f1-score']), 4),
+                    'support':   int(report_cnn[str(i)]['support']),
+                } for i, cls in enumerate(class_labels_cnn) if str(i) in report_cnn
+            },
         })
+
+        # Guardar historial de entrenamiento por época
+        history_data = {
+            'loss':         [round(float(x), 4) for x in history.history.get('loss', [])],
+            'val_loss':     [round(float(x), 4) for x in history.history.get('val_loss', [])],
+            'accuracy':     [round(float(x), 4) for x in history.history.get('accuracy', [])],
+            'val_accuracy': [round(float(x), 4) for x in history.history.get('val_accuracy', [])],
+        }
+        history_path = os.path.join(output_dir, 'cnn_1d_history.json')
+        with open(history_path, 'w') as f:
+            json.dump(history_data, f, indent=2)
+        print(f"Historial CNN 1D guardado: {history_path}")
+
+        # Guardar matriz de confusión
+        cm_path_cnn = os.path.join(output_dir, 'cnn_1d_confusion_matrix.json')
+        with open(cm_path_cnn, 'w') as f:
+            json.dump({'matrix': cm_cnn, 'labels': class_labels_cnn}, f, indent=2)
+        print(f"Matriz de confusion CNN 1D guardada: {cm_path_cnn}")
 
         # Guardar modelo
         model_path = os.path.join(output_dir, 'cnn_model.h5')

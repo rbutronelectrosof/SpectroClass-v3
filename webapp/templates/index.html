@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SpectroClass v3.1</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div class="app-container">
@@ -1989,7 +1990,7 @@
                         <button class="btn-primary btn-large" id="btnTrainNeural" onclick="trainNeuralModel()">
                             🚀 Entrenar Modelo
                         </button>
-                        <button class="btn-secondary" onclick="loadNeuralMetrics()">
+                        <button class="btn-secondary" onclick="loadNeuralMetrics(); loadTrainingHistory();">
                             📊 Ver Métricas
                         </button>
                         <button class="btn-secondary" onclick="verifyNeuralModels()">
@@ -2033,6 +2034,57 @@
                             </div>
                         </div>
                         <div id="nnResultsDetails" class="results-details"></div>
+                    </div>
+
+                    <!-- ═══════════════════════════════════════════════════════
+                         PANEL DE MÉTRICAS GRÁFICAS
+                    ══════════════════════════════════════════════════════════ -->
+                    <div id="nnMetricsPanel" class="nn-metrics-panel" style="display:none;">
+
+                        <!-- Selector de modelo -->
+                        <div class="nn-metrics-header">
+                            <h3>📊 Métricas de Entrenamiento</h3>
+                            <div class="nn-metrics-tabs">
+                                <button class="nm-tab active" data-model="cnn_1d" onclick="switchMetricsModel('cnn_1d',this)">CNN 1D</button>
+                                <button class="nm-tab" data-model="knn" onclick="switchMetricsModel('knn',this)">KNN</button>
+                            </div>
+                            <button class="btn-secondary btn-sm" onclick="loadTrainingHistory()" style="margin-left:auto;">
+                                🔄 Actualizar
+                            </button>
+                        </div>
+
+                        <!-- Indicador de Accuracy del modelo seleccionado -->
+                        <div class="nm-accuracy-badge" id="nmAccuracyBadge">—</div>
+
+                        <!-- Gráficas de evolución (solo CNN) -->
+                        <div id="nmChartsSection">
+                            <div class="nm-charts-row">
+                                <div class="nm-chart-card">
+                                    <h4>Precisión por época</h4>
+                                    <canvas id="chartAccuracy" height="220"></canvas>
+                                </div>
+                                <div class="nm-chart-card">
+                                    <h4>Pérdida (Loss) por época</h4>
+                                    <canvas id="chartLoss" height="220"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Matriz de confusión -->
+                        <div id="nmConfusionSection">
+                            <h4 style="margin-top:1.5rem;">Matriz de Confusión</h4>
+                            <div id="nmConfusionMatrix" class="nm-confusion-wrap"></div>
+                        </div>
+
+                        <!-- Métricas por clase -->
+                        <div id="nmPerClassSection">
+                            <h4 style="margin-top:1.5rem;">Métricas por Clase</h4>
+                            <div id="nmPerClassTable" class="nm-perclass-wrap"></div>
+                        </div>
+
+                        <p id="nmNoData" class="nm-nodata" style="display:none;">
+                            Aún no hay métricas guardadas para este modelo. Entrena el modelo primero.
+                        </p>
                     </div>
 
                     <!-- Opción de integración en votación -->
