@@ -5701,3 +5701,18 @@ details[open] summary {
     background: #2d3748;
     border-radius: 3px;
 }
+
+/* ── Curva de diagnóstico ── */
+.hm-diag-card {
+    margin-top: 1.2rem;
+    width: 100%;
+    max-width: 680px;
+}
+
+.hm-diag-desc {
+    font-size: 0.78rem;
+    color: #718096;
+    margin: 0 0 0.85rem 0;
+    line-height: 1.5;
+    font-style: italic;
+}

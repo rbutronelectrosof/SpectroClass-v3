@@ -1956,13 +1956,23 @@ def metrics_all():
         }
 
     # ── DT / RF / GB ─────────────────────────────────────────────────────────
-    dt_meta = load_json(os.path.join(models_dir, 'metadata.json'))
-    dt_cm   = load_json(os.path.join(models_dir, 'dt_confusion_matrix.json'))
+    dt_meta  = load_json(os.path.join(models_dir, 'metadata.json'))
+    dt_cm    = load_json(os.path.join(models_dir, 'dt_confusion_matrix.json'))
     dt_entry = build_entry(dt_meta, dt_cm)
+    if dt_entry:
+        # Curva de diagnóstico: DT → accuracy vs profundidad
+        dt_diag = load_json(os.path.join(models_dir, 'dt_depth_curve.json'))
+        # RF → error vs n_estimators
+        rf_diag = load_json(os.path.join(models_dir, 'rf_estimators_curve.json'))
+        dt_entry['diag_curve'] = dt_diag or rf_diag  # usa la que exista según último entrenamiento
+        dt_entry['extra'] = {
+            'max_depth':    dt_meta.get('params', {}).get('max_depth'),
+            'n_estimators': dt_meta.get('params', {}).get('n_estimators'),
+        }
 
     # ── KNN ──────────────────────────────────────────────────────────────────
-    knn_meta = load_json(os.path.join(models_dir, 'knn_metadata.json'))
-    knn_cm   = load_json(os.path.join(models_dir, 'knn_confusion_matrix.json'))
+    knn_meta  = load_json(os.path.join(models_dir, 'knn_metadata.json'))
+    knn_cm    = load_json(os.path.join(models_dir, 'knn_confusion_matrix.json'))
     knn_entry = build_entry(knn_meta, knn_cm)
     if knn_entry:
         knn_entry['extra'] = {
@@ -1971,11 +1981,12 @@ def metrics_all():
             'metric':      knn_meta.get('metric'),
             'cv_mean':     round(knn_meta.get('accuracy_cv_mean', 0) * 100, 1) if knn_meta.get('accuracy_cv_mean') else None,
         }
+        knn_entry['diag_curve'] = load_json(os.path.join(models_dir, 'knn_k_curve.json'))
 
     # ── CNN 1D ───────────────────────────────────────────────────────────────
-    cnn1d_meta = load_json(os.path.join(models_dir, 'cnn_1d_metadata.json'))
-    cnn1d_cm   = load_json(os.path.join(models_dir, 'cnn_1d_confusion_matrix.json'))
-    cnn1d_hist = load_json(os.path.join(models_dir, 'cnn_1d_history.json'))
+    cnn1d_meta  = load_json(os.path.join(models_dir, 'cnn_1d_metadata.json'))
+    cnn1d_cm    = load_json(os.path.join(models_dir, 'cnn_1d_confusion_matrix.json'))
+    cnn1d_hist  = load_json(os.path.join(models_dir, 'cnn_1d_history.json'))
     cnn1d_entry = build_entry(cnn1d_meta, cnn1d_cm)
     if cnn1d_entry:
         cnn1d_entry['history'] = cnn1d_hist
@@ -1987,7 +1998,7 @@ def metrics_all():
         }
 
     # ── CNN 2D ───────────────────────────────────────────────────────────────
-    cnn2d_meta = load_json(os.path.join(models_dir, 'cnn_2d_metadata.json'))
+    cnn2d_meta  = load_json(os.path.join(models_dir, 'cnn_2d_metadata.json'))
     cnn2d_entry = build_entry(cnn2d_meta, None)
 
     return jsonify({

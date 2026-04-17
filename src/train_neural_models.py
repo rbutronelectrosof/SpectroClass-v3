@@ -900,6 +900,26 @@ def train_and_save_model(model_type, catalog_path, output_dir, **kwargs):
             json.dump({'matrix': cm, 'labels': class_labels}, f, indent=2)
         print(f"Matriz de confusion KNN guardada: {cm_path}")
 
+        # ── Curva accuracy vs K (para encontrar K óptimo) ────────────────────
+        print("\n[INFO] Calculando curva accuracy vs K...", flush=True)
+        k_max = min(25, max(3, len(X_train) - 1))
+        k_values, k_train_acc, k_test_acc = [], [], []
+        for k_val in range(1, k_max + 1):
+            _knn = KNeighborsClassifier(
+                n_neighbors=k_val,
+                metric=kwargs.get('metric', 'euclidean')
+            )
+            _knn.fit(X_train, y_train)
+            k_values.append(k_val)
+            k_train_acc.append(round(float(accuracy_score(y_train, _knn.predict(X_train))), 4))
+            k_test_acc.append(round(float(accuracy_score(y_test,  _knn.predict(X_test))),  4))
+        k_curve_path = os.path.join(output_dir, 'knn_k_curve.json')
+        with open(k_curve_path, 'w') as f:
+            json.dump({'k_values': k_values, 'train_acc': k_train_acc,
+                       'test_acc': k_test_acc,
+                       'optimal_k': kwargs.get('n_neighbors', 5)}, f, indent=2)
+        print(f"Curva KNN k-accuracy guardada: {k_curve_path}", flush=True)
+
         # Guardar modelo y scaler
         model_path = os.path.join(output_dir, 'knn_model.pkl')
         scaler_path = os.path.join(output_dir, 'knn_scaler.pkl')

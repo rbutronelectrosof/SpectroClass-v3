@@ -1584,6 +1584,15 @@
                                 </div>
                             </div>
 
+                            <!-- Curva de diagnóstico (KNN: k vs acc | DT: depth vs acc | RF: n_est vs error) -->
+                            <div id="hmDiagSection" style="display:none;">
+                                <div class="nm-chart-card hm-diag-card">
+                                    <h4 id="hmDiagTitle">Curva de Diagnóstico</h4>
+                                    <p id="hmDiagDesc" class="hm-diag-desc"></p>
+                                    <canvas id="hmChartDiag" height="230"></canvas>
+                                </div>
+                            </div>
+
                             <!-- Matriz de confusión -->
                             <div id="hmConfusionSection" style="display:none;">
                                 <h4 style="margin-top:1.5rem; color:#e2e8f0;">Matriz de Confusión</h4>

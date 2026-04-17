@@ -765,6 +765,9 @@ def main():
         print(f"{'='*50}")
         print(f"Accuracy en test: {acc_dt*100:.2f}%")
 
+    # Asegurar que y_pred existe para todos los tipos de modelo (DT no lo asigna arriba)
+    y_pred = model_dt.predict(X_test)
+
     # ── PASO 5: Validación cruzada k-fold ────────────────────────────────────
     # Divide todos los datos en k grupos, entrena k veces dejando un grupo fuera
     # como test en cada iteración. Mide la variabilidad del accuracy (std).
@@ -863,6 +866,42 @@ def main():
         tree_path = os.path.join(args.output_dir, 'decision_tree.png')
         # max_depth=3 muestra solo los 3 primeros niveles (más legible)
         plot_decision_tree_diagram(model_dt, feature_cols, tree_path, max_depth=3)
+
+    # ── PASO 8b: Curvas de diagnóstico (para visualización en webapp) ────────
+    # Árbol de decisión: accuracy vs profundidad máxima (detecta sobreajuste)
+    if args.model == 'decision_tree':
+        print("\n[INFO] Calculando curva accuracy vs profundidad...", flush=True)
+        curve_depths = list(range(1, max(16, args.tree_depth + 4)))
+        curve_train, curve_test = [], []
+        for d in curve_depths:
+            _m = DecisionTreeClassifier(max_depth=d, min_samples_split=10,
+                                        min_samples_leaf=5, random_state=42)
+            _m.fit(X_train, y_train)
+            curve_train.append(round(float(accuracy_score(y_train, _m.predict(X_train))), 4))
+            curve_test.append(round(float(accuracy_score(y_test,  _m.predict(X_test))),  4))
+        with open(os.path.join(args.output_dir, 'dt_depth_curve.json'), 'w') as f:
+            json.dump({'depths': curve_depths, 'train_acc': curve_train,
+                       'test_acc': curve_test, 'optimal_depth': args.tree_depth}, f, indent=2)
+        print(f"[OK] Curva DT profundidad guardada", flush=True)
+
+    # Random Forest: error vs número de árboles (muestra estabilización del error)
+    elif args.model == 'random_forest':
+        from sklearn.ensemble import RandomForestClassifier as _RFC
+        print("\n[INFO] Calculando curva error vs n_estimators...", flush=True)
+        _n_list = [1, 5, 10, 20, 30, 50, 75, 100, 150, 200]
+        _n_list = sorted(set(n for n in _n_list if n <= args.n_estimators) | {args.n_estimators})
+        _rf_w = _RFC(warm_start=True, max_depth=args.tree_depth, random_state=42, n_jobs=-1)
+        rf_n_est, rf_train_err, rf_test_err = [], [], []
+        for _n in _n_list:
+            _rf_w.n_estimators = _n
+            _rf_w.fit(X_train, y_train)
+            rf_n_est.append(_n)
+            rf_train_err.append(round(1.0 - float(accuracy_score(y_train, _rf_w.predict(X_train))), 4))
+            rf_test_err.append(round(1.0 - float(accuracy_score(y_test,  _rf_w.predict(X_test))),  4))
+        with open(os.path.join(args.output_dir, 'rf_estimators_curve.json'), 'w') as f:
+            json.dump({'n_estimators': rf_n_est, 'train_error': rf_train_err,
+                       'test_error': rf_test_err, 'optimal_n': args.n_estimators}, f, indent=2)
+        print(f"[OK] Curva RF estimadores guardada", flush=True)
 
     # ── PASO 9: Reporte de validación (.txt) ─────────────────────────────────
     generate_report(df, results_physical, model_dt, acc_dt, importances, args.output_dir)

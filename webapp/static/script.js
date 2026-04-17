@@ -6416,6 +6416,130 @@ function _renderHmMetrics(data) {
     } else {
         pcSection.style.display = 'none';
     }
+
+    // Curva de diagnóstico (KNN / DT / RF)
+    const diagSection = document.getElementById('hmDiagSection');
+    if (m.diag_curve) {
+        diagSection.style.display = 'block';
+        _renderHmDiagCurve(m.diag_curve, _hmCurrentModel);
+    } else {
+        diagSection.style.display = 'none';
+    }
+}
+
+// ── Curva de diagnóstico ─────────────────────────────────────────────────────
+let _hmChartDiag = null;
+
+function _renderHmDiagCurve(curve, modelType) {
+    const canvas = document.getElementById('hmChartDiag');
+    if (!canvas) return;
+    if (_hmChartDiag) { _hmChartDiag.destroy(); _hmChartDiag = null; }
+
+    let xLabels, datasets, titleText, descText, xAxisLabel, yAxisLabel;
+
+    if (modelType === 'knn' && curve.k_values) {
+        // KNN: accuracy vs K
+        titleText   = 'Accuracy vs Número de Vecinos (K)';
+        descText    = 'A medida que aumenta K el modelo se generaliza más. El punto óptimo equilibra sesgo y varianza.';
+        xAxisLabel  = 'Número de vecinos (K)';
+        yAxisLabel  = 'Accuracy';
+        xLabels     = curve.k_values;
+        const optK  = curve.optimal_k;
+        datasets = [
+            {
+                label: 'Train Accuracy',
+                data: curve.train_acc.map(v => +(v * 100).toFixed(1)),
+                borderColor: '#48bb78', backgroundColor: 'rgba(72,187,120,0.10)',
+                tension: 0.3, fill: false, pointRadius: 3,
+            },
+            {
+                label: 'Test Accuracy',
+                data: curve.test_acc.map(v => +(v * 100).toFixed(1)),
+                borderColor: '#63b3ed', backgroundColor: 'rgba(99,179,237,0.15)',
+                tension: 0.3, fill: true, pointRadius: 3,
+                pointBackgroundColor: curve.k_values.map(k => k === optK ? '#fbbf24' : 'transparent'),
+                pointBorderColor:     curve.k_values.map(k => k === optK ? '#fbbf24' : '#63b3ed'),
+                pointRadius:          curve.k_values.map(k => k === optK ? 7 : 3),
+            },
+        ];
+
+    } else if ((modelType === 'decision_tree') && curve.depths) {
+        // DT: accuracy vs profundidad
+        titleText  = 'Accuracy vs Profundidad del Árbol';
+        descText   = 'Cuando train accuracy >> test accuracy hay sobreajuste (overfitting). La profundidad óptima maximiza test accuracy.';
+        xAxisLabel = 'Profundidad máxima';
+        yAxisLabel = 'Accuracy (%)';
+        xLabels    = curve.depths;
+        const optD = curve.optimal_depth;
+        datasets = [
+            {
+                label: 'Train Accuracy',
+                data: curve.train_acc.map(v => +(v * 100).toFixed(1)),
+                borderColor: '#f6ad55', backgroundColor: 'rgba(246,173,85,0.10)',
+                tension: 0.2, fill: false, pointRadius: 3,
+            },
+            {
+                label: 'Test Accuracy',
+                data: curve.test_acc.map(v => +(v * 100).toFixed(1)),
+                borderColor: '#68d391', backgroundColor: 'rgba(104,211,145,0.15)',
+                tension: 0.2, fill: true, pointRadius: 3,
+                pointBackgroundColor: curve.depths.map(d => d === optD ? '#fbbf24' : 'transparent'),
+                pointBorderColor:     curve.depths.map(d => d === optD ? '#fbbf24' : '#68d391'),
+                pointRadius:          curve.depths.map(d => d === optD ? 7 : 3),
+            },
+        ];
+
+    } else if (curve.n_estimators) {
+        // RF: error vs n_estimators
+        titleText  = 'Error vs Número de Árboles (Random Forest)';
+        descText   = 'El error se estabiliza a medida que se agregan más árboles. Después del "codo" agregar más árboles aporta poco.';
+        xAxisLabel = 'Número de árboles (n_estimators)';
+        yAxisLabel = 'Error (1 − Accuracy)';
+        xLabels    = curve.n_estimators;
+        datasets = [
+            {
+                label: 'Train Error',
+                data: curve.train_error.map(v => +(v * 100).toFixed(1)),
+                borderColor: '#fc8181', backgroundColor: 'rgba(252,129,129,0.10)',
+                tension: 0.3, fill: false, pointRadius: 3,
+            },
+            {
+                label: 'Test Error',
+                data: curve.test_error.map(v => +(v * 100).toFixed(1)),
+                borderColor: '#f6ad55', backgroundColor: 'rgba(246,173,85,0.15)',
+                tension: 0.3, fill: true, pointRadius: 3,
+            },
+        ];
+    } else {
+        document.getElementById('hmDiagSection').style.display = 'none';
+        return;
+    }
+
+    document.getElementById('hmDiagTitle').textContent = titleText;
+    document.getElementById('hmDiagDesc').textContent  = descText;
+
+    _hmChartDiag = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: { labels: xLabels, datasets },
+        options: {
+            responsive: true,
+            animation: { duration: 300 },
+            plugins: {
+                legend: { labels: { color: '#a0aec0', font: { size: 11 } } },
+                tooltip: { mode: 'index', intersect: false,
+                    callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y}%` } },
+            },
+            scales: {
+                x: { title: { display: true, text: xAxisLabel, color: '#718096', font: { size: 11 } },
+                     ticks: { color: '#718096', font: { size: 10 } },
+                     grid:  { color: 'rgba(255,255,255,0.05)' } },
+                y: { title: { display: true, text: yAxisLabel, color: '#718096', font: { size: 11 } },
+                     ticks: { color: '#718096', font: { size: 10 },
+                              callback: v => v + '%' },
+                     grid:  { color: 'rgba(255,255,255,0.06)' } },
+            },
+        },
+    });
 }
 
 // ── Historial de entrenamientos ─────────────────────────────────────────────
