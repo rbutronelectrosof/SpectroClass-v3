@@ -5356,3 +5356,20 @@ details[open] summary {
     padding: 0.3rem 0.8rem;
     font-size: 0.82rem;
 }
+
+/* Aviso de redirección a pesos en panel neural */
+.voting-redirect-notice {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: rgba(99,179,237,0.08);
+    border: 1px solid rgba(99,179,237,0.25);
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    flex-wrap: wrap;
+}
+.voting-redirect-notice p {
+    margin: 0.2rem 0;
+    font-size: 0.9rem;
+    color: #cbd5e0;
+}

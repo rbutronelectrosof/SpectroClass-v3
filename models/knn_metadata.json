@@ -11,42 +11,42 @@
     "O"
   ],
   "test_size": 0.2,
-  "timestamp": "2026-04-17T16:05:16.586305",
-  "accuracy_test": 0.8786127167630058,
-  "accuracy_cv_mean": 0.8687659631670922,
-  "accuracy_cv_std": 0.025319344525862028,
-  "n_neighbors": 6,
-  "weights": "uniform",
-  "metric": "euclidean",
+  "timestamp": "2026-04-17T16:14:27.248470",
+  "accuracy_test": 0.8728323699421965,
+  "accuracy_cv_mean": 0.8792109154456245,
+  "accuracy_cv_std": 0.01778028897988701,
+  "n_neighbors": 5,
+  "weights": "distance",
+  "metric": "cosine",
   "per_class_metrics": {
     "A": {
-      "precision": 0.75,
+      "precision": 0.7778,
       "recall": 0.75,
-      "f1": 0.75,
+      "f1": 0.7636,
       "support": 28
     },
     "B": {
-      "precision": 0.875,
-      "recall": 0.5385,
-      "f1": 0.6667,
+      "precision": 0.8,
+      "recall": 0.6154,
+      "f1": 0.6957,
       "support": 13
     },
     "F": {
-      "precision": 0.8947,
-      "recall": 0.9577,
-      "f1": 0.9252,
+      "precision": 0.9041,
+      "recall": 0.9296,
+      "f1": 0.9167,
       "support": 71
     },
     "K": {
-      "precision": 0.9123,
-      "recall": 1.0,
-      "f1": 0.9541,
+      "precision": 0.8947,
+      "recall": 0.9808,
+      "f1": 0.9358,
       "support": 52
     },
     "M": {
-      "precision": 1.0,
-      "recall": 0.3333,
-      "f1": 0.5,
+      "precision": 0.75,
+      "recall": 0.5,
+      "f1": 0.6,
       "support": 6
     },
     "O": {
@@ -56,5 +56,5 @@
       "support": 3
     }
   },
-  "training_time_seconds": 103.20634698867798
+  "training_time_seconds": 89.90232968330383
 }

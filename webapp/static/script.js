@@ -2976,7 +2976,7 @@ function setupNeuralTab() {
         weightSlider.addEventListener('input', (e) => {
             const weight = parseFloat(e.target.value);
             document.getElementById('nnVotingWeightValue').textContent = weight.toFixed(2);
-            updateWeightsDisplay(weight);
+            updateWeightsDisplay();
             saveNeuralConfig();
         });
     }
@@ -3045,7 +3045,7 @@ function restoreNeuralConfig() {
             slider.value = config.weight;
             document.getElementById('nnVotingWeightValue').textContent =
                 parseFloat(config.weight).toFixed(2);
-            updateWeightsDisplay(parseFloat(config.weight));
+            updateWeightsDisplay();
         }
 
         // El modelo se restaura en populateNeuralModelSelect() una vez que
@@ -3140,41 +3140,31 @@ function updateNeuralParams() {
     document.getElementById('cnn2dParams').style.display = type === 'cnn_2d' ? 'block' : 'none';
 }
 
-function updateWeightsDisplay(neuralWeight) {
-    // Recalcular pesos de los otros métodos proporcionalmente
-    const remaining = 1 - neuralWeight;
-    const physicalWeight = (0.10 / 0.60) * remaining;
-    const dtWeight = (0.40 / 0.60) * remaining;
-    const templateWeight = (0.10 / 0.60) * remaining;
-
+function updateWeightsDisplay() {
+    // Muestra los pesos actuales de globalWeights (6 métodos independientes)
+    const w = globalWeights;
     const weightsDisplay = document.getElementById('currentWeightsDisplay');
-    if (weightsDisplay) {
-        weightsDisplay.innerHTML = `
-            <h4>Pesos Actuales:</h4>
-            <div class="weights-bars">
-                <div class="weight-bar">
-                    <span class="weight-label">Físico</span>
-                    <div class="weight-fill" style="width: ${physicalWeight * 100}%"></div>
-                    <span class="weight-value">${physicalWeight.toFixed(2)}</span>
-                </div>
-                <div class="weight-bar">
-                    <span class="weight-label">Árbol de Decisión</span>
-                    <div class="weight-fill" style="width: ${dtWeight * 100}%"></div>
-                    <span class="weight-value">${dtWeight.toFixed(2)}</span>
-                </div>
-                <div class="weight-bar">
-                    <span class="weight-label">Template</span>
-                    <div class="weight-fill" style="width: ${templateWeight * 100}%"></div>
-                    <span class="weight-value">${templateWeight.toFixed(2)}</span>
-                </div>
-                <div class="weight-bar neural">
-                    <span class="weight-label">Neural (KNN/CNN)</span>
-                    <div class="weight-fill" style="width: ${neuralWeight * 100}%"></div>
-                    <span class="weight-value">${neuralWeight.toFixed(2)}</span>
-                </div>
-            </div>
-        `;
-    }
+    if (!weightsDisplay) return;
+
+    const rows = [
+        ['Físico',            w.physical,      '#e17055'],
+        ['Árbol de Decisión', w.decision_tree, '#00b894'],
+        ['Template',          w.template,      '#fdcb6e'],
+        ['KNN',               w.knn,           '#0984e3'],
+        ['CNN 1D',            w.cnn_1d,        '#74b9ff'],
+        ['CNN 2D',            w.cnn_2d,        '#a29bfe'],
+    ];
+
+    weightsDisplay.innerHTML = `
+        <h4>Pesos Actuales:</h4>
+        <div class="weights-bars">
+            ${rows.map(([label, val, color]) => `
+            <div class="weight-bar">
+                <span class="weight-label">${label}</span>
+                <div class="weight-fill" style="width:${(val*100).toFixed(1)}%; background:${color}"></div>
+                <span class="weight-value">${val.toFixed(2)}</span>
+            </div>`).join('')}
+        </div>`;
 }
 
 async function trainNeuralModel() {

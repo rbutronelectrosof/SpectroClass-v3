@@ -1123,12 +1123,14 @@
                                     <span class="help-icon">?
                                         <div class="tooltip">
                                             <div class="tooltip-title">Pesos de Votación</div>
-                                            <p>El sistema combina 4 métodos para dar la clasificación final. Los pesos determinan cuánto influye cada uno.</p>
+                                            <p>El sistema combina <b>6 métodos independientes</b> para dar la clasificación final. Los pesos determinan cuánto influye cada uno.</p>
                                             <ul>
                                                 <li><b>Físico (10%):</b> Reglas espectroscópicas clásicas</li>
                                                 <li><b>Árbol de Decisión (40%):</b> Modelo ML entrenado</li>
                                                 <li><b>Templates (10%):</b> Comparación con espectros de referencia</li>
-                                                <li><b>Neural (40%):</b> KNN o CNN</li>
+                                                <li><b>KNN (20%):</b> K-Nearest Neighbors</li>
+                                                <li><b>CNN 1D (20%):</b> Red convolucional 1D</li>
+                                                <li><b>CNN 2D (0%):</b> Red convolucional 2D (experimental)</li>
                                             </ul>
                                             <p style="margin-top:8px">La suma de todos los pesos debe ser siempre <b>1.00</b>.</p>
                                         </div>
@@ -1262,7 +1264,7 @@
                             </div>
 
                             <p class="weights-panel-desc">
-                                El clasificador combina <strong>4 métodos independientes</strong>. Cada peso indica cuánto
+                                El clasificador combina <strong>6 métodos independientes</strong>. Cada peso indica cuánto
                                 influye ese método en la decisión final. La suma siempre debe ser <strong>1.00</strong>.
                             </p>
 
@@ -2141,25 +2143,24 @@
                         </p>
                     </div>
 
-                    <!-- Opción de integración en votación -->
+                    <!-- Integración en Votación — redirige a Herramientas -->
                     <div class="voting-integration-panel">
                         <div class="label-with-help" style="margin-bottom: 1rem;">
                             <h3 style="margin: 0;">🗳️ Integración en Votación Multi-Método</h3>
-                            <span class="help-icon">?
-                                <div class="tooltip">
-                                    <div class="tooltip-title">Sistema de Votación</div>
-                                    <p>La clasificación final se decide combinando varios métodos con pesos.</p>
-                                    <ul>
-                                        <li><b>Físico:</b> Reglas basadas en líneas espectrales</li>
-                                        <li><b>ML (Árbol):</b> Modelo de árbol de decisión</li>
-                                        <li><b>Templates:</b> Comparación con espectros de referencia</li>
-                                        <li><b>Neural:</b> KNN o CNN (si está entrenado)</li>
-                                    </ul>
-                                    <p style="margin-top:8px">Cada método "vota" por un tipo. El tipo con más votos ponderados gana.</p>
-                                </div>
-                            </span>
                         </div>
-                        <div class="voting-options">
+                        <div class="voting-redirect-notice">
+                            <span style="font-size:1.4rem;">⚖️</span>
+                            <div>
+                                <p>Los pesos de votación (Físico, Árbol, Template, <b>KNN</b>, <b>CNN 1D</b>, <b>CNN 2D</b>) se configuran en:</p>
+                                <p><strong>Herramientas → Utilidades → Pesos de Votación</strong></p>
+                            </div>
+                            <button class="btn-secondary" onclick="
+                                document.querySelector('[data-tab=herramientas]').click();
+                                setTimeout(()=>{ document.querySelector('[data-subtab=utilidades]').click(); toggleWeightsPanel(); }, 150);">
+                                Ir a Pesos de Votación →
+                            </button>
+                        </div>
+                        <div class="voting-options" style="display:none;">
                             <label class="checkbox-option">
                                 <input type="checkbox" id="nnIncludeInVoting" checked>
                                 <span>Incluir modelo neuronal en votación</span>
@@ -2220,10 +2221,20 @@
                                     <div class="weight-fill" style="width: 10%"></div>
                                     <span class="weight-value">0.10</span>
                                 </div>
-                                <div class="weight-bar neural">
-                                    <span class="weight-label">Neural (KNN/CNN)</span>
-                                    <div class="weight-fill" style="width: 30%"></div>
-                                    <span class="weight-value">0.30</span>
+                                <div class="weight-bar">
+                                    <span class="weight-label">KNN</span>
+                                    <div class="weight-fill" style="width: 20%; background:#0984e3"></div>
+                                    <span class="weight-value">0.20</span>
+                                </div>
+                                <div class="weight-bar">
+                                    <span class="weight-label">CNN 1D</span>
+                                    <div class="weight-fill" style="width: 20%; background:#74b9ff"></div>
+                                    <span class="weight-value">0.20</span>
+                                </div>
+                                <div class="weight-bar">
+                                    <span class="weight-label">CNN 2D</span>
+                                    <div class="weight-fill" style="width: 0%; background:#a29bfe"></div>
+                                    <span class="weight-value">0.00</span>
                                 </div>
                             </div>
                         </div>
@@ -2758,11 +2769,11 @@
                                     <span class="help-icon">?
                                         <div class="tooltip">
                                             <div class="tooltip-title">Votación Ponderada</div>
-                                            <p>Cada método vota por un tipo espectral. Los votos se ponderan (Físico 10%, Árbol 40%, Template 10%, Neural 40% por defecto). El ganador es la clasificación final.</p>
+                                            <p>Cada método vota por un tipo espectral. Los votos se ponderan (Físico 10%, Árbol 40%, Template 10%, KNN 20%, CNN 1D 20% por defecto). El ganador es la clasificación final.</p>
                                             <p style="margin-top:6px">Puedes cambiar los pesos en <b>Herramientas → Pesos de Votación</b>.</p>
                                         </div>
                                     </span>
-                                    <p>🔬 Físico · 🌿 Árbol de Decisión · 📋 Template Matching · 🧠 Neural (KNN/CNN)</p>
+                                    <p>🔬 Físico · 🌿 Árbol · 📋 Template · 📍 KNN · 〰️ CNN 1D · 🖼️ CNN 2D</p>
                                 </div>
                             </div>
                             <div class="help-pipe-arrow">▼</div>
@@ -2816,10 +2827,10 @@
                             </div>
                             <div class="help-method-card">
                                 <div class="help-method-icon">🧠</div>
-                                <h4>Neural (KNN / CNN)</h4>
-                                <div class="help-method-acc">KNN ~84% · CNN ~45%</div>
-                                <p>KNN usa los 19 EW como features: funciona muy bien con pocos datos. CNN 1D usa el flujo completo pero requiere alineación espectral y miles de muestras por clase para superar al KNN.</p>
-                                <div class="help-method-footer">Peso por defecto: 40%</div>
+                                <h4>KNN + CNN 1D + CNN 2D</h4>
+                                <div class="help-method-acc">KNN ~84% · CNN 1D ~45%+ · CNN 2D experimental</div>
+                                <p>Tres modelos neuronales independientes. KNN usa los EWs como features (rápido, preciso). CNN 1D procesa el espectro completo (necesita más datos). CNN 2D usa imágenes del espectro (experimental).</p>
+                                <div class="help-method-footer">Pesos por defecto: KNN 20% · CNN 1D 20% · CNN 2D 0%</div>
                             </div>
                         </div>
                     </div>
@@ -2834,7 +2845,7 @@
                                 <div class="tooltip">
                                     <div class="tooltip-title">Cálculo de confianza</div>
                                     <p>Confianza = suma de pesos de los métodos que coinciden con la clasificación final / suma total de pesos × 100.</p>
-                                    <p style="margin-top:6px">Si los 4 métodos coinciden → 100%. Si sólo el árbol (40%) coincide → 40%.</p>
+                                    <p style="margin-top:6px">Si los 6 métodos coinciden → 100%. Si sólo el árbol (40%) coincide → 40%.</p>
                                 </div>
                             </span>
                         </div>
@@ -2842,7 +2853,7 @@
                             <div class="help-conf-row">
                                 <div class="help-conf-label" style="color:#27ae60">Alta (&gt;80%)</div>
                                 <div class="help-conf-bar"><div class="help-conf-fill" style="width:85%;background:#27ae60"></div></div>
-                                <div class="help-conf-desc">3 o 4 métodos coinciden. Clasificación muy confiable.</div>
+                                <div class="help-conf-desc">4 o más de los 6 métodos coinciden. Clasificación muy confiable.</div>
                             </div>
                             <div class="help-conf-row">
                                 <div class="help-conf-label" style="color:#f39c12">Media (50–80%)</div>
@@ -4778,7 +4789,7 @@ print(<span class="mlc-str">"✅ Modelo CNN 2D guardado en models/cnn2d_model.h5
                         <details>
                             <summary>¿Qué significa el sistema multi-método?
                                 <span class="help-icon" style="margin-left:6px">?
-                                    <div class="tooltip">Los 4 métodos trabajan de forma completamente independiente. Si coinciden → alta confianza.</div>
+                                    <div class="tooltip">Los 6 métodos trabajan de forma completamente independiente. Si coinciden → alta confianza.</div>
                                 </span>
                             </summary>
                             <p>Cuatro clasificadores independientes votan por un tipo espectral. La clasificación final es la más votada ponderando los pesos asignados a cada método (configurables en Herramientas).</p>
