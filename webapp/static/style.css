@@ -5520,3 +5520,184 @@ details[open] summary {
         border-bottom: 1px solid #2d3748;
     }
 }
+
+/* ── Herramientas Métricas — summary row & model info chips ── */
+.hm-summary-row {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.hm-model-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.9rem;
+}
+
+.hm-info-chip {
+    background: #1a202c;
+    border: 1px solid #2d3748;
+    border-radius: 12px;
+    padding: 0.2rem 0.65rem;
+    font-size: 0.78rem;
+    color: #a0aec0;
+    white-space: nowrap;
+}
+
+.hm-info-chip b {
+    color: #e2e8f0;
+}
+
+/* ── Herramientas Métricas — accuracy badge ── */
+.hm-acc-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: linear-gradient(135deg, #1a3a2a, #1a2a1a);
+    border: 1px solid #276749;
+    border-radius: 8px;
+    padding: 0.35rem 0.85rem;
+    font-size: 0.88rem;
+    color: #68d391;
+    font-weight: 600;
+}
+
+.hm-acc-badge .hm-acc-val {
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+
+/* ── History section ── */
+.hm-history-section {
+    margin-top: 1.5rem;
+    border-top: 1px solid #2d3748;
+    padding-top: 1.2rem;
+}
+
+.hm-history-header {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #a0aec0;
+    margin-bottom: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.hm-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.hm-history-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 0.75rem;
+    background: #141820;
+    border: 1px solid #2d3748;
+    border-radius: 8px;
+    padding: 0.55rem 0.85rem;
+    font-size: 0.82rem;
+    transition: border-color 0.15s;
+}
+
+.hm-history-item:hover {
+    border-color: #4a5568;
+}
+
+.hm-hist-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.hm-hist-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+
+.hm-hist-badge.dt   { background: #2a3a1a; color: #68d391; border: 1px solid #276749; }
+.hm-hist-badge.knn  { background: #1a2a3a; color: #63b3ed; border: 1px solid #2b6cb0; }
+.hm-hist-badge.cnn1 { background: #2a1a3a; color: #b794f4; border: 1px solid #553c9a; }
+.hm-hist-badge.cnn2 { background: #3a2a1a; color: #f6ad55; border: 1px solid #c05621; }
+
+.hm-hist-ts {
+    color: #718096;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.hm-hist-center {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+}
+
+.hm-hist-param {
+    background: #1a202c;
+    border: 1px solid #2d3748;
+    border-radius: 4px;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.72rem;
+    color: #718096;
+}
+
+.hm-hist-right {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.hm-hist-acc {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #68d391;
+}
+
+.hm-hist-acc.medium { color: #f6ad55; }
+.hm-hist-acc.low    { color: #fc8181; }
+
+.hm-hist-classes {
+    font-size: 0.7rem;
+    color: #718096;
+    margin-top: 0.1rem;
+}
+
+/* no-data placeholder */
+.hm-nodata {
+    text-align: center;
+    color: #718096;
+    font-size: 0.85rem;
+    padding: 2rem 0;
+}
+
+.hm-hist-params {
+    font-size: 0.72rem;
+    color: #718096;
+    font-style: italic;
+}
+
+.hm-history-list::-webkit-scrollbar {
+    width: 5px;
+}
+.hm-history-list::-webkit-scrollbar-track {
+    background: #0d1117;
+}
+.hm-history-list::-webkit-scrollbar-thumb {
+    background: #2d3748;
+    border-radius: 3px;
+}

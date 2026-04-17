@@ -1081,6 +1081,34 @@ def train_and_save_model(model_type, catalog_path, output_dir, **kwargs):
     with open(metadata_path, 'w') as f:
         json.dump(convert_to_native(results), f, indent=2)
 
+    # Agregar entrada al historial acumulativo de entrenamientos
+    log_path = os.path.join(output_dir, 'training_log.json')
+    try:
+        existing_log = json.load(open(log_path)) if os.path.exists(log_path) else []
+    except Exception:
+        existing_log = []
+    existing_log.append({
+        'id':            f"{model_type}_{results['timestamp']}",
+        'model_type':    model_type,
+        'timestamp':     results['timestamp'],
+        'accuracy_test': round(float(results.get('accuracy_test', 0)), 4),
+        'accuracy_cv_mean': round(float(results.get('accuracy_cv_mean', 0)), 4) if 'accuracy_cv_mean' in results else None,
+        'n_samples':     results.get('n_samples', 0),
+        'n_classes':     results.get('n_classes', 0),
+        'classes':       results.get('classes', []),
+        'params': {
+            'n_neighbors':    results.get('n_neighbors'),
+            'weights':        results.get('weights'),
+            'metric':         results.get('metric'),
+            'epochs_trained': results.get('epochs_trained'),
+            'learning_rate':  results.get('learning_rate'),
+            'dropout_rate':   results.get('dropout_rate'),
+        },
+    })
+    with open(log_path, 'w') as f:
+        json.dump(existing_log, f, indent=2)
+    print(f"Historial de entrenamientos actualizado: {log_path}")
+
     # ========================================
     # RESUMEN FINAL
     # ========================================

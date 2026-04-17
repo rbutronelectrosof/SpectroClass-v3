@@ -1923,6 +1923,99 @@ def neural_history():
     })
 
 
+@app.route('/metrics_all', methods=['GET'])
+def metrics_all():
+    """Devuelve métricas de TODOS los modelos: DT/RF/GB + KNN + CNN 1D/2D."""
+    import json as _json
+    models_dir = os.path.join(project_root, 'models')
+
+    def load_json(path):
+        try:
+            with open(path, 'r') as f:
+                return _json.load(f)
+        except Exception:
+            return None
+
+    def build_entry(meta, cm_data):
+        if not meta:
+            return None
+        acc_raw = meta.get('accuracy_test')
+        return {
+            'model_type':    meta.get('model_type', '?'),
+            'accuracy':      round(acc_raw * 100, 1) if acc_raw is not None else None,
+            'accuracy_cv':   round(meta.get('accuracy_cv_mean', 0) * 100, 1) if meta.get('accuracy_cv_mean') else None,
+            'accuracy_cv_std': round(meta.get('accuracy_cv_std', 0) * 100, 1) if meta.get('accuracy_cv_std') else None,
+            'n_samples':     meta.get('n_samples') or (meta.get('n_train', 0) + meta.get('n_test', 0)),
+            'n_classes':     meta.get('n_classes'),
+            'classes':       meta.get('classes', []),
+            'per_class':     meta.get('per_class_metrics'),
+            'confusion_matrix': cm_data,
+            'params':        meta.get('params', {}),
+            'timestamp':     meta.get('timestamp'),
+            'history':       None,  # rellenado más abajo para CNN 1D
+        }
+
+    # ── DT / RF / GB ─────────────────────────────────────────────────────────
+    dt_meta = load_json(os.path.join(models_dir, 'metadata.json'))
+    dt_cm   = load_json(os.path.join(models_dir, 'dt_confusion_matrix.json'))
+    dt_entry = build_entry(dt_meta, dt_cm)
+
+    # ── KNN ──────────────────────────────────────────────────────────────────
+    knn_meta = load_json(os.path.join(models_dir, 'knn_metadata.json'))
+    knn_cm   = load_json(os.path.join(models_dir, 'knn_confusion_matrix.json'))
+    knn_entry = build_entry(knn_meta, knn_cm)
+    if knn_entry:
+        knn_entry['extra'] = {
+            'n_neighbors': knn_meta.get('n_neighbors'),
+            'weights':     knn_meta.get('weights'),
+            'metric':      knn_meta.get('metric'),
+            'cv_mean':     round(knn_meta.get('accuracy_cv_mean', 0) * 100, 1) if knn_meta.get('accuracy_cv_mean') else None,
+        }
+
+    # ── CNN 1D ───────────────────────────────────────────────────────────────
+    cnn1d_meta = load_json(os.path.join(models_dir, 'cnn_1d_metadata.json'))
+    cnn1d_cm   = load_json(os.path.join(models_dir, 'cnn_1d_confusion_matrix.json'))
+    cnn1d_hist = load_json(os.path.join(models_dir, 'cnn_1d_history.json'))
+    cnn1d_entry = build_entry(cnn1d_meta, cnn1d_cm)
+    if cnn1d_entry:
+        cnn1d_entry['history'] = cnn1d_hist
+        cnn1d_entry['extra'] = {
+            'epochs_trained':  cnn1d_meta.get('epochs_trained'),
+            'spectrum_length': cnn1d_meta.get('spectrum_length'),
+            'learning_rate':   cnn1d_meta.get('learning_rate'),
+            'dropout_rate':    cnn1d_meta.get('dropout_rate'),
+        }
+
+    # ── CNN 2D ───────────────────────────────────────────────────────────────
+    cnn2d_meta = load_json(os.path.join(models_dir, 'cnn_2d_metadata.json'))
+    cnn2d_entry = build_entry(cnn2d_meta, None)
+
+    return jsonify({
+        'success': True,
+        'models': {
+            'decision_tree': dt_entry,
+            'knn':           knn_entry,
+            'cnn_1d':        cnn1d_entry,
+            'cnn_2d':        cnn2d_entry,
+        },
+    })
+
+
+@app.route('/training_log', methods=['GET'])
+def training_log():
+    """Devuelve el historial acumulativo de todos los entrenamientos."""
+    import json as _json
+    models_dir = os.path.join(project_root, 'models')
+    log_path = os.path.join(models_dir, 'training_log.json')
+    try:
+        entries = _json.load(open(log_path)) if os.path.exists(log_path) else []
+        # Más recientes primero
+        entries = sorted(entries, key=lambda e: e.get('timestamp', ''), reverse=True)
+        return jsonify({'success': True, 'entries': entries})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e), 'entries': []})
+
+
 @app.route('/verify_neural_models', methods=['GET'])
 def verify_neural_models():
     """Verifica qué modelos neuronales están disponibles"""

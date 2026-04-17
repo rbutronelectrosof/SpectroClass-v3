@@ -782,15 +782,40 @@ def main():
     # ── PASO 7: Guardar metadata del entrenamiento (.json) ────────────────────
     # Permite al servidor saber la accuracy, número de muestras y fecha del modelo
     # sin necesidad de cargarlo completo (útil para el banner de "modelo activo").
+    now_ts = datetime.now().isoformat()
+
+    # Métricas por clase (precision, recall, F1, support)
+    report_dict = classification_report(y_test, y_pred, output_dict=True, zero_division=0)
+    present_classes = sorted(set(y_test) | set(y_pred))
+    per_class = {}
+    for cls in present_classes:
+        row = report_dict.get(cls, {})
+        if row:
+            per_class[cls] = {
+                'precision': round(float(row.get('precision', 0)), 4),
+                'recall':    round(float(row.get('recall', 0)), 4),
+                'f1':        round(float(row.get('f1-score', 0)), 4),
+                'support':   int(row.get('support', 0)),
+            }
+
     metadata = {
-        'n_train': len(X_train),              # muestras de entrenamiento
-        'n_test': len(X_test),                # muestras de evaluación
-        'accuracy_test': acc_dt,              # accuracy en conjunto de test (0-1)
-        'accuracy_cv_mean': mean_cv,          # accuracy promedio en validación cruzada
-        'accuracy_cv_std': scores_cv.std(),   # variabilidad del accuracy
-        'accuracy_physical': acc_physical,    # accuracy del clasificador físico (referencia)
-        'feature_names': feature_cols,        # lista de features usadas (para debugging)
-        'timestamp': datetime.now().isoformat()  # fecha y hora de entrenamiento
+        'model_type': args.model,
+        'n_train': len(X_train),
+        'n_test': len(X_test),
+        'n_samples': len(X_train) + len(X_test),
+        'accuracy_test': acc_dt,
+        'accuracy_cv_mean': mean_cv,
+        'accuracy_cv_std': float(scores_cv.std()),
+        'accuracy_physical': acc_physical,
+        'feature_names': feature_cols,
+        'classes': sorted(present_classes),
+        'n_classes': len(present_classes),
+        'per_class_metrics': per_class,
+        'params': {
+            'max_depth':    args.tree_depth,
+            'n_estimators': getattr(args, 'n_estimators', None),
+        },
+        'timestamp': now_ts,
     }
 
     metadata_path = os.path.join(args.output_dir, 'metadata.json')
@@ -798,11 +823,38 @@ def main():
         json.dump(metadata, f, indent=2)
     print(f"[OK] Metadata guardada: {metadata_path}")
 
+    # Guardar historial de entrenamientos (acumulativo)
+    log_path = os.path.join(args.output_dir, 'training_log.json')
+    try:
+        existing = json.load(open(log_path)) if os.path.exists(log_path) else []
+    except Exception:
+        existing = []
+    existing.append({
+        'id': f"{args.model}_{now_ts}",
+        'model_type': args.model,
+        'timestamp':  now_ts,
+        'accuracy_test':    round(float(acc_dt), 4),
+        'accuracy_cv_mean': round(float(mean_cv), 4),
+        'n_samples': len(X_train) + len(X_test),
+        'n_classes': len(present_classes),
+        'classes': sorted(present_classes),
+        'params': metadata['params'],
+    })
+    with open(log_path, 'w') as f:
+        json.dump(existing, f, indent=2)
+    print(f"[OK] Historial de entrenamientos actualizado: {log_path}")
+
     # ── PASO 8: Visualizaciones ───────────────────────────────────────────────
     y_pred = model_dt.predict(X_test)
 
+    # Guardar matriz de confusión como JSON (para la webapp)
+    cm_array = confusion_matrix(y_test, y_pred, labels=sorted(present_classes)).tolist()
+    cm_json_path = os.path.join(args.output_dir, 'dt_confusion_matrix.json')
+    with open(cm_json_path, 'w') as f:
+        json.dump({'matrix': cm_array, 'labels': sorted(present_classes)}, f, indent=2)
+    print(f"[OK] Matriz de confusión JSON guardada: {cm_json_path}")
+
     # Matriz de confusión: filas = tipo real, columnas = tipo predicho
-    # La diagonal muestra aciertos; fuera de diagonal = errores
     cm_path = os.path.join(args.output_dir, 'confusion_matrix.png')
     plot_confusion_matrix(y_test, y_pred, MAIN_TYPES, cm_path)
 

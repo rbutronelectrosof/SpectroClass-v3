@@ -6305,30 +6305,43 @@ function _updateLiveCharts(epochData) {
 }
 
 // ============================================================================
-// MÉTRICAS NEURALES — Panel en Herramientas (IDs prefijo hm-)
+// MÉTRICAS — Panel completo en Herramientas (IDs prefijo hm-)
 // ============================================================================
 
 let _hmChartAcc   = null;
 let _hmChartLoss  = null;
-let _hmCurrentModel = 'cnn_1d';
-let _hmData = null;
+let _hmCurrentModel = 'decision_tree';
+let _hmAllData = null;   // respuesta completa de /metrics_all
+
+const _hmModelLabels = {
+    decision_tree: '🌿 Árbol / RF / GB',
+    knn:           '📍 KNN',
+    cnn_1d:        '〰️ CNN 1D',
+    cnn_2d:        '🖼️ CNN 2D',
+};
 
 function switchHmModel(model, btn) {
     _hmCurrentModel = model;
-    document.querySelectorAll('#hmTabCNN, #hmTabKNN').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('[id^="hmTab_"]').forEach(b => b.classList.remove('active'));
     if (btn) btn.classList.add('active');
-    if (_hmData) _renderHmMetrics(_hmData);
+    if (_hmAllData) _renderHmMetrics(_hmAllData);
 }
 
 async function loadMetricsHerramientas() {
     try {
-        const res  = await fetch('/neural_history');
-        const data = await res.json();
-        if (!data.success) { _hmShowNoData('Error al cargar métricas.'); return; }
-        _hmData = data;
-        _renderHmMetrics(data);
+        const [mRes, hRes] = await Promise.all([
+            fetch('/metrics_all'),
+            fetch('/training_log'),
+        ]);
+        const mData = await mRes.json();
+        const hData = await hRes.json();
+
+        if (!mData.success) { _hmShowNoData('Error al cargar métricas.'); return; }
+        _hmAllData = mData;
+        _renderHmMetrics(mData);
+        _renderHmHistory(hData.entries || []);
     } catch (e) {
-        _hmShowNoData('No se pudo contactar con el servidor.');
+        _hmShowNoData('No se pudo contactar con el servidor: ' + e.message);
     }
 }
 
@@ -6338,24 +6351,45 @@ function _hmShowNoData(msg) {
     ['hmChartsSection','hmConfusionSection','hmPerClassSection'].forEach(id => {
         const s = document.getElementById(id); if (s) s.style.display = 'none';
     });
+    const badge = document.getElementById('hmAccuracyBadge');
+    if (badge) badge.textContent = '—';
 }
 
 function _renderHmMetrics(data) {
-    const m    = data[_hmCurrentModel] || {};
-    const noD  = document.getElementById('hmNoData');
-    const hasAny = m.history || m.confusion_matrix || m.per_class;
+    const m   = (data.models || {})[_hmCurrentModel];
+    const noD = document.getElementById('hmNoData');
 
-    noD.style.display = hasAny ? 'none' : 'block';
-    if (!hasAny) {
-        noD.textContent = 'Aún no hay métricas guardadas para este modelo. Entrena el modelo primero.';
+    if (!m) {
+        _hmShowNoData('Sin datos para este modelo. Entrénalo primero.');
         return;
     }
+    noD.style.display = 'none';
 
-    // Badge accuracy
+    // Badge de accuracy
     const badge = document.getElementById('hmAccuracyBadge');
-    if (badge) badge.textContent = m.accuracy != null ? `Accuracy: ${m.accuracy}%` : '—';
+    if (badge) {
+        badge.textContent = m.accuracy != null ? `Accuracy: ${m.accuracy}%` : '—';
+        badge.style.color = m.accuracy >= 80 ? '#68d391' : m.accuracy >= 60 ? '#fbbf24' : '#fc8181';
+    }
 
-    // Gráficas por época
+    // Info rápida del modelo
+    const infoDiv = document.getElementById('hmModelInfo');
+    if (infoDiv) {
+        const extra = m.extra || {};
+        const rows = [];
+        if (m.accuracy_cv)     rows.push(`CV: ${m.accuracy_cv}% ±${m.accuracy_cv_std||0}%`);
+        if (m.n_samples)       rows.push(`Muestras: ${m.n_samples}`);
+        if (m.classes?.length) rows.push(`Clases: ${m.classes.join(', ')}`);
+        if (extra.n_neighbors) rows.push(`K vecinos: ${extra.n_neighbors}`);
+        if (extra.metric)      rows.push(`Métrica: ${extra.metric}`);
+        if (extra.epochs_trained) rows.push(`Épocas: ${extra.epochs_trained}`);
+        if (extra.learning_rate)  rows.push(`LR: ${extra.learning_rate}`);
+        if (m.params?.max_depth)  rows.push(`Profundidad: ${m.params.max_depth}`);
+        if (m.timestamp)       rows.push(`Entrenado: ${m.timestamp.slice(0,16).replace('T',' ')}`);
+        infoDiv.innerHTML = rows.map(r => `<span class="hm-info-chip">${r}</span>`).join('');
+    }
+
+    // Gráficas por época (solo CNN)
     const chartsSection = document.getElementById('hmChartsSection');
     if (m.history) {
         chartsSection.style.display = 'block';
@@ -6384,6 +6418,54 @@ function _renderHmMetrics(data) {
     }
 }
 
+// ── Historial de entrenamientos ─────────────────────────────────────────────
+function _renderHmHistory(entries) {
+    const list  = document.getElementById('hmHistoryList');
+    const count = document.getElementById('hmHistoryCount');
+    if (!list) return;
+
+    if (count) count.textContent = `${entries.length} entrenamiento${entries.length !== 1 ? 's' : ''} registrado${entries.length !== 1 ? 's' : ''}`;
+
+    if (entries.length === 0) {
+        list.innerHTML = '<p class="nm-nodata">Sin historial guardado aún.</p>';
+        return;
+    }
+
+    const typeColor = {
+        decision_tree: '#00b894', random_forest: '#00b894', gradient_boosting: '#00b894',
+        knn: '#0984e3', cnn_1d: '#74b9ff', cnn_2d: '#a29bfe',
+    };
+
+    list.innerHTML = entries.map(e => {
+        const acc   = e.accuracy_test != null ? (e.accuracy_test * 100).toFixed(1) : '—';
+        const cv    = e.accuracy_cv_mean != null ? ` | CV: ${(e.accuracy_cv_mean * 100).toFixed(1)}%` : '';
+        const ts    = (e.timestamp || '').slice(0, 16).replace('T', ' ');
+        const color = typeColor[e.model_type] || '#94a3b8';
+        const label = _hmModelLabels[e.model_type] || e.model_type;
+        const cls   = (e.classes || []).join(', ');
+        const paramStr = Object.entries(e.params || {})
+            .filter(([,v]) => v != null)
+            .map(([k,v]) => `${k}: ${v}`)
+            .join(' · ') || '';
+        return `
+        <div class="hm-history-item">
+            <div class="hm-hist-left">
+                <span class="hm-hist-badge" style="background:${color}22; color:${color}; border-color:${color}44;">${label}</span>
+                <span class="hm-hist-ts">🕐 ${ts}</span>
+            </div>
+            <div class="hm-hist-center">
+                <span class="hm-hist-acc" style="color:${parseFloat(acc)>=80?'#68d391':parseFloat(acc)>=60?'#fbbf24':'#fc8181'}">
+                    ${acc}%${cv}
+                </span>
+                <span class="hm-hist-classes">${cls}</span>
+            </div>
+            <div class="hm-hist-right">
+                <span class="hm-hist-params">${paramStr}</span>
+            </div>
+        </div>`;
+    }).join('');
+}
+
 function _hmRenderAccChart(history) {
     const canvas = document.getElementById('hmChartAccuracy');
     if (!canvas) return;
@@ -6391,19 +6473,14 @@ function _hmRenderAccChart(history) {
     const epochs = history.accuracy.map((_, i) => i + 1);
     _hmChartAcc = new Chart(canvas.getContext('2d'), {
         type: 'line',
-        data: {
-            labels: epochs,
-            datasets: [
-                { label: 'Train Acc', data: history.accuracy,     borderColor: '#68d391', backgroundColor: 'rgba(104,211,145,0.15)', tension: 0.3, fill: true,  pointRadius: 3 },
-                { label: 'Val Acc',   data: history.val_accuracy, borderColor: '#63b3ed', backgroundColor: 'rgba(99,179,237,0.10)',  tension: 0.3, fill: false, borderDash: [5,3], pointRadius: 3 },
-            ],
-        },
-        options: {
-            ..._chartDefaults(),
+        data: { labels: epochs, datasets: [
+            { label: 'Train Acc', data: history.accuracy,     borderColor: '#68d391', backgroundColor: 'rgba(104,211,145,0.15)', tension: 0.3, fill: true,  pointRadius: 3 },
+            { label: 'Val Acc',   data: history.val_accuracy, borderColor: '#63b3ed', backgroundColor: 'rgba(99,179,237,0.10)',  tension: 0.3, fill: false, borderDash: [5,3], pointRadius: 3 },
+        ]},
+        options: { ..._chartDefaults(),
             scales: { ..._chartDefaults().scales,
                 y: { ..._chartDefaults().scales.y, min: 0, max: 1,
-                     ticks: { color: '#718096', callback: v => (v*100).toFixed(0)+'%' } } },
-        },
+                     ticks: { color: '#718096', callback: v => (v*100).toFixed(0)+'%' } } } },
     });
 }
 
@@ -6414,13 +6491,10 @@ function _hmRenderLossChart(history) {
     const epochs = history.loss.map((_, i) => i + 1);
     _hmChartLoss = new Chart(canvas.getContext('2d'), {
         type: 'line',
-        data: {
-            labels: epochs,
-            datasets: [
-                { label: 'Train Loss', data: history.loss,     borderColor: '#fc8181', backgroundColor: 'rgba(252,129,129,0.15)', tension: 0.3, fill: true,  pointRadius: 3 },
-                { label: 'Val Loss',   data: history.val_loss, borderColor: '#f6ad55', backgroundColor: 'rgba(246,173,85,0.10)',  tension: 0.3, fill: false, borderDash: [5,3], pointRadius: 3 },
-            ],
-        },
+        data: { labels: epochs, datasets: [
+            { label: 'Train Loss', data: history.loss,     borderColor: '#fc8181', backgroundColor: 'rgba(252,129,129,0.15)', tension: 0.3, fill: true,  pointRadius: 3 },
+            { label: 'Val Loss',   data: history.val_loss, borderColor: '#f6ad55', backgroundColor: 'rgba(246,173,85,0.10)',  tension: 0.3, fill: false, borderDash: [5,3], pointRadius: 3 },
+        ]},
         options: _chartDefaults(),
     });
 }

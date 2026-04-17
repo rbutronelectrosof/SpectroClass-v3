@@ -688,7 +688,7 @@
                         <button class="subtab-btn active" data-subtab="entrenar">🤖 Entrenar Modelos</button>
                         <button class="subtab-btn" data-subtab="testear">🔬 Test Espectros</button>
                         <button class="subtab-btn" data-subtab="utilidades">🛠️ Utilidades</button>
-                        <button class="subtab-btn" data-subtab="metricas" onclick="loadMetricsHerramientas()">📊 Métricas Neurales</button>
+                        <button class="subtab-btn" data-subtab="metricas" onclick="loadMetricsHerramientas()">📊 Métricas</button>
                     </div>
 
                     <!-- SUBTAB: ENTRENAR MODELOS -->
@@ -1548,28 +1548,30 @@
                         </div>
                     </div>
 
-                    <!-- SUBTAB: MÉTRICAS NEURALES -->
+                    <!-- SUBTAB: MÉTRICAS -->
                     <div id="subtab-metricas" class="subtab-content">
-
                         <div class="nn-metrics-panel" style="margin-top:0; padding-top:1.2rem;">
 
-                            <!-- Cabecera con selector de modelo y botón actualizar -->
+                            <!-- Cabecera -->
                             <div class="nn-metrics-header">
-                                <h3>📊 Métricas de Entrenamiento Neural</h3>
+                                <h3>📊 Métricas de Entrenamiento</h3>
                                 <div class="nn-metrics-tabs">
-                                    <button class="nm-tab active" id="hmTabCNN" onclick="switchHmModel('cnn_1d',this)">CNN 1D</button>
-                                    <button class="nm-tab" id="hmTabKNN"  onclick="switchHmModel('knn',this)">KNN</button>
+                                    <button class="nm-tab active" id="hmTab_decision_tree" onclick="switchHmModel('decision_tree',this)">🌿 Árbol / RF / GB</button>
+                                    <button class="nm-tab" id="hmTab_knn"    onclick="switchHmModel('knn',this)">📍 KNN</button>
+                                    <button class="nm-tab" id="hmTab_cnn_1d" onclick="switchHmModel('cnn_1d',this)">〰️ CNN 1D</button>
+                                    <button class="nm-tab" id="hmTab_cnn_2d" onclick="switchHmModel('cnn_2d',this)">🖼️ CNN 2D</button>
                                 </div>
-                                <button class="btn-secondary btn-sm" onclick="loadMetricsHerramientas()" style="margin-left:auto;">
-                                    🔄 Actualizar
-                                </button>
+                                <button class="btn-secondary btn-sm" onclick="loadMetricsHerramientas()" style="margin-left:auto;">🔄 Actualizar</button>
                             </div>
 
-                            <!-- Badge de accuracy -->
-                            <div class="nm-accuracy-badge" id="hmAccuracyBadge">—</div>
+                            <!-- Badge de accuracy + info rápida del modelo -->
+                            <div class="hm-summary-row">
+                                <div class="nm-accuracy-badge" id="hmAccuracyBadge" style="margin:0;">—</div>
+                                <div id="hmModelInfo" class="hm-model-info"></div>
+                            </div>
 
                             <!-- Gráficas accuracy / loss (solo CNN) -->
-                            <div id="hmChartsSection">
+                            <div id="hmChartsSection" style="display:none;">
                                 <div class="nm-charts-row">
                                     <div class="nm-chart-card">
                                         <h4>Precisión por época</h4>
@@ -1583,21 +1585,32 @@
                             </div>
 
                             <!-- Matriz de confusión -->
-                            <div id="hmConfusionSection">
+                            <div id="hmConfusionSection" style="display:none;">
                                 <h4 style="margin-top:1.5rem; color:#e2e8f0;">Matriz de Confusión</h4>
                                 <div id="hmConfusionMatrix" class="nm-confusion-wrap"></div>
                             </div>
 
                             <!-- Métricas por clase -->
-                            <div id="hmPerClassSection">
+                            <div id="hmPerClassSection" style="display:none;">
                                 <h4 style="margin-top:1.5rem; color:#e2e8f0;">Métricas por Clase</h4>
                                 <div id="hmPerClassTable" class="nm-perclass-wrap"></div>
                             </div>
 
                             <p id="hmNoData" class="nm-nodata" style="display:none;">
-                                Aún no hay métricas guardadas. Entrena un modelo primero desde la pestaña
-                                <strong>Redes Neuronales → Entrenar Modelo</strong>.
+                                Aún no hay métricas para este modelo. Entrénalo primero.
                             </p>
+
+                            <!-- ═══ HISTORIAL DE ENTRENAMIENTOS ═══ -->
+                            <div class="hm-history-section">
+                                <div class="hm-history-header">
+                                    <h4>🕐 Historial de Entrenamientos</h4>
+                                    <span id="hmHistoryCount" style="color:#718096; font-size:0.82rem;"></span>
+                                </div>
+                                <div id="hmHistoryList" class="hm-history-list">
+                                    <p class="nm-nodata">Sin historial guardado aún.</p>
+                                </div>
+                            </div>
+
                         </div>
                     </div>
 
