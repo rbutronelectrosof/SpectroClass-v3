@@ -11,12 +11,50 @@
     "O"
   ],
   "test_size": 0.2,
-  "timestamp": "2026-04-13T16:34:07.827157",
-  "accuracy_test": 0.8728323699421965,
-  "accuracy_cv_mean": 0.8710982658959537,
-  "accuracy_cv_std": 0.021124335373099566,
-  "n_neighbors": 9,
-  "weights": "distance",
-  "metric": "cosine",
-  "training_time_seconds": 210.64152932167053
+  "timestamp": "2026-04-17T16:05:16.586305",
+  "accuracy_test": 0.8786127167630058,
+  "accuracy_cv_mean": 0.8687659631670922,
+  "accuracy_cv_std": 0.025319344525862028,
+  "n_neighbors": 6,
+  "weights": "uniform",
+  "metric": "euclidean",
+  "per_class_metrics": {
+    "A": {
+      "precision": 0.75,
+      "recall": 0.75,
+      "f1": 0.75,
+      "support": 28
+    },
+    "B": {
+      "precision": 0.875,
+      "recall": 0.5385,
+      "f1": 0.6667,
+      "support": 13
+    },
+    "F": {
+      "precision": 0.8947,
+      "recall": 0.9577,
+      "f1": 0.9252,
+      "support": 71
+    },
+    "K": {
+      "precision": 0.9123,
+      "recall": 1.0,
+      "f1": 0.9541,
+      "support": 52
+    },
+    "M": {
+      "precision": 1.0,
+      "recall": 0.3333,
+      "f1": 0.5,
+      "support": 6
+    },
+    "O": {
+      "precision": 1.0,
+      "recall": 0.6667,
+      "f1": 0.8,
+      "support": 3
+    }
+  },
+  "training_time_seconds": 103.20634698867798
 }

@@ -1,9 +1,9 @@
 {
   "n_train": 685,
   "n_test": 172,
-  "accuracy_test": 0.9069767441860465,
-  "accuracy_cv_mean": 0.899626002991976,
-  "accuracy_cv_std": 0.02658991241316291,
+  "accuracy_test": 0.8953488372093024,
+  "accuracy_cv_mean": 0.8855977152182783,
+  "accuracy_cv_std": 0.02433056644837299,
   "accuracy_physical": 0.08508158508158509,
   "feature_names": [
     "ew_He_II_4686",
@@ -31,5 +31,5 @@
     "ratio_Ca_I_H_gamma",
     "H_avg"
   ],
-  "timestamp": "2026-04-13T15:19:17.074711"
+  "timestamp": "2026-04-17T15:58:56.365840"
 }

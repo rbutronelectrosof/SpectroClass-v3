@@ -6313,3 +6313,124 @@ function _updateLiveCharts(epochData) {
     _chartLoss.data.datasets[1].data.push(epochData.val_loss);
     _chartLoss.update('none');
 }
+
+// ============================================================================
+// MÉTRICAS NEURALES — Panel en Herramientas (IDs prefijo hm-)
+// ============================================================================
+
+let _hmChartAcc   = null;
+let _hmChartLoss  = null;
+let _hmCurrentModel = 'cnn_1d';
+let _hmData = null;
+
+function switchHmModel(model, btn) {
+    _hmCurrentModel = model;
+    document.querySelectorAll('#hmTabCNN, #hmTabKNN').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    if (_hmData) _renderHmMetrics(_hmData);
+}
+
+async function loadMetricsHerramientas() {
+    try {
+        const res  = await fetch('/neural_history');
+        const data = await res.json();
+        if (!data.success) { _hmShowNoData('Error al cargar métricas.'); return; }
+        _hmData = data;
+        _renderHmMetrics(data);
+    } catch (e) {
+        _hmShowNoData('No se pudo contactar con el servidor.');
+    }
+}
+
+function _hmShowNoData(msg) {
+    const el = document.getElementById('hmNoData');
+    if (el) { el.style.display = 'block'; el.textContent = msg; }
+    ['hmChartsSection','hmConfusionSection','hmPerClassSection'].forEach(id => {
+        const s = document.getElementById(id); if (s) s.style.display = 'none';
+    });
+}
+
+function _renderHmMetrics(data) {
+    const m    = data[_hmCurrentModel] || {};
+    const noD  = document.getElementById('hmNoData');
+    const hasAny = m.history || m.confusion_matrix || m.per_class;
+
+    noD.style.display = hasAny ? 'none' : 'block';
+    if (!hasAny) {
+        noD.textContent = 'Aún no hay métricas guardadas para este modelo. Entrena el modelo primero.';
+        return;
+    }
+
+    // Badge accuracy
+    const badge = document.getElementById('hmAccuracyBadge');
+    if (badge) badge.textContent = m.accuracy != null ? `Accuracy: ${m.accuracy}%` : '—';
+
+    // Gráficas por época
+    const chartsSection = document.getElementById('hmChartsSection');
+    if (m.history) {
+        chartsSection.style.display = 'block';
+        _hmRenderAccChart(m.history);
+        _hmRenderLossChart(m.history);
+    } else {
+        chartsSection.style.display = 'none';
+    }
+
+    // Matriz de confusión
+    const confSection = document.getElementById('hmConfusionSection');
+    if (m.confusion_matrix) {
+        confSection.style.display = 'block';
+        _renderConfusionMatrix(m.confusion_matrix, document.getElementById('hmConfusionMatrix'));
+    } else {
+        confSection.style.display = 'none';
+    }
+
+    // Métricas por clase
+    const pcSection = document.getElementById('hmPerClassSection');
+    if (m.per_class) {
+        pcSection.style.display = 'block';
+        _renderPerClass(m.per_class, document.getElementById('hmPerClassTable'));
+    } else {
+        pcSection.style.display = 'none';
+    }
+}
+
+function _hmRenderAccChart(history) {
+    const canvas = document.getElementById('hmChartAccuracy');
+    if (!canvas) return;
+    if (_hmChartAcc) _hmChartAcc.destroy();
+    const epochs = history.accuracy.map((_, i) => i + 1);
+    _hmChartAcc = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: epochs,
+            datasets: [
+                { label: 'Train Acc', data: history.accuracy,     borderColor: '#68d391', backgroundColor: 'rgba(104,211,145,0.15)', tension: 0.3, fill: true,  pointRadius: 3 },
+                { label: 'Val Acc',   data: history.val_accuracy, borderColor: '#63b3ed', backgroundColor: 'rgba(99,179,237,0.10)',  tension: 0.3, fill: false, borderDash: [5,3], pointRadius: 3 },
+            ],
+        },
+        options: {
+            ..._chartDefaults(),
+            scales: { ..._chartDefaults().scales,
+                y: { ..._chartDefaults().scales.y, min: 0, max: 1,
+                     ticks: { color: '#718096', callback: v => (v*100).toFixed(0)+'%' } } },
+        },
+    });
+}
+
+function _hmRenderLossChart(history) {
+    const canvas = document.getElementById('hmChartLoss');
+    if (!canvas) return;
+    if (_hmChartLoss) _hmChartLoss.destroy();
+    const epochs = history.loss.map((_, i) => i + 1);
+    _hmChartLoss = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: epochs,
+            datasets: [
+                { label: 'Train Loss', data: history.loss,     borderColor: '#fc8181', backgroundColor: 'rgba(252,129,129,0.15)', tension: 0.3, fill: true,  pointRadius: 3 },
+                { label: 'Val Loss',   data: history.val_loss, borderColor: '#f6ad55', backgroundColor: 'rgba(246,173,85,0.10)',  tension: 0.3, fill: false, borderDash: [5,3], pointRadius: 3 },
+            ],
+        },
+        options: _chartDefaults(),
+    });
+}

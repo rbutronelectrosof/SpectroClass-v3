@@ -1,7 +1,7 @@
 ======================================================================
 REPORTE DE VALIDACIÓN - CLASIFICACIÓN ESPECTRAL
 ======================================================================
-Fecha: 2026-04-13 15:19:18
+Fecha: 2026-04-17 15:58:56
 Catálogo: 858 espectros
 
 DISTRIBUCIÓN POR TIPO:
@@ -26,21 +26,21 @@ Accuracy por tipo:
   K: 0.00% (0/259)
   M: 0.00% (0/28)
 
-MODELO (RandomForestClassifier):
-Accuracy: 90.70%
+MODELO (GradientBoostingClassifier):
+Accuracy: 89.53%
 Estimadores: 350
-Profundidad maxima: 9
+Profundidad maxima: 7
 
 TOP 10 FEATURES MÁS IMPORTANTES:
-0.132952
-0.113215
-0.104649
-0.100356
-0.088364
-0.065237
-0.041244
-0.039974
-0.035967
-0.034794
+0.289834
+0.202077
+0.158834
+0.112487
+0.047705
+0.023457
+0.021417
+0.019233
+0.016088
+0.015689
 
 ======================================================================
