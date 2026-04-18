@@ -6166,47 +6166,67 @@ function _chartDefaults() {
 function _renderAccChart(history) {
     const canvas = document.getElementById('chartAccuracy');
     if (!canvas) return;
-    if (_chartAcc) { _chartAcc.destroy(); _chartAcc = null; }
-    // Restaurar altura después de destroy() para que Chart.js mida bien el contenedor
-    _fixCanvasSize(canvas);
     const epochs = history.accuracy.map((_, i) => i + 1);
-    _chartAcc = new Chart(canvas.getContext('2d'), {
-        type: 'line',
-        data: {
-            labels: epochs,
-            datasets: [
-                { label: 'Train Acc', data: history.accuracy,     borderColor: '#68d391', backgroundColor: 'rgba(104,211,145,0.15)', tension: 0.3, fill: true,  pointRadius: 3 },
-                { label: 'Val Acc',   data: history.val_accuracy, borderColor: '#63b3ed', backgroundColor: 'rgba(99,179,237,0.10)',  tension: 0.3, fill: false, borderDash: [5,3], pointRadius: 3 },
-            ],
-        },
-        options: {
-            ..._chartDefaults(),
-            scales: {
-                ..._chartDefaults().scales,
-                y: { ..._chartDefaults().scales.y, min: 0, max: 1,
-                     ticks: { color: '#718096', callback: v => (v * 100).toFixed(0) + '%' } },
+
+    if (_chartAcc) {
+        // Reusar el chart existente (evita destroy → canvas colapsa → blanco)
+        _chartAcc.data.labels = epochs;
+        _chartAcc.data.datasets[0].data = [...history.accuracy];
+        _chartAcc.data.datasets[1].data = [...history.val_accuracy];
+        // Restaurar responsive y animación para la vista estática final
+        _chartAcc.options.responsive          = true;
+        _chartAcc.options.animation           = { duration: 400 };
+        _chartAcc.options.scales.y.min        = 0;
+        _chartAcc.options.scales.y.max        = 1;
+        _chartAcc.options.scales.y.ticks      = { color: '#718096', callback: v => (v * 100).toFixed(0) + '%' };
+        _chartAcc.update();
+    } else {
+        // Primera vez: no hay live chart, crear desde cero
+        _chartAcc = new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: epochs,
+                datasets: [
+                    { label: 'Train Acc', data: history.accuracy,     borderColor: '#68d391', backgroundColor: 'rgba(104,211,145,0.15)', tension: 0.3, fill: true,  pointRadius: 3 },
+                    { label: 'Val Acc',   data: history.val_accuracy, borderColor: '#63b3ed', backgroundColor: 'rgba(99,179,237,0.10)',  tension: 0.3, fill: false, borderDash: [5,3], pointRadius: 3 },
+                ],
             },
-        },
-    });
+            options: {
+                ..._chartDefaults(),
+                scales: { ..._chartDefaults().scales,
+                    y: { ..._chartDefaults().scales.y, min: 0, max: 1,
+                         ticks: { color: '#718096', callback: v => (v * 100).toFixed(0) + '%' } },
+                },
+            },
+        });
+    }
 }
 
 function _renderLossChart(history) {
     const canvas = document.getElementById('chartLoss');
     if (!canvas) return;
-    if (_chartLoss) { _chartLoss.destroy(); _chartLoss = null; }
-    _fixCanvasSize(canvas);
     const epochs = history.loss.map((_, i) => i + 1);
-    _chartLoss = new Chart(canvas.getContext('2d'), {
-        type: 'line',
-        data: {
-            labels: epochs,
-            datasets: [
-                { label: 'Train Loss', data: history.loss,     borderColor: '#fc8181', backgroundColor: 'rgba(252,129,129,0.15)', tension: 0.3, fill: true,  pointRadius: 3 },
-                { label: 'Val Loss',   data: history.val_loss, borderColor: '#f6ad55', backgroundColor: 'rgba(246,173,85,0.10)',  tension: 0.3, fill: false, borderDash: [5,3], pointRadius: 3 },
-            ],
-        },
-        options: _chartDefaults(),
-    });
+
+    if (_chartLoss) {
+        _chartLoss.data.labels = epochs;
+        _chartLoss.data.datasets[0].data = [...history.loss];
+        _chartLoss.data.datasets[1].data = [...history.val_loss];
+        _chartLoss.options.responsive = true;
+        _chartLoss.options.animation  = { duration: 400 };
+        _chartLoss.update();
+    } else {
+        _chartLoss = new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: epochs,
+                datasets: [
+                    { label: 'Train Loss', data: history.loss,     borderColor: '#fc8181', backgroundColor: 'rgba(252,129,129,0.15)', tension: 0.3, fill: true,  pointRadius: 3 },
+                    { label: 'Val Loss',   data: history.val_loss, borderColor: '#f6ad55', backgroundColor: 'rgba(246,173,85,0.10)',  tension: 0.3, fill: false, borderDash: [5,3], pointRadius: 3 },
+                ],
+            },
+            options: _chartDefaults(),
+        });
+    }
 }
 
 function _renderConfusionMatrix(cmData, container) {
@@ -6268,37 +6288,49 @@ function _initLiveCharts() {
     _liveAccData  = [];
     _liveLossData = [];
 
-    const accCanvas  = document.getElementById('chartAccuracy');
-    const lossCanvas = document.getElementById('chartLoss');
-    if (!accCanvas || !lossCanvas) return;
-
-    // Fijar dimensiones explícitas ANTES de crear el chart para evitar
-    // el loop resize → blank → resize que causa Chart.js 4 con responsive:true
-    _fixCanvasSize(accCanvas);
-    _fixCanvasSize(lossCanvas);
-
-    // Mostrar el panel durante entrenamiento
+    // Mostrar el panel ANTES de medir el canvas (necesita estar en el DOM visible)
     document.getElementById('nnMetricsPanel').style.display = 'block';
     document.getElementById('nmChartsSection').style.display = 'block';
     document.getElementById('nmConfusionSection').style.display = 'none';
     document.getElementById('nmPerClassSection').style.display = 'none';
     document.getElementById('nmNoData').style.display = 'none';
 
+    const accCanvas  = document.getElementById('chartAccuracy');
+    const lossCanvas = document.getElementById('chartLoss');
+    if (!accCanvas || !lossCanvas) return;
+
+    // ── Solución al parpadeo / blanco durante training ──────────────────────
+    // Chart.js 4 con responsive:true usa ResizeObserver. Cada vez que appendLog()
+    // añade una línea al log se produce un reflow de layout → el ResizeObserver
+    // dispara → Chart.js borra el canvas y lo redibuja → parpadeo en blanco.
+    //
+    // Fix: fijar dimensiones intrínsecas del canvas (buffer de píxeles) y usar
+    // responsive:false. Así Chart.js NO instala ResizeObserver y el canvas
+    // nunca se borra por cambios de layout externos.
+    // Las dimensiones se toman del contenedor real en este momento.
+    const W = accCanvas.parentElement?.clientWidth  || 480;
+    const H = parseInt(accCanvas.getAttribute('height') || '220', 10);
+
+    for (const cv of [accCanvas, lossCanvas]) {
+        cv.width  = W;   // buffer de píxeles (lo que Chart.js usa con responsive:false)
+        cv.height = H;
+        cv.style.width  = '100%';   // sigue siendo fluido visualmente vía CSS
+        cv.style.height = H + 'px';
+    }
+
+    // Si ya existe un chart de sesión anterior, destruirlo una sola vez aquí
+    // (NO en _renderAccChart: esa función reutiliza el chart para evitar el colapso)
     if (_chartAcc)  { _chartAcc.destroy();  _chartAcc  = null; }
     if (_chartLoss) { _chartLoss.destroy(); _chartLoss = null; }
 
-    // Opciones para gráficas en VIVO:
-    // - animation: false  → sin animación, evita conflictos con actualizaciones rápidas
-    // - responsive: false → desactiva el ResizeObserver; cada appendLog() causaría reflow
-    //                       que dispara redibujado completo (pantalla en blanco momentáneo)
     const liveOpts = {
-        animation: false,
-        responsive: false,
+        animation: false,        // sin animación de creación ni de actualización
+        responsive: false,       // sin ResizeObserver → sin parpadeo
         maintainAspectRatio: false,
         plugins: { legend: { labels: { color: '#a0aec0', font: { size: 11 } } } },
         scales: {
             x: { ticks: { color: '#718096', font: { size: 10 } }, grid: { color: '#2d3748' } },
-            y: { ticks: { color: '#718096' }, grid: { color: '#2d3748' } },
+            y: { ticks: { color: '#718096', font: { size: 10 } }, grid: { color: '#2d3748' } },
         },
     };
 
@@ -6322,15 +6354,6 @@ function _initLiveCharts() {
         ]},
         options: liveOpts,
     });
-}
-
-// Fija el tamaño del canvas con estilos inline para que Chart.js no lo recalcule
-function _fixCanvasSize(canvas) {
-    const card = canvas.closest('.nm-chart-card') || canvas.parentElement;
-    const h = parseInt(canvas.getAttribute('height') || '220', 10);
-    canvas.style.width  = '100%';
-    canvas.style.height = h + 'px';
-    if (card) card.style.minHeight = (h + 50) + 'px';
 }
 
 function _updateLiveCharts(epochData) {
