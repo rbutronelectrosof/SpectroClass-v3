@@ -5720,7 +5720,7 @@ details[open] summary {
 /* ── Wrapper de canvas con altura fija (evita ResizeObserver loop en Chart.js 4) ── */
 .nm-canvas-wrap {
     position: relative;
-    height: 200px;          /* altura fija que Chart.js mide — nunca cambia por log lines */
+    height: 200px;
 }
 .nm-canvas-wrap canvas {
     position: absolute;
@@ -5728,3 +5728,278 @@ details[open] summary {
     width: 100% !important;
     height: 100% !important;
 }
+
+/* ════════════════════════════════════════════════════════════════
+   PANEL DE GESTIÓN DE DATASET
+   ════════════════════════════════════════════════════════════════ */
+
+.dm-catalog-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 0.8rem 0 1rem;
+    flex-wrap: wrap;
+}
+.dm-catalog-label {
+    color: #a0aec0;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+.dm-catalog-input-field {
+    flex: 1;
+    min-width: 180px;
+    max-width: 340px;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    color: #e2e8f0;
+    padding: 0.4rem 0.7rem;
+    font-size: 0.85rem;
+}
+.dm-catalog-input-field:focus {
+    outline: none;
+    border-color: #4299e1;
+}
+
+/* Sub-nav */
+.dm-subnav {
+    display: flex;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #334155;
+    padding-bottom: 0.5rem;
+}
+.dm-tab-btn {
+    background: transparent;
+    border: 1px solid #334155;
+    border-radius: 6px 6px 0 0;
+    color: #718096;
+    padding: 0.4rem 0.85rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.dm-tab-btn:hover  { background: #1e293b; color: #e2e8f0; }
+.dm-tab-btn.active {
+    background: #2d3748;
+    border-color: #4299e1;
+    border-bottom-color: #2d3748;
+    color: #63b3ed;
+    font-weight: 600;
+}
+
+/* Panels */
+.dm-panel { padding: 0.6rem 0; }
+
+.dm-hint {
+    color: #718096;
+    font-size: 0.85rem;
+    font-style: italic;
+    margin: 0.3rem 0 0.8rem;
+}
+
+/* Overview stats grid */
+.dm-overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.7rem;
+    margin-bottom: 1rem;
+}
+.dm-stat-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 0.7rem 1rem;
+    text-align: center;
+}
+.dm-stat-card .dm-stat-val {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #63b3ed;
+    line-height: 1.1;
+}
+.dm-stat-card .dm-stat-lbl {
+    font-size: 0.73rem;
+    color: #718096;
+    margin-top: 0.25rem;
+}
+
+/* Distribution table */
+.dm-dist-table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+.dm-dist-table th {
+    color: #718096; text-align: left; padding: 0.3rem 0.5rem;
+    border-bottom: 1px solid #334155; font-weight: 500;
+}
+.dm-dist-table td { padding: 0.3rem 0.5rem; border-bottom: 1px solid #1e293b; color: #e2e8f0; }
+.dm-dist-bar-cell { width: 40%; }
+.dm-dist-bar-wrap { background: #1e293b; border-radius: 4px; height: 8px; overflow: hidden; }
+.dm-dist-bar-fill { height: 100%; border-radius: 4px; background: #4299e1; transition: width 0.4s; }
+
+/* Filter bar */
+.dm-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.8rem;
+}
+.dm-filter-input {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    color: #e2e8f0;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.83rem;
+}
+.dm-filter-input:focus { outline: none; border-color: #4299e1; }
+.dm-filter-select {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    color: #e2e8f0;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.83rem;
+}
+.dm-check-label { color: #a0aec0; font-size: 0.82rem; display: flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+
+/* Inspector table */
+.dm-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.dm-table th {
+    color: #718096; text-align: left; padding: 0.35rem 0.6rem;
+    border-bottom: 1px solid #334155; font-weight: 500; position: sticky; top: 0; background: #0f172a;
+}
+.dm-table td { padding: 0.3rem 0.6rem; border-bottom: 1px solid #1e293b; color: #e2e8f0; }
+.dm-table tr:hover td { background: #1e293b; cursor: pointer; }
+.dm-table tr.dm-selected td { background: #1e3a5f; }
+
+/* Class badge */
+.dm-badge {
+    display: inline-block;
+    padding: 0.1rem 0.45rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    background: #2d3748;
+    color: #63b3ed;
+}
+
+/* Source badge */
+.dm-badge-disc { background: #4a1212; color: #fc8181; }
+.dm-badge-aug  { background: #14432a; color: #68d391; }
+
+/* Pager */
+.dm-pager {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.7rem;
+    flex-wrap: wrap;
+}
+.dm-pager button {
+    background: #1e293b; border: 1px solid #334155; color: #a0aec0;
+    padding: 0.25rem 0.6rem; border-radius: 5px; font-size: 0.8rem; cursor: pointer;
+}
+.dm-pager button:hover   { background: #2d3748; color: #e2e8f0; }
+.dm-pager button.active  { background: #2b4c7e; border-color: #4299e1; color: #90cdf4; }
+.dm-pager button:disabled { opacity: 0.4; cursor: default; }
+.dm-pager-info { color: #718096; font-size: 0.8rem; }
+
+/* Spectrum viewer */
+.dm-spectrum-viewer {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 0.8rem;
+    margin-top: 1rem;
+}
+.dm-sv-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 0.5rem;
+}
+.dm-sv-title { color: #90cdf4; font-size: 0.9rem; font-weight: 600; }
+.dm-sv-close {
+    background: transparent; border: none; color: #718096;
+    font-size: 1rem; cursor: pointer; padding: 0.1rem 0.4rem; border-radius: 4px;
+}
+.dm-sv-close:hover { background: #2d3748; color: #e2e8f0; }
+.dm-sv-meta { color: #718096; font-size: 0.78rem; margin-top: 0.5rem; line-height: 1.6; }
+#dmSvCanvas { position: absolute; top:0; left:0; width:100%!important; height:100%!important; }
+
+/* Action bar */
+.dm-action-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+.dm-sel-count { color: #a0aec0; font-size: 0.83rem; }
+
+/* Danger button */
+.btn-danger {
+    background: #c53030;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 0.45rem 1rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.btn-danger:hover { background: #e53e3e; }
+
+/* Form rows */
+.dm-form-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+.dm-form-group { display: flex; flex-direction: column; gap: 0.25rem; }
+.dm-form-label { color: #a0aec0; font-size: 0.8rem; }
+
+/* Message box */
+.dm-msg {
+    background: #1e293b;
+    border-left: 3px solid #4299e1;
+    border-radius: 4px;
+    padding: 0.5rem 0.8rem;
+    color: #e2e8f0;
+    font-size: 0.83rem;
+    line-height: 1.5;
+}
+.dm-msg.ok   { border-color: #48bb78; }
+.dm-msg.err  { border-color: #fc8181; }
+
+/* Augment preview table */
+.dm-aug-table { width: 100%; border-collapse: collapse; font-size: 0.83rem; margin-top: 0.5rem; }
+.dm-aug-table th {
+    color: #718096; text-align: left; padding: 0.3rem 0.5rem;
+    border-bottom: 1px solid #334155; font-weight: 500;
+}
+.dm-aug-table td { padding: 0.3rem 0.5rem; border-bottom: 1px solid #1e293b; color: #e2e8f0; }
+.dm-aug-table .aug-ok   { color: #48bb78; }
+.dm-aug-table .aug-warn { color: #f6ad55; }
+.dm-aug-summary {
+    margin-top: 0.8rem;
+    background: #1a2942;
+    border: 1px solid #2d4a6e;
+    border-radius: 6px;
+    padding: 0.6rem 0.9rem;
+    font-size: 0.83rem;
+    color: #90cdf4;
+    line-height: 1.8;
+}
+
+/* Quality table */
+.dm-quality-table { width: 100%; border-collapse: collapse; font-size: 0.81rem; }
+.dm-quality-table th {
+    color: #718096; text-align: left; padding: 0.3rem 0.5rem;
+    border-bottom: 1px solid #334155; font-weight: 500;
+}
+.dm-quality-table td { padding: 0.28rem 0.5rem; border-bottom: 1px solid #1e293b; color: #e2e8f0; }
+.dm-quality-ok   { color: #48bb78; font-weight: 600; }
+.dm-quality-warn { color: #f6ad55; }
+.dm-quality-err  { color: #fc8181; font-weight: 600; }

@@ -57,6 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupBatchProcessing();
     setupFitsExtractor();
     initPreambuloUpload();
+    dmSetupSubnav();
 });
 
 // ===========================
@@ -6671,4 +6672,590 @@ function _hmRenderLossChart(history) {
         ]},
         options: _chartDefaults(),
     });
+}
+
+
+// ════════════════════════════════════════════════════════════════════
+// PANEL DE GESTIÓN DE DATASET
+// ════════════════════════════════════════════════════════════════════
+
+let _dmPage         = 1;
+let _dmPerPage      = 25;
+let _dmTotalPages   = 1;
+let _dmAllFiles     = [];   // last inspector fetch
+let _dmCleanupFiles = [];   // for cleanup tab
+let _dmSvChart      = null; // spectrum viewer chart
+let _dmDistChart    = null; // distribution bar chart
+let _dmSelectedCleanup  = new Set();
+let _dmSelectedRestore  = new Set();
+
+// ── Sub-tab navigation ──────────────────────────────────────────────
+function dmSetupSubnav() {
+    document.querySelectorAll('.dm-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.dm-tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.dm-panel').forEach(p => p.style.display = 'none');
+            btn.classList.add('active');
+            const panel = document.getElementById(`dm-${btn.dataset.dmtab}`);
+            if (panel) panel.style.display = '';
+        });
+    });
+}
+
+function dmCatalog() {
+    return (document.getElementById('dmCatalogPath')?.value || 'data/elodie/').trim();
+}
+
+// ── Main load ───────────────────────────────────────────────────────
+async function dmLoadPanel() {
+    await dmLoadOverview();
+    await dmLoadInspector(1);
+    await dmLoadCleanup();
+    dmPopulateClassFilter();
+}
+
+// ── 1. VISTA GENERAL ───────────────────────────────────────────────
+async function dmLoadOverview() {
+    const content = document.getElementById('dmOverviewContent');
+    content.innerHTML = '<p class="dm-hint">Cargando…</p>';
+
+    const res  = await fetch(`/dataset/overview?catalog=${encodeURIComponent(dmCatalog())}`);
+    const data = await res.json();
+    if (data.error) { content.innerHTML = `<p class="dm-msg err">${data.error}</p>`; return; }
+
+    // Stats cards
+    const most = data.most_represented ? `${data.most_represented.class} (${data.most_represented.count})` : '—';
+    const least= data.least_represented? `${data.least_represented.class} (${data.least_represented.count})`: '—';
+
+    content.innerHTML = `
+        <div class="dm-overview-grid">
+            <div class="dm-stat-card"><div class="dm-stat-val">${data.total}</div><div class="dm-stat-lbl">Espectros activos</div></div>
+            <div class="dm-stat-card"><div class="dm-stat-val">${data.n_classes}</div><div class="dm-stat-lbl">Clases presentes</div></div>
+            <div class="dm-stat-card"><div class="dm-stat-val">${data.total_discarded}</div><div class="dm-stat-lbl">Descartados</div></div>
+            <div class="dm-stat-card"><div class="dm-stat-val">${data.total_augmented}</div><div class="dm-stat-lbl">Sintéticos</div></div>
+            <div class="dm-stat-card"><div class="dm-stat-val" style="font-size:1rem;">${most}</div><div class="dm-stat-lbl">Clase más grande</div></div>
+            <div class="dm-stat-card"><div class="dm-stat-val" style="font-size:1rem;color:#fc8181;">${least}</div><div class="dm-stat-lbl">Clase más pequeña</div></div>
+        </div>
+        <table class="dm-dist-table">
+            <thead><tr><th>Clase</th><th>Espectros</th><th>%</th><th class="dm-dist-bar-cell">Distribución</th></tr></thead>
+            <tbody>
+                ${data.distribution.map(d => `
+                <tr>
+                    <td><span class="dm-badge">${d.class}</span></td>
+                    <td>${d.count}</td>
+                    <td>${d.pct}%</td>
+                    <td class="dm-dist-bar-cell">
+                        <div class="dm-dist-bar-wrap">
+                            <div class="dm-dist-bar-fill" style="width:${d.pct}%"></div>
+                        </div>
+                    </td>
+                </tr>`).join('')}
+            </tbody>
+        </table>`;
+
+    // Bar chart
+    const wrap = document.getElementById('dmDistChartWrap');
+    wrap.style.display = '';
+    const canvas = document.getElementById('dmDistChart');
+    if (_dmDistChart) _dmDistChart.destroy();
+    _dmDistChart = new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels:   data.distribution.map(d => d.class),
+            datasets: [{
+                label: 'Espectros por clase',
+                data:  data.distribution.map(d => d.count),
+                backgroundColor: data.distribution.map((_, i) => `hsl(${200 + i*28},70%,55%)`),
+                borderRadius: 4,
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, animation: false,
+            plugins: { legend: { display: false },
+                       tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y} espectros` } } },
+            scales: {
+                x: { ticks: { color: '#a0aec0' }, grid: { color: '#1e293b' } },
+                y: { ticks: { color: '#a0aec0', stepSize: 1 }, grid: { color: '#2d3748' }, beginAtZero: true },
+            }
+        }
+    });
+}
+
+// ── 2. INSPECTOR ───────────────────────────────────────────────────
+async function dmLoadInspector(page) {
+    _dmPage = page;
+    const catalog    = dmCatalog();
+    const filterName = document.getElementById('dmFilterName')?.value || '';
+    const filterCls  = document.getElementById('dmFilterClass')?.value || '';
+    const inclDisc   = document.getElementById('dmIncDiscarded')?.checked ? 'true' : 'false';
+
+    const url = `/dataset/spectra?catalog=${encodeURIComponent(catalog)}`
+              + `&page=${page}&per_page=${_dmPerPage}`
+              + `&filter_name=${encodeURIComponent(filterName)}`
+              + `&filter_class=${encodeURIComponent(filterCls)}`
+              + `&include_discarded=${inclDisc}`;
+
+    const res  = await fetch(url);
+    const data = await res.json();
+    const wrap = document.getElementById('dmInspectorTable');
+    if (data.error) { wrap.innerHTML = `<p class="dm-msg err">${data.error}</p>`; return; }
+
+    _dmAllFiles   = data.files;
+    _dmTotalPages = data.pages;
+
+    wrap.innerHTML = `
+        <table class="dm-table">
+            <thead><tr>
+                <th>Archivo</th><th>Tipo</th><th>Clase</th><th>Tamaño</th><th>Fecha</th><th>Estado</th>
+            </tr></thead>
+            <tbody>
+                ${data.files.map(f => `
+                <tr onclick="dmViewSpectrum('${escHtml(f.filename)}','${f.source}')"
+                    title="Click para ver espectro">
+                    <td>${escHtml(f.filename)}</td>
+                    <td>${f.sptype}</td>
+                    <td><span class="dm-badge">${f.class}</span></td>
+                    <td>${f.size_kb} KB</td>
+                    <td>${f.mtime}</td>
+                    <td>${f.source === 'catalog' ? '' :
+                         f.source === '_descartados' ? '<span class="dm-badge dm-badge-disc">descartado</span>' :
+                         '<span class="dm-badge dm-badge-aug">sintético</span>'}</td>
+                </tr>`).join('')}
+            </tbody>
+        </table>
+        <p style="color:#718096;font-size:0.78rem;margin-top:0.4rem;">${data.total} resultado(s)</p>`;
+
+    dmRenderPager(data.total, page, data.pages, 'dmLoadInspector');
+}
+
+function dmInspectorSearch() { dmLoadInspector(1); }
+
+function dmRenderPager(total, page, pages, callbackFn) {
+    const pager = document.getElementById('dmInspectorPager');
+    if (!pager) return;
+    if (pages <= 1) { pager.innerHTML = ''; return; }
+    let html = `<button onclick="${callbackFn}(${page-1})" ${page<=1?'disabled':''}>‹ Ant.</button>`;
+    const start = Math.max(1, page - 2), end = Math.min(pages, page + 2);
+    for (let p = start; p <= end; p++) {
+        html += `<button class="${p===page?'active':''}" onclick="${callbackFn}(${p})">${p}</button>`;
+    }
+    html += `<button onclick="${callbackFn}(${page+1})" ${page>=pages?'disabled':''}>Sig. ›</button>`;
+    html += `<span class="dm-pager-info">Pág. ${page} / ${pages} · ${total} total</span>`;
+    pager.innerHTML = html;
+}
+
+async function dmViewSpectrum(filename, source) {
+    const viewer = document.getElementById('dmSpectrumViewer');
+    const title  = document.getElementById('dmSvTitle');
+    const meta   = document.getElementById('dmSvMeta');
+    viewer.style.display = '';
+    title.textContent = '⌛ Cargando…';
+    meta.textContent  = '';
+
+    const url = `/dataset/spectrum_data?catalog=${encodeURIComponent(dmCatalog())}`
+              + `&file=${encodeURIComponent(filename)}&source=${encodeURIComponent(source)}`;
+    const res  = await fetch(url);
+    const data = await res.json();
+    if (data.error) {
+        title.textContent = 'Error: ' + data.error;
+        return;
+    }
+
+    title.textContent = `${data.filename}  —  Tipo: ${data.sptype}`;
+    meta.innerHTML = `λ ${data.wave_min.toFixed(1)} – ${data.wave_max.toFixed(1)} Å &nbsp;|&nbsp; ${data.n_points} puntos`;
+
+    const canvas = document.getElementById('dmSvCanvas');
+    if (_dmSvChart) _dmSvChart.destroy();
+    _dmSvChart = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: { labels: data.wave,
+                datasets: [{ label: data.sptype, data: data.flux,
+                             borderColor: '#63b3ed', borderWidth: 1.2,
+                             pointRadius: 0, tension: 0 }] },
+        options: {
+            responsive: true, maintainAspectRatio: false, animation: false,
+            plugins: { legend: { display: false },
+                       tooltip: { callbacks: { label: ctx => ` flux: ${ctx.parsed.y.toFixed(4)}`,
+                                               title: ctx => `λ ${ctx[0].label} Å` } } },
+            scales: {
+                x: { ticks: { color: '#718096', maxTicksLimit: 8,
+                              callback: (v,i,a) => data.wave[i] ? data.wave[i].toFixed(0)+'Å' : '' },
+                     grid: { color: '#1e293b' } },
+                y: { ticks: { color: '#718096' }, grid: { color: '#2d3748' } },
+            }
+        }
+    });
+
+    // Also pre-fill reclassify tab
+    const reFile = document.getElementById('dmReFile');
+    const reSrc  = document.getElementById('dmReSource');
+    if (reFile) reFile.value = filename;
+    if (reSrc)  reSrc.value  = source === '_descartados' ? 'discarded' : 'catalog';
+}
+
+function dmCloseSpectrumViewer() {
+    document.getElementById('dmSpectrumViewer').style.display = 'none';
+    if (_dmSvChart) { _dmSvChart.destroy(); _dmSvChart = null; }
+}
+
+function dmPopulateClassFilter() {
+    fetch(`/dataset/overview?catalog=${encodeURIComponent(dmCatalog())}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) return;
+            const sel = document.getElementById('dmFilterClass');
+            if (!sel) return;
+            const current = sel.value;
+            sel.innerHTML = '<option value="">Todas las clases</option>'
+                + data.classes_present.map(c => `<option value="${c}">${c}</option>`).join('');
+            sel.value = current;
+        });
+}
+
+// ── 3. LIMPIEZA ─────────────────────────────────────────────────────
+async function dmLoadCleanup() {
+    _dmSelectedCleanup.clear();
+    _dmSelectedRestore.clear();
+    const res  = await fetch(`/dataset/spectra?catalog=${encodeURIComponent(dmCatalog())}&per_page=1000`);
+    const data = await res.json();
+    if (data.error) return;
+    _dmCleanupFiles = data.files;
+    dmRenderCleanupTable(_dmCleanupFiles);
+    await dmLoadDiscarded();
+}
+
+function dmCleanupFilter() {
+    const maxN = parseInt(document.getElementById('dmCleanupMaxN')?.value || '5');
+    // Group by class, keep only files whose class has <= maxN total spectra
+    const classCounts = {};
+    _dmCleanupFiles.forEach(f => { classCounts[f.class] = (classCounts[f.class]||0)+1; });
+    const filtered = _dmCleanupFiles.filter(f => classCounts[f.class] <= maxN);
+    dmRenderCleanupTable(filtered);
+}
+
+function dmCleanupShowAll() {
+    dmRenderCleanupTable(_dmCleanupFiles);
+}
+
+function dmRenderCleanupTable(files) {
+    _dmSelectedCleanup.clear();
+    const wrap = document.getElementById('dmCleanupTable');
+    const actions = document.getElementById('dmCleanupActions');
+    if (!files.length) {
+        wrap.innerHTML = '<p class="dm-hint">No hay espectros que mostrar.</p>';
+        actions.style.display = 'none'; return;
+    }
+    wrap.innerHTML = `
+        <table class="dm-table">
+            <thead><tr>
+                <th><input type="checkbox" id="dmCleanupCheckAll" onchange="dmCleanupToggleAll(this)"></th>
+                <th>Archivo</th><th>Tipo</th><th>Clase</th><th>Tamaño</th>
+            </tr></thead>
+            <tbody>
+                ${files.map(f => `
+                <tr>
+                    <td><input type="checkbox" class="dm-cleanup-chk" value="${escHtml(f.filename)}"
+                               onchange="dmCleanupCheckChange(this)"></td>
+                    <td onclick="dmViewSpectrum('${escHtml(f.filename)}','catalog')" style="cursor:pointer;color:#90cdf4;">
+                        ${escHtml(f.filename)}</td>
+                    <td>${f.sptype}</td>
+                    <td><span class="dm-badge">${f.class}</span></td>
+                    <td>${f.size_kb} KB</td>
+                </tr>`).join('')}
+            </tbody>
+        </table>`;
+    actions.style.display = 'none';
+}
+
+function dmCleanupToggleAll(chk) {
+    document.querySelectorAll('.dm-cleanup-chk').forEach(c => {
+        c.checked = chk.checked;
+        if (chk.checked) _dmSelectedCleanup.add(c.value);
+        else             _dmSelectedCleanup.delete(c.value);
+    });
+    dmUpdateCleanupActions();
+}
+
+function dmCleanupCheckChange(chk) {
+    if (chk.checked) _dmSelectedCleanup.add(chk.value);
+    else             _dmSelectedCleanup.delete(chk.value);
+    dmUpdateCleanupActions();
+}
+
+function dmUpdateCleanupActions() {
+    const n = _dmSelectedCleanup.size;
+    document.getElementById('dmCleanupSelCount').textContent = `${n} seleccionado${n!==1?'s':''}`;
+    document.getElementById('dmCleanupActions').style.display = n > 0 ? '' : 'none';
+}
+
+async function dmDiscardSelected() {
+    if (!_dmSelectedCleanup.size) return;
+    const files = [..._dmSelectedCleanup];
+    const res   = await fetch('/dataset/discard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ catalog: dmCatalog(), files }),
+    });
+    const data = await res.json();
+    const msg = data.error ? `❌ ${data.error}` :
+        `✅ ${data.count} archivo(s) movido(s) a _descartados/${data.errors.length ? '. Errores: '+data.errors.join(', ') : ''}`;
+    showToast(msg);
+    await dmLoadCleanup();
+    await dmLoadOverview();
+}
+
+async function dmLoadDiscarded() {
+    _dmSelectedRestore.clear();
+    const res  = await fetch(`/dataset/spectra?catalog=${encodeURIComponent(dmCatalog())}&include_discarded=true&per_page=1000`);
+    const data = await res.json();
+    if (data.error) return;
+    const discarded = data.files.filter(f => f.source === '_descartados');
+    const section   = document.getElementById('dmDiscardedSection');
+    section.style.display = discarded.length ? '' : 'none';
+    if (!discarded.length) return;
+
+    document.getElementById('dmDiscardedTable').innerHTML = `
+        <table class="dm-table">
+            <thead><tr>
+                <th><input type="checkbox" id="dmRestoreCheckAll" onchange="dmRestoreToggleAll(this)"></th>
+                <th>Archivo</th><th>Tipo</th><th>Clase</th>
+            </tr></thead>
+            <tbody>
+                ${discarded.map(f => `
+                <tr>
+                    <td><input type="checkbox" class="dm-restore-chk" value="${escHtml(f.filename)}"
+                               onchange="dmRestoreCheckChange(this)"></td>
+                    <td onclick="dmViewSpectrum('${escHtml(f.filename)}','_descartados')" style="cursor:pointer;color:#fc8181;">
+                        ${escHtml(f.filename)}</td>
+                    <td>${f.sptype}</td>
+                    <td><span class="dm-badge">${f.class}</span></td>
+                </tr>`).join('')}
+            </tbody>
+        </table>`;
+}
+
+function dmRestoreToggleAll(chk) {
+    document.querySelectorAll('.dm-restore-chk').forEach(c => {
+        c.checked = chk.checked;
+        if (chk.checked) _dmSelectedRestore.add(c.value);
+        else             _dmSelectedRestore.delete(c.value);
+    });
+    dmUpdateRestoreActions();
+}
+
+function dmRestoreCheckChange(chk) {
+    if (chk.checked) _dmSelectedRestore.add(chk.value);
+    else             _dmSelectedRestore.delete(chk.value);
+    dmUpdateRestoreActions();
+}
+
+function dmUpdateRestoreActions() {
+    const n = _dmSelectedRestore.size;
+    document.getElementById('dmRestoreSelCount').textContent = `${n} seleccionado${n!==1?'s':''}`;
+    document.getElementById('dmRestoreActions').style.display = n > 0 ? '' : 'none';
+}
+
+async function dmRestoreSelected() {
+    if (!_dmSelectedRestore.size) return;
+    const res  = await fetch('/dataset/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ catalog: dmCatalog(), files: [..._dmSelectedRestore] }),
+    });
+    const data = await res.json();
+    const msg = data.error ? `❌ ${data.error}` :
+        `✅ ${data.count} archivo(s) restaurado(s)${data.errors.length ? '. Errores: '+data.errors.join(', ') : ''}`;
+    showToast(msg);
+    await dmLoadCleanup();
+    await dmLoadOverview();
+}
+
+// ── 4. RECLASIFICAR ─────────────────────────────────────────────────
+async function dmDoReclassify() {
+    const file      = document.getElementById('dmReFile')?.value.trim();
+    const newSptype = document.getElementById('dmReNewSptype')?.value.trim();
+    const source    = document.getElementById('dmReSource')?.value || 'catalog';
+    const resultEl  = document.getElementById('dmReResult');
+
+    if (!file || !newSptype) {
+        resultEl.className = 'dm-msg err';
+        resultEl.textContent = 'Completá el nombre de archivo y el nuevo tipo espectral.';
+        return;
+    }
+
+    const res  = await fetch('/dataset/reclassify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ catalog: dmCatalog(), file, new_sptype: newSptype, source }),
+    });
+    const data = await res.json();
+
+    if (data.error) {
+        resultEl.className = 'dm-msg err';
+        resultEl.textContent = `❌ ${data.error}`;
+    } else {
+        resultEl.className = 'dm-msg ok';
+        resultEl.innerHTML = `✅ Renombrado:<br>
+            <code>${escHtml(data.old_filename)}</code><br>→ <code>${escHtml(data.new_filename)}</code>`;
+        document.getElementById('dmReFile').value = '';
+        await dmLoadInspector(1);
+        await dmLoadCleanup();
+        await dmLoadOverview();
+        dmPopulateClassFilter();
+    }
+}
+
+// ── 5. COMPENSACIÓN ─────────────────────────────────────────────────
+async function dmAugPreview() {
+    const target   = document.getElementById('dmAugTarget')?.value;
+    const maxRatio = document.getElementById('dmAugMaxRatio')?.value || 5;
+    const noise    = document.getElementById('dmAugNoise')?.value || 0.015;
+
+    const res  = await fetch('/dataset/augment_preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            catalog: dmCatalog(),
+            target_per_class: target ? parseInt(target) : null,
+            max_augment_ratio: parseInt(maxRatio),
+        }),
+    });
+    const data = await res.json();
+    const wrap = document.getElementById('dmAugPreviewTable');
+    const applyBtn = document.getElementById('dmAugApplyBtn');
+
+    if (data.error) {
+        wrap.innerHTML = `<p class="dm-msg err">${data.error}</p>`;
+        applyBtn.style.display = 'none'; return;
+    }
+
+    const rows = data.preview.map(p => `
+        <tr>
+            <td><span class="dm-badge">${p.class}</span></td>
+            <td>${p.original}</td>
+            <td class="${p.synthetic > 0 ? 'aug-warn' : 'aug-ok'}">${p.synthetic > 0 ? '+'+p.synthetic : '—'}</td>
+            <td class="${p.capped ? 'aug-warn' : ''}">${p.total}${p.capped ? ' ⚠️' : ''}</td>
+        </tr>`).join('');
+
+    wrap.innerHTML = `
+        <table class="dm-aug-table">
+            <thead><tr><th>Clase</th><th>Original</th><th>Sintéticos</th><th>Total</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table>
+        <div class="dm-aug-summary">
+            Target por clase: <strong>${data.target_per_class}</strong>
+            (mediana del dataset: ${data.median_count})<br>
+            Sintéticos a generar: <strong>${data.total_synthetic}</strong> &nbsp;|&nbsp;
+            Total tras augmentación: <strong>${data.total_after}</strong>
+            ${data.preview.some(p=>p.capped) ? '<br>⚠️ Algunas clases limitadas por el multiplicador máximo.' : ''}
+        </div>`;
+
+    applyBtn.style.display = data.total_synthetic > 0 ? '' : 'none';
+    document.getElementById('dmAugResult').textContent = '';
+}
+
+async function dmAugApply() {
+    const target   = document.getElementById('dmAugTarget')?.value;
+    const maxRatio = document.getElementById('dmAugMaxRatio')?.value || 5;
+    const noise    = parseFloat(document.getElementById('dmAugNoise')?.value || 0.015);
+    const resultEl = document.getElementById('dmAugResult');
+    resultEl.className = 'dm-msg';
+    resultEl.textContent = '⌛ Generando espectros sintéticos…';
+
+    const res  = await fetch('/dataset/augment_apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            catalog: dmCatalog(),
+            target_per_class: target ? parseInt(target) : null,
+            max_augment_ratio: parseInt(maxRatio),
+            noise_factor: noise,
+        }),
+    });
+    const data = await res.json();
+
+    if (data.error) {
+        resultEl.className = 'dm-msg err';
+        resultEl.textContent = `❌ ${data.error}`;
+    } else {
+        resultEl.className = 'dm-msg ok';
+        resultEl.innerHTML = `✅ ${data.generated} espectros sintéticos generados en <code>${data.aug_dir}</code>`;
+        await dmLoadOverview();
+    }
+}
+
+// ── 6. CALIDAD ──────────────────────────────────────────────────────
+async function dmRunQuality() {
+    const btn = document.getElementById('dmQualityBtn');
+    const res_el = document.getElementById('dmQualityResult');
+    btn.disabled = true;
+    btn.textContent = '⌛ Analizando…';
+    res_el.innerHTML = '';
+
+    const res  = await fetch(`/dataset/quality?catalog=${encodeURIComponent(dmCatalog())}`);
+    const data = await res.json();
+    btn.disabled = false;
+    btn.textContent = '🔬 Analizar calidad';
+
+    if (data.error) { res_el.innerHTML = `<p class="dm-msg err">${data.error}</p>`; return; }
+
+    const rows = data.results.map(r => {
+        const issues = r.issues.length ? r.issues.join(', ') : '—';
+        const snr    = r.snr_est != null ? r.snr_est : '—';
+        const cls    = r.ok ? 'dm-quality-ok' : (r.issues.some(i=>i.startsWith('error')) ? 'dm-quality-err' : 'dm-quality-warn');
+        return `<tr>
+            <td>${r.ok ? '✅' : '⚠️'}</td>
+            <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                title="${escHtml(r.filename)}">${escHtml(r.filename)}</td>
+            <td><span class="dm-badge">${r.class}</span></td>
+            <td>${r.n_points || '—'}</td>
+            <td>${snr}</td>
+            <td class="${cls}">${issues}</td>
+        </tr>`;
+    }).join('');
+
+    res_el.innerHTML = `
+        <div class="dm-aug-summary" style="margin-bottom:0.8rem;">
+            Total: ${data.total} &nbsp;|&nbsp;
+            <span style="color:#48bb78;">✅ OK: ${data.ok}</span> &nbsp;|&nbsp;
+            <span style="color:#f6ad55;">⚠️ Con problemas: ${data.with_issues}</span>
+        </div>
+        <table class="dm-quality-table">
+            <thead><tr><th></th><th>Archivo</th><th>Clase</th><th>Puntos</th><th>SNR est.</th><th>Problemas</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table>`;
+}
+
+// ── 7. EXPORTAR ─────────────────────────────────────────────────────
+function dmExport(fmt) {
+    const catalog = dmCatalog();
+    const info = document.getElementById('dmExportInfo');
+    info.className = 'dm-msg ok';
+    info.textContent = `⌛ Generando ${fmt.toUpperCase()}…`;
+    const url = `/dataset/export?catalog=${encodeURIComponent(catalog)}&format=${fmt}`;
+    // Trigger download
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dataset_export.${fmt}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => { info.textContent = `✅ Descarga iniciada (${fmt.toUpperCase()})`; }, 400);
+}
+
+// ── Utility ──────────────────────────────────────────────────────────
+function escHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg) {
+    // If there's already a toast function in the codebase reuse it, else simple alert
+    if (typeof window._showToast === 'function') { window._showToast(msg); return; }
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;bottom:1.5rem;right:1.5rem;background:#2d3748;color:#e2e8f0;'
+        + 'padding:0.7rem 1.2rem;border-radius:8px;font-size:0.85rem;z-index:9999;'
+        + 'border-left:4px solid #48bb78;max-width:360px;line-height:1.5;';
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3500);
 }

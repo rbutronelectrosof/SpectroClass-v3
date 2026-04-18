@@ -675,6 +675,184 @@
                     </div>
 
                 </div>
+
+                <div class="batch-container">
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <!-- PANEL DE GESTIÓN DE DATASET                        -->
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <hr style="border-color:#334155;margin:2rem 0;">
+
+                    <div class="label-with-help" style="justify-content:center;margin-bottom:0.5rem;">
+                        <h2 style="margin:0;">🗄️ Gestión de Dataset</h2>
+                    </div>
+                    <p class="batch-description">Inspecciona, limpia, reclasifica y mejora tu conjunto de datos de entrenamiento</p>
+
+                    <!-- Selector de catálogo -->
+                    <div class="dm-catalog-bar">
+                        <label class="dm-catalog-label">Catálogo:</label>
+                        <input type="text" id="dmCatalogPath" value="data/elodie/"
+                               class="dm-catalog-input-field" placeholder="data/elodie/">
+                        <button class="btn-secondary" onclick="dmLoadPanel()" style="padding:0.4rem 0.9rem;font-size:0.85rem;">
+                            🔄 Cargar
+                        </button>
+                    </div>
+
+                    <!-- Sub-tab navigation -->
+                    <nav class="dm-subnav" id="dmSubnav">
+                        <button class="dm-tab-btn active" data-dmtab="overview">📊 Vista General</button>
+                        <button class="dm-tab-btn" data-dmtab="inspector">🔍 Inspector</button>
+                        <button class="dm-tab-btn" data-dmtab="cleanup">🗑️ Limpieza</button>
+                        <button class="dm-tab-btn" data-dmtab="reclassify">🏷️ Reclasificar</button>
+                        <button class="dm-tab-btn" data-dmtab="augment">⚖️ Compensación</button>
+                        <button class="dm-tab-btn" data-dmtab="quality">🔬 Calidad</button>
+                        <button class="dm-tab-btn" data-dmtab="export">📤 Exportar</button>
+                    </nav>
+
+                    <!-- ── 1. VISTA GENERAL ── -->
+                    <div id="dm-overview" class="dm-panel active">
+                        <div id="dmOverviewContent">
+                            <p class="dm-hint">Haz clic en <strong>Cargar</strong> para escanear el catálogo.</p>
+                        </div>
+                        <!-- Gráfico de distribución -->
+                        <div id="dmDistChartWrap" style="display:none; position:relative; height:220px; margin-top:1rem;">
+                            <canvas id="dmDistChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- ── 2. INSPECTOR ── -->
+                    <div id="dm-inspector" class="dm-panel" style="display:none;">
+                        <!-- Filtros -->
+                        <div class="dm-filter-bar">
+                            <input type="text" id="dmFilterName" placeholder="Buscar por nombre…"
+                                   oninput="dmInspectorSearch()" class="dm-filter-input">
+                            <select id="dmFilterClass" onchange="dmInspectorSearch()" class="dm-filter-select">
+                                <option value="">Todas las clases</option>
+                            </select>
+                            <label class="dm-check-label">
+                                <input type="checkbox" id="dmIncDiscarded" onchange="dmInspectorSearch()">
+                                Incluir descartados
+                            </label>
+                        </div>
+                        <div id="dmInspectorTable"></div>
+                        <div id="dmInspectorPager" class="dm-pager"></div>
+                        <!-- Vista de espectro -->
+                        <div id="dmSpectrumViewer" class="dm-spectrum-viewer" style="display:none;">
+                            <div class="dm-sv-header">
+                                <span id="dmSvTitle" class="dm-sv-title"></span>
+                                <button class="dm-sv-close" onclick="dmCloseSpectrumViewer()">✕</button>
+                            </div>
+                            <div style="position:relative;height:220px;">
+                                <canvas id="dmSvCanvas"></canvas>
+                            </div>
+                            <div id="dmSvMeta" class="dm-sv-meta"></div>
+                        </div>
+                    </div>
+
+                    <!-- ── 3. LIMPIEZA ── -->
+                    <div id="dm-cleanup" class="dm-panel" style="display:none;">
+                        <div class="dm-filter-bar">
+                            <label style="color:#a0aec0;font-size:0.85rem;">Mostrar clases con menos de</label>
+                            <input type="number" id="dmCleanupMaxN" value="5" min="1" max="9999"
+                                   class="dm-filter-input" style="width:70px;" oninput="dmCleanupFilter()">
+                            <label style="color:#a0aec0;font-size:0.85rem;">espectros</label>
+                            <button class="btn-secondary" onclick="dmCleanupFilter()" style="padding:0.3rem 0.8rem;font-size:0.82rem;">
+                                Filtrar
+                            </button>
+                            <button class="btn-secondary" onclick="dmCleanupShowAll()" style="padding:0.3rem 0.8rem;font-size:0.82rem;">
+                                Mostrar todos
+                            </button>
+                        </div>
+                        <div id="dmCleanupTable"></div>
+                        <div id="dmCleanupActions" class="dm-action-bar" style="display:none;">
+                            <span id="dmCleanupSelCount" class="dm-sel-count">0 seleccionados</span>
+                            <button class="btn-danger" onclick="dmDiscardSelected()">🗑️ Mover a _descartados/</button>
+                        </div>
+                        <!-- Archivos descartados -->
+                        <div id="dmDiscardedSection" style="margin-top:1.5rem; display:none;">
+                            <h4 style="color:#fc8181;margin-bottom:0.5rem;">📂 Archivos en _descartados/</h4>
+                            <div id="dmDiscardedTable"></div>
+                            <div id="dmRestoreActions" class="dm-action-bar" style="display:none; margin-top:0.5rem;">
+                                <span id="dmRestoreSelCount" class="dm-sel-count">0 seleccionados</span>
+                                <button class="btn-secondary" onclick="dmRestoreSelected()">♻️ Restaurar al catálogo</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ── 4. RECLASIFICAR ── -->
+                    <div id="dm-reclassify" class="dm-panel" style="display:none;">
+                        <p class="dm-hint">Selecciona un espectro del inspector, o escribe el nombre del archivo.</p>
+                        <div class="dm-form-row">
+                            <label class="dm-form-label">Archivo:</label>
+                            <input type="text" id="dmReFile" class="dm-filter-input"
+                                   placeholder="HD000108_tipoO6pe.txt" style="flex:1;">
+                            <select id="dmReSource" class="dm-filter-select">
+                                <option value="catalog">Catálogo</option>
+                                <option value="discarded">Descartados</option>
+                            </select>
+                        </div>
+                        <div class="dm-form-row" style="margin-top:0.6rem;">
+                            <label class="dm-form-label">Nuevo tipo:</label>
+                            <input type="text" id="dmReNewSptype" class="dm-filter-input"
+                                   placeholder="Ej: B3V, A0, K5III" style="width:140px;">
+                            <button class="btn-primary" onclick="dmDoReclassify()" style="padding:0.4rem 1rem;">
+                                Renombrar
+                            </button>
+                        </div>
+                        <div id="dmReResult" class="dm-msg" style="margin-top:0.8rem;"></div>
+                        <!-- Lista rápida del catálogo -->
+                        <div id="dmReList" style="margin-top:1rem;"></div>
+                    </div>
+
+                    <!-- ── 5. COMPENSACIÓN (AUGMENTACIÓN) ── -->
+                    <div id="dm-augment" class="dm-panel" style="display:none;">
+                        <div class="dm-form-row" style="flex-wrap:wrap;gap:0.8rem;">
+                            <div class="dm-form-group">
+                                <label class="dm-form-label">Target por clase</label>
+                                <input type="number" id="dmAugTarget" class="dm-filter-input"
+                                       placeholder="Auto (mediana)" min="1" style="width:140px;">
+                            </div>
+                            <div class="dm-form-group">
+                                <label class="dm-form-label">Multiplicador máx.</label>
+                                <input type="number" id="dmAugMaxRatio" value="5" min="1" max="20"
+                                       class="dm-filter-input" style="width:90px;">
+                            </div>
+                            <div class="dm-form-group">
+                                <label class="dm-form-label">Factor de ruido</label>
+                                <input type="number" id="dmAugNoise" value="0.015" min="0.001" max="0.2"
+                                       step="0.001" class="dm-filter-input" style="width:100px;">
+                            </div>
+                        </div>
+                        <div class="dm-action-bar" style="margin-top:0.8rem;">
+                            <button class="btn-secondary" onclick="dmAugPreview()">👁️ Vista previa</button>
+                            <button class="btn-primary"   onclick="dmAugApply()" id="dmAugApplyBtn" style="display:none;">
+                                ⚡ Generar sintéticos
+                            </button>
+                        </div>
+                        <div id="dmAugPreviewTable" style="margin-top:1rem;"></div>
+                        <div id="dmAugResult" class="dm-msg" style="margin-top:0.6rem;"></div>
+                    </div>
+
+                    <!-- ── 6. CALIDAD ── -->
+                    <div id="dm-quality" class="dm-panel" style="display:none;">
+                        <div class="dm-action-bar">
+                            <button class="btn-primary" onclick="dmRunQuality()" id="dmQualityBtn">
+                                🔬 Analizar calidad
+                            </button>
+                        </div>
+                        <div id="dmQualityResult" style="margin-top:1rem;"></div>
+                    </div>
+
+                    <!-- ── 7. EXPORTAR ── -->
+                    <div id="dm-export" class="dm-panel" style="display:none;">
+                        <p class="dm-hint">Genera un resumen del dataset: archivos activos, descartados y augmentados.</p>
+                        <div class="dm-action-bar" style="gap:0.8rem;">
+                            <button class="btn-primary" onclick="dmExport('csv')">📥 Exportar CSV</button>
+                            <button class="btn-secondary" onclick="dmExport('json')">📄 Exportar JSON</button>
+                        </div>
+                        <div id="dmExportInfo" class="dm-msg" style="margin-top:0.8rem;"></div>
+                    </div>
+
+                </div><!-- /batch-container -->
             </section>
 
             <!-- TAB 3: HERRAMIENTAS -->

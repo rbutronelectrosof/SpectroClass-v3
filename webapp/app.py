@@ -2842,6 +2842,487 @@ def normalizacion_ajustar_smooth():
 
 # ──────────────────────────────────────────────────────────────────────────
 
+# ============================================================================
+# PANEL DE GESTIÓN DE DATASET
+# ============================================================================
+
+import re as _re_dm
+from collections import Counter, defaultdict
+
+def _dm_project_root():
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+def _dm_resolve_catalog(catalog):
+    """Resolve catalog to absolute path, raising ValueError if not a directory."""
+    root = _dm_project_root()
+    path = catalog if os.path.isabs(catalog) else os.path.join(root, catalog)
+    return os.path.normpath(path)
+
+def _dm_extract_sptype(filename):
+    """Extract full sptype string from filename (e.g. 'O6pe', 'B3V', 'A5')."""
+    m = _re_dm.search(r'_tipo_?([A-Za-z][a-zA-Z0-9\-]*)', filename, _re_dm.IGNORECASE)
+    return m.group(1).upper() if m else '?'
+
+def _dm_main_class(sptype):
+    """Return first letter of sptype as main class."""
+    return sptype[0].upper() if sptype and sptype != '?' else '?'
+
+def _dm_scan_files(catalog_dir, subdir=None):
+    """Return list of file-info dicts from catalog_dir (or a subdir of it)."""
+    scan_dir = os.path.join(catalog_dir, subdir) if subdir else catalog_dir
+    if not os.path.isdir(scan_dir):
+        return []
+    result = []
+    for f in sorted(os.listdir(scan_dir)):
+        if not f.endswith('.txt'):
+            continue
+        fpath = os.path.join(scan_dir, f)
+        sptype = _dm_extract_sptype(f)
+        result.append({
+            'filename': f,
+            'sptype':   sptype,
+            'class':    _dm_main_class(sptype),
+            'size_kb':  round(os.path.getsize(fpath) / 1024, 1),
+            'mtime':    datetime.fromtimestamp(os.path.getmtime(fpath)).strftime('%Y-%m-%d'),
+            'source':   subdir if subdir else 'catalog',
+        })
+    return result
+
+
+@app.route('/dataset/overview')
+def dataset_overview():
+    catalog = request.args.get('catalog', 'data/elodie/')
+    try:
+        cdir = _dm_resolve_catalog(catalog)
+        if not os.path.isdir(cdir):
+            return jsonify({'error': f'Catálogo no encontrado: {catalog}'}), 404
+
+        files      = _dm_scan_files(cdir)
+        discarded  = _dm_scan_files(cdir, '_descartados')
+        augmented  = _dm_scan_files(cdir, '_augmented')
+
+        class_counts = Counter(f['class'] for f in files)
+        total = len(files)
+        distribution = sorted(
+            [{'class': cls, 'count': cnt,
+              'pct': round(cnt / total * 100, 1) if total else 0}
+             for cls, cnt in class_counts.items()],
+            key=lambda x: x['class']
+        )
+        max_cls = max(class_counts, key=class_counts.get) if class_counts else None
+        min_cls = min(class_counts, key=class_counts.get) if class_counts else None
+
+        return jsonify({
+            'total':            total,
+            'total_discarded':  len(discarded),
+            'total_augmented':  len(augmented),
+            'n_classes':        len(class_counts),
+            'classes_present':  sorted(class_counts.keys()),
+            'most_represented': {'class': max_cls, 'count': class_counts.get(max_cls, 0)} if max_cls else None,
+            'least_represented':{'class': min_cls, 'count': class_counts.get(min_cls, 0)} if min_cls else None,
+            'distribution':     distribution,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/dataset/spectra')
+def dataset_spectra():
+    catalog           = request.args.get('catalog', 'data/elodie/')
+    page              = max(1, int(request.args.get('page', 1)))
+    per_page          = min(100, max(5, int(request.args.get('per_page', 25))))
+    filter_class      = request.args.get('filter_class', '').upper().strip()
+    filter_name       = request.args.get('filter_name', '').strip().lower()
+    include_discarded = request.args.get('include_discarded', 'false').lower() == 'true'
+
+    try:
+        cdir = _dm_resolve_catalog(catalog)
+        if not os.path.isdir(cdir):
+            return jsonify({'error': f'Catálogo no encontrado: {catalog}'}), 404
+
+        files = _dm_scan_files(cdir)
+        if include_discarded:
+            disc = _dm_scan_files(cdir, '_descartados')
+            files.extend(disc)
+
+        if filter_class:
+            files = [f for f in files if f['class'] == filter_class or f['sptype'].startswith(filter_class)]
+        if filter_name:
+            files = [f for f in files if filter_name in f['filename'].lower()]
+
+        total     = len(files)
+        start     = (page - 1) * per_page
+        page_data = files[start: start + per_page]
+
+        return jsonify({
+            'total':    total,
+            'page':     page,
+            'per_page': per_page,
+            'pages':    max(1, (total + per_page - 1) // per_page),
+            'files':    page_data,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/dataset/spectrum_data')
+def dataset_spectrum_data():
+    catalog  = request.args.get('catalog', 'data/elodie/')
+    filename = request.args.get('file', '')
+    source   = request.args.get('source', 'catalog')
+
+    if not filename or '..' in filename or '/' in filename or '\\' in filename:
+        return jsonify({'error': 'Nombre de archivo inválido'}), 400
+
+    try:
+        cdir = _dm_resolve_catalog(catalog)
+        subdir_map = {'discarded': '_descartados', 'augmented': '_augmented'}
+        sub = subdir_map.get(source, '')
+        fpath = os.path.join(cdir, sub, filename) if sub else os.path.join(cdir, filename)
+
+        if not os.path.isfile(fpath):
+            return jsonify({'error': f'Archivo no encontrado: {filename}'}), 404
+
+        wavelengths, flux, _, _ = load_spectrum_file(fpath)
+
+        # Downsample for plot performance
+        if len(wavelengths) > 2000:
+            step = len(wavelengths) // 2000
+            wavelengths = wavelengths[::step]
+            flux        = flux[::step]
+
+        return jsonify({
+            'filename': filename,
+            'sptype':   _dm_extract_sptype(filename),
+            'wave':     [round(float(w), 2) for w in wavelengths],
+            'flux':     [round(float(v), 6) for v in flux],
+            'wave_min': float(wavelengths.min()),
+            'wave_max': float(wavelengths.max()),
+            'n_points': len(wavelengths),
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/dataset/discard', methods=['POST'])
+def dataset_discard():
+    data    = request.json or {}
+    catalog = data.get('catalog', 'data/elodie/')
+    files   = data.get('files', [])
+    if not files:
+        return jsonify({'error': 'No se especificaron archivos'}), 400
+    try:
+        cdir     = _dm_resolve_catalog(catalog)
+        disc_dir = os.path.join(cdir, '_descartados')
+        os.makedirs(disc_dir, exist_ok=True)
+        moved, errors = [], []
+        for fname in files:
+            if '..' in fname or '/' in fname or '\\' in fname:
+                errors.append(f'{fname}: nombre inválido'); continue
+            src = os.path.join(cdir, fname)
+            dst = os.path.join(disc_dir, fname)
+            if not os.path.isfile(src):
+                errors.append(f'{fname}: no encontrado'); continue
+            if os.path.exists(dst):
+                base, ext = os.path.splitext(fname)
+                dst = os.path.join(disc_dir, f'{base}_dup{int(os.path.getmtime(src))}{ext}')
+            os.rename(src, dst)
+            moved.append(fname)
+        return jsonify({'moved': moved, 'errors': errors, 'count': len(moved)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/dataset/restore', methods=['POST'])
+def dataset_restore():
+    data    = request.json or {}
+    catalog = data.get('catalog', 'data/elodie/')
+    files   = data.get('files', [])
+    if not files:
+        return jsonify({'error': 'No se especificaron archivos'}), 400
+    try:
+        cdir     = _dm_resolve_catalog(catalog)
+        disc_dir = os.path.join(cdir, '_descartados')
+        moved, errors = [], []
+        for fname in files:
+            if '..' in fname or '/' in fname or '\\' in fname:
+                errors.append(f'{fname}: nombre inválido'); continue
+            src = os.path.join(disc_dir, fname)
+            dst = os.path.join(cdir, fname)
+            if not os.path.isfile(src):
+                errors.append(f'{fname}: no en _descartados/'); continue
+            if os.path.exists(dst):
+                errors.append(f'{fname}: ya existe en catálogo'); continue
+            os.rename(src, dst)
+            moved.append(fname)
+        return jsonify({'moved': moved, 'errors': errors, 'count': len(moved)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/dataset/reclassify', methods=['POST'])
+def dataset_reclassify():
+    data      = request.json or {}
+    catalog   = data.get('catalog', 'data/elodie/')
+    filename  = data.get('file', '')
+    new_sptype = data.get('new_sptype', '').strip()
+    source    = data.get('source', 'catalog')
+
+    if not filename or '..' in filename or '/' in filename or '\\' in filename:
+        return jsonify({'error': 'Nombre de archivo inválido'}), 400
+    if not new_sptype:
+        return jsonify({'error': 'Nuevo tipo espectral requerido'}), 400
+
+    new_sptype_safe = _re_dm.sub(r'[^A-Za-z0-9]', '', new_sptype)[:12]
+    if not new_sptype_safe:
+        return jsonify({'error': 'Tipo espectral inválido (use letras y números)'}), 400
+
+    try:
+        cdir   = _dm_resolve_catalog(catalog)
+        fdir   = os.path.join(cdir, '_descartados') if source == 'discarded' else cdir
+        src    = os.path.join(fdir, filename)
+        if not os.path.isfile(src):
+            return jsonify({'error': f'Archivo no encontrado: {filename}'}), 404
+
+        # Replace _tipo<sptype> part in filename
+        m = _re_dm.search(r'(_tipo_?)([A-Za-z][a-zA-Z0-9\-]*)(\.(txt|fit|fits)$)',
+                          filename, _re_dm.IGNORECASE)
+        if m:
+            new_filename = filename[:m.start(1)] + m.group(1) + new_sptype_safe + m.group(3)
+        else:
+            base, ext = os.path.splitext(filename)
+            new_filename = f'{base}_tipo{new_sptype_safe}{ext}'
+
+        dst = os.path.join(fdir, new_filename)
+        if os.path.exists(dst):
+            return jsonify({'error': f'Ya existe un archivo con ese nombre: {new_filename}'}), 409
+
+        os.rename(src, dst)
+        return jsonify({'old_filename': filename, 'new_filename': new_filename,
+                        'new_sptype': new_sptype_safe})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/dataset/quality')
+def dataset_quality():
+    catalog = request.args.get('catalog', 'data/elodie/')
+    try:
+        cdir = _dm_resolve_catalog(catalog)
+        if not os.path.isdir(cdir):
+            return jsonify({'error': f'Catálogo no encontrado: {catalog}'}), 404
+
+        files   = _dm_scan_files(cdir)
+        results = []
+
+        for fi in files:
+            fpath  = os.path.join(cdir, fi['filename'])
+            issues = []
+            stats  = {}
+            try:
+                wave, flux, _, _ = load_spectrum_file(fpath)
+
+                flux_max  = float(np.max(np.abs(flux)))
+                flux_mean = float(np.mean(flux))
+
+                if flux_max < 1e-10:
+                    issues.append('flujo_cero')
+                elif flux_max < 1e-3:
+                    issues.append('flujo_muy_bajo')
+
+                if not np.all(np.isfinite(flux)):
+                    issues.append(f'nan_inf ({int(np.sum(~np.isfinite(flux)))} pts)')
+
+                if float(wave.max()) - float(wave.min()) < 100:
+                    issues.append('rango_lambda_corto')
+
+                if len(wave) < 50:
+                    issues.append(f'pocos_puntos ({len(wave)})')
+
+                # SNR estimate via residuals of moving average
+                if len(flux) >= 20:
+                    win = min(50, max(3, len(flux) // 8))
+                    smoothed  = np.convolve(flux, np.ones(win) / win, mode='same')
+                    res_std   = float(np.std(flux - smoothed)) + 1e-12
+                    snr       = float(abs(flux_mean)) / res_std
+                    stats['snr_est'] = round(snr, 1)
+                    if snr < 3:
+                        issues.append(f'snr_bajo ({snr:.1f})')
+
+                stats.update({
+                    'wave_min': round(float(wave.min()), 1),
+                    'wave_max': round(float(wave.max()), 1),
+                    'n_points': len(wave),
+                    'flux_max': round(flux_max, 4),
+                })
+            except Exception as ex:
+                issues.append(f'error_lectura: {str(ex)[:60]}')
+
+            results.append({**fi, 'issues': issues, 'ok': len(issues) == 0, **stats})
+
+        n_ok = sum(1 for r in results if r['ok'])
+        return jsonify({'total': len(results), 'ok': n_ok,
+                        'with_issues': len(results) - n_ok, 'results': results})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/dataset/augment_preview', methods=['POST'])
+def dataset_augment_preview():
+    data               = request.json or {}
+    catalog            = data.get('catalog', 'data/elodie/')
+    target_per_class   = data.get('target_per_class')
+    max_augment_ratio  = int(data.get('max_augment_ratio', 5))
+    try:
+        cdir         = _dm_resolve_catalog(catalog)
+        files        = _dm_scan_files(cdir)
+        class_counts = Counter(f['class'] for f in files)
+        if not class_counts:
+            return jsonify({'error': 'No hay espectros en el catálogo'}), 400
+
+        import statistics as _stats
+        median_count = int(_stats.median(class_counts.values()))
+        target       = int(target_per_class) if target_per_class else median_count
+
+        preview = []
+        for cls in sorted(class_counts):
+            orig    = class_counts[cls]
+            max_new = orig * max_augment_ratio - orig
+            needed  = max(0, min(target - orig, max_new))
+            preview.append({
+                'class':     cls,
+                'original':  orig,
+                'synthetic': needed,
+                'total':     orig + needed,
+                'capped':    (target - orig) > max_new and orig < target,
+            })
+
+        return jsonify({
+            'target_per_class': target,
+            'median_count':     median_count,
+            'total_original':   len(files),
+            'total_synthetic':  sum(p['synthetic'] for p in preview),
+            'total_after':      sum(p['total']     for p in preview),
+            'preview':          preview,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/dataset/augment_apply', methods=['POST'])
+def dataset_augment_apply():
+    data              = request.json or {}
+    catalog           = data.get('catalog', 'data/elodie/')
+    target_per_class  = data.get('target_per_class')
+    max_augment_ratio = int(data.get('max_augment_ratio', 5))
+    noise_factor      = float(data.get('noise_factor', 0.015))
+
+    try:
+        cdir    = _dm_resolve_catalog(catalog)
+        aug_dir = os.path.join(cdir, '_augmented')
+        os.makedirs(aug_dir, exist_ok=True)
+
+        files = _dm_scan_files(cdir)
+        files_by_class = defaultdict(list)
+        for f in files:
+            files_by_class[f['class']].append(f['filename'])
+
+        class_counts = {cls: len(v) for cls, v in files_by_class.items()}
+        if not class_counts:
+            return jsonify({'error': 'No hay espectros en el catálogo'}), 400
+
+        import statistics as _stats
+        median_count = int(_stats.median(class_counts.values()))
+        target       = int(target_per_class) if target_per_class else median_count
+        rng          = np.random.RandomState(42)
+        generated    = []
+
+        for cls, flist in sorted(files_by_class.items()):
+            orig    = len(flist)
+            if orig >= target:
+                continue
+            max_new = orig * max_augment_ratio - orig
+            n_new   = max(0, min(target - orig, max_new))
+            if n_new == 0:
+                continue
+
+            # Load class spectra
+            class_spectra = []
+            for fname in flist:
+                try:
+                    w, f_arr, _, _ = load_spectrum_file(os.path.join(cdir, fname))
+                    class_spectra.append((w, f_arr, fname))
+                except Exception:
+                    pass
+            if not class_spectra:
+                continue
+
+            for i in range(n_new):
+                src_w, src_f, src_name = class_spectra[rng.randint(len(class_spectra))]
+                noise    = rng.normal(0, noise_factor * (np.std(src_f) + 1e-8),
+                                      size=src_f.shape).astype(np.float32)
+                syn_flux = src_f + noise
+                base     = os.path.splitext(src_name)[0]
+                syn_name = f'{base}_syn{i+1:03d}.txt'
+                syn_path = os.path.join(aug_dir, syn_name)
+                lines    = ['Longitud_de_onda_A,espectro']
+                for w_v, f_v in zip(src_w, syn_flux):
+                    lines.append(f'{w_v:.4f},{f_v:.6g}')
+                with open(syn_path, 'w') as fout:
+                    fout.write('\n'.join(lines))
+                generated.append({'file': syn_name, 'class': cls, 'source': src_name})
+
+        return jsonify({
+            'generated':       len(generated),
+            'target_per_class': target,
+            'aug_dir':         '_augmented/',
+            'files':           generated,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/dataset/export')
+def dataset_export():
+    catalog = request.args.get('catalog', 'data/elodie/')
+    fmt     = request.args.get('format', 'csv')
+    try:
+        cdir      = _dm_resolve_catalog(catalog)
+        active    = _dm_scan_files(cdir)
+        discarded = _dm_scan_files(cdir, '_descartados')
+        augmented = _dm_scan_files(cdir, '_augmented')
+        all_files = (
+            [{'status': 'active',    **f} for f in active]   +
+            [{'status': 'discarded', **f} for f in discarded] +
+            [{'status': 'augmented', **f} for f in augmented]
+        )
+        import io as _io_exp
+        if fmt == 'json':
+            content = json.dumps({
+                'catalog':     catalog,
+                'exported_at': datetime.now().isoformat(),
+                'summary':     {'active': len(active), 'discarded': len(discarded),
+                                'augmented': len(augmented)},
+                'files': all_files,
+            }, indent=2)
+            return send_file(_io_exp.BytesIO(content.encode()),
+                             mimetype='application/json', as_attachment=True,
+                             download_name='dataset_export.json')
+        else:
+            lines = ['status,filename,sptype,class,size_kb,mtime']
+            for f in all_files:
+                lines.append(f'"{f["status"]}","{f["filename"]}","{f["sptype"]}",'
+                             f'"{f["class"]}",{f["size_kb"]},"{f["mtime"]}"')
+            content = '\n'.join(lines)
+            return send_file(_io_exp.BytesIO(content.encode()),
+                             mimetype='text/csv', as_attachment=True,
+                             download_name='dataset_export.csv')
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ──────────────────────────────────────────────────────────────────────────
+
 
 if __name__ == '__main__':
     import logging
