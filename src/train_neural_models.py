@@ -487,7 +487,7 @@ def train_cnn_1d(X_train, y_train, n_classes, epochs=20, batch_size=32,
     """
     tf = get_tensorflow()
     from tensorflow.keras.models import Sequential
-    from tensorflow.keras.layers import Conv1D, MaxPooling1D, Dense, Dropout, Flatten, BatchNormalization
+    from tensorflow.keras.layers import Conv1D, MaxPooling1D, Dense, Dropout, Flatten, BatchNormalization, GlobalAveragePooling1D
     from tensorflow.keras.optimizers import Adam
     from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, Callback
 
@@ -522,47 +522,46 @@ def train_cnn_1d(X_train, y_train, n_classes, epochs=20, batch_size=32,
         X_val = X_val.reshape(X_val.shape[0], X_val.shape[1], 1)
 
     # ARQUITECTURA DE LA RED
+    # Cambio clave vs. versión anterior: GlobalAveragePooling1D en vez de
+    # MaxPool+Flatten. Con MaxPool+Flatten la CNN es sensible a la POSICIÓN
+    # de las líneas espectrales. Si dos espectros tienen el mismo patrón
+    # pero en distinto rango de λ (porque la interpolación no alinea λ), el
+    # modelo ve patrones distintos → mode collapse.
+    # GlobalAveragePooling1D promedia sobre todas las posiciones → detecta
+    # si una línea EXISTE en el espectro sin importar dónde está exactamente.
     model = Sequential([
-        # ========================================
-        # BLOQUE 1: Primera capa convolucional
-        # ========================================
-        # Conv1D: Detecta patrones locales en el espectro
-        # - 32 filtros: Aprende 32 patrones diferentes
-        # - kernel_size=7: Cada filtro "ve" 7 puntos a la vez
-        # - activation='relu': Solo pasa valores positivos
-        Conv1D(32, kernel_size=7, activation='relu', padding='same',
+        # ── BLOQUE 1 ─────────────────────────────────────────────────────────
+        # kernel_size=11: ventana grande para capturar líneas anchas (Balmer)
+        Conv1D(32, kernel_size=11, activation='relu', padding='same',
                input_shape=(X_train.shape[1], 1)),
-        # BatchNormalization: Normaliza las salidas (estabiliza entrenamiento)
         BatchNormalization(),
-        # MaxPooling1D: Reduce tamano a la mitad, mantiene valores maximos
-        MaxPooling1D(pool_size=2),
-        # Dropout: "Apaga" 15% de neuronas aleatoriamente (evita overfitting)
+        MaxPooling1D(pool_size=4),   # 1000 → 250
         Dropout(dropout_rate * 0.5),
 
-        # ========================================
-        # BLOQUE 2: Segunda capa convolucional
-        # ========================================
-        # Mas filtros (64) para patrones mas complejos
-        Conv1D(64, kernel_size=5, activation='relu', padding='same'),
+        # ── BLOQUE 2 ─────────────────────────────────────────────────────────
+        # kernel_size=7: líneas de ancho intermedio (Ca II, He I)
+        Conv1D(64, kernel_size=7, activation='relu', padding='same'),
         BatchNormalization(),
-        MaxPooling1D(pool_size=2),
+        MaxPooling1D(pool_size=4),   # 250 → 62
         Dropout(dropout_rate * 0.7),
 
-        # ========================================
-        # BLOQUE 3: Tercera capa convolucional
-        # ========================================
-        # Aun mas filtros (128) para patrones de alto nivel
-        Conv1D(128, kernel_size=3, activation='relu', padding='same'),
+        # ── BLOQUE 3 ─────────────────────────────────────────────────────────
+        # kernel_size=5: patrones finos (ratios de líneas)
+        Conv1D(128, kernel_size=5, activation='relu', padding='same'),
         BatchNormalization(),
-        MaxPooling1D(pool_size=2),
+        MaxPooling1D(pool_size=2),   # 62 → 31
         Dropout(dropout_rate),
 
-        # ========================================
-        # CAPAS DENSAS (fully connected)
-        # ========================================
-        # Flatten: Convierte el tensor 3D a vector 1D
-        Flatten(),
-        # Dense: Capa completamente conectada
+        # ── BLOQUE 4 ─────────────────────────────────────────────────────────
+        Conv1D(128, kernel_size=3, activation='relu', padding='same'),
+        BatchNormalization(),
+
+        # GlobalAveragePooling: promedia sobre las 31 posiciones restantes.
+        # Invariante a desplazamientos → no importa si Hβ está en posición
+        # 0.39 o 0.86 dentro del espectro interpolado.
+        GlobalAveragePooling1D(),
+
+        # ── CAPAS DENSAS ─────────────────────────────────────────────────────
         Dense(dense_units, activation='relu'),
         BatchNormalization(),
         Dropout(dropout_rate),
@@ -570,11 +569,7 @@ def train_cnn_1d(X_train, y_train, n_classes, epochs=20, batch_size=32,
         Dense(dense_units // 2, activation='relu'),
         Dropout(dropout_rate * 0.5),
 
-        # ========================================
-        # CAPA DE SALIDA
-        # ========================================
-        # Softmax: Convierte a probabilidades (suman 1.0)
-        # n_classes neuronas, una por cada tipo espectral
+        # ── CAPA DE SALIDA ────────────────────────────────────────────────────
         Dense(n_classes, activation='softmax')
     ])
 
@@ -588,11 +583,16 @@ def train_cnn_1d(X_train, y_train, n_classes, epochs=20, batch_size=32,
         metrics=['accuracy']
     )
 
-    # Pesos de clase para dataset desbalanceado (O, M escasas vs F, K abundantes)
+    # Pesos de clase para dataset desbalanceado
+    # IMPORTANTE: se capan a 4.0 máximo para evitar spikes de gradiente
+    # que causan mode-collapse (el modelo aprende a predecir siempre la
+    # clase minoritaria porque su gradiente escala domina el entrenamiento).
     unique_classes = np.unique(y_train)
     cw_values = compute_class_weight('balanced', classes=unique_classes, y=y_train)
-    class_weight_dict = dict(zip(unique_classes.tolist(), cw_values.tolist()))
-    print(f"\n  Pesos de clase (balanceo): { {str(k): round(v,2) for k,v in class_weight_dict.items()} }")
+    cap = 4.0
+    cw_capped = np.minimum(cw_values, cap)
+    class_weight_dict = {int(k): round(float(v), 2) for k, v in zip(unique_classes, cw_capped)}
+    print(f"\n  Pesos de clase (balanceo, cap={cap}): {class_weight_dict}")
 
     # CALLBACKS: Funciones que se ejecutan durante el entrenamiento
     callbacks = [
@@ -975,10 +975,27 @@ def train_and_save_model(model_type, catalog_path, output_dir, **kwargs):
         if len(X) < 10:
             raise ValueError(f"Muy pocos espectros validos: {len(X)}")
 
+        # ── Normalización Z-score por espectro ───────────────────────────────
+        # CRÍTICO para CNN: cada espectro puede tener distinto nivel de flujo
+        # absoluto (estrellas brillantes vs. tenues). Sin normalizar, la CNN ve
+        # todas las formas distintas y no puede aprender líneas espectrales.
+        # Z-score centra cada espectro en 0 y escala a std=1:
+        #   - Continuo → cerca de 0
+        #   - Líneas de absorción → spikes negativos proporcionales a su profundidad
+        # Esto hace que los PATRONES de líneas sean comparables entre estrellas.
+        X_mean = X.mean(axis=1, keepdims=True)
+        X_std  = X.std( axis=1, keepdims=True) + 1e-7
+        X = (X - X_mean) / X_std
+        print(f"  Normalización Z-score aplicada (media={X.mean():.4f}, std={X.std():.4f})")
+
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=test_size, stratify=y, random_state=42
         )
         print(f"  Train: {len(X_train)}, Test: {len(X_test)}")
+
+        # Verificar distribución de clases en train
+        unique_tr, counts_tr = np.unique(y_train, return_counts=True)
+        print(f"  Clases en y_train: { {str(encoder.classes_[k]): int(c) for k, c in zip(unique_tr, counts_tr)} }")
 
         # Entrenar CNN
         model, history = train_cnn_1d(
