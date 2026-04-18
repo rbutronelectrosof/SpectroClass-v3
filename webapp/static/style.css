@@ -5716,3 +5716,15 @@ details[open] summary {
     line-height: 1.5;
     font-style: italic;
 }
+
+/* ── Wrapper de canvas con altura fija (evita ResizeObserver loop en Chart.js 4) ── */
+.nm-canvas-wrap {
+    position: relative;
+    height: 200px;          /* altura fija que Chart.js mide — nunca cambia por log lines */
+}
+.nm-canvas-wrap canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100% !important;
+    height: 100% !important;
+}

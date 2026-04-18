@@ -6288,7 +6288,7 @@ function _initLiveCharts() {
     _liveAccData  = [];
     _liveLossData = [];
 
-    // Mostrar el panel ANTES de medir el canvas (necesita estar en el DOM visible)
+    // Mostrar el panel primero (necesita estar visible para que Chart.js mida bien)
     document.getElementById('nnMetricsPanel').style.display = 'block';
     document.getElementById('nmChartsSection').style.display = 'block';
     document.getElementById('nmConfusionSection').style.display = 'none';
@@ -6299,33 +6299,17 @@ function _initLiveCharts() {
     const lossCanvas = document.getElementById('chartLoss');
     if (!accCanvas || !lossCanvas) return;
 
-    // ── Solución al parpadeo / blanco durante training ──────────────────────
-    // Chart.js 4 con responsive:true usa ResizeObserver. Cada vez que appendLog()
-    // añade una línea al log se produce un reflow de layout → el ResizeObserver
-    // dispara → Chart.js borra el canvas y lo redibuja → parpadeo en blanco.
-    //
-    // Fix: fijar dimensiones intrínsecas del canvas (buffer de píxeles) y usar
-    // responsive:false. Así Chart.js NO instala ResizeObserver y el canvas
-    // nunca se borra por cambios de layout externos.
-    // Las dimensiones se toman del contenedor real en este momento.
-    const W = accCanvas.parentElement?.clientWidth  || 480;
-    const H = parseInt(accCanvas.getAttribute('height') || '220', 10);
-
-    for (const cv of [accCanvas, lossCanvas]) {
-        cv.width  = W;   // buffer de píxeles (lo que Chart.js usa con responsive:false)
-        cv.height = H;
-        cv.style.width  = '100%';   // sigue siendo fluido visualmente vía CSS
-        cv.style.height = H + 'px';
-    }
-
-    // Si ya existe un chart de sesión anterior, destruirlo una sola vez aquí
-    // (NO en _renderAccChart: esa función reutiliza el chart para evitar el colapso)
+    // Destruir charts previos (solo aquí, no en _renderAccChart)
     if (_chartAcc)  { _chartAcc.destroy();  _chartAcc  = null; }
     if (_chartLoss) { _chartLoss.destroy(); _chartLoss = null; }
 
+    // El canvas está dentro de .nm-canvas-wrap { position:relative; height:200px }
+    // → Chart.js lee 200px fijos del wrapper, NO el scroll-container que crece
+    //   con cada appendLog(). Así el ResizeObserver nunca dispara por el log.
+    // animation:false evita que la animación de creación choque con update('none').
     const liveOpts = {
-        animation: false,        // sin animación de creación ni de actualización
-        responsive: false,       // sin ResizeObserver → sin parpadeo
+        animation: false,
+        responsive: true,
         maintainAspectRatio: false,
         plugins: { legend: { labels: { color: '#a0aec0', font: { size: 11 } } } },
         scales: {
