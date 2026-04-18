@@ -1,0 +1,103 @@
+[
+  {
+    "id": "cnn_1d_2026-04-17T17:43:01.702297",
+    "model_type": "cnn_1d",
+    "timestamp": "2026-04-17T17:43:01.702297",
+    "accuracy_test": 0.0173,
+    "accuracy_cv_mean": null,
+    "n_samples": 861,
+    "n_classes": 6,
+    "classes": [
+      "A",
+      "B",
+      "F",
+      "K",
+      "M",
+      "O"
+    ],
+    "params": {
+      "n_neighbors": null,
+      "weights": null,
+      "metric": null,
+      "epochs_trained": 9,
+      "learning_rate": 0.001,
+      "dropout_rate": 0.3
+    }
+  },
+  {
+    "id": "cnn_1d_2026-04-17T23:20:58.405254",
+    "model_type": "cnn_1d",
+    "timestamp": "2026-04-17T23:20:58.405254",
+    "accuracy_test": 0.0173,
+    "accuracy_cv_mean": null,
+    "n_samples": 861,
+    "n_classes": 6,
+    "classes": [
+      "A",
+      "B",
+      "F",
+      "K",
+      "M",
+      "O"
+    ],
+    "params": {
+      "n_neighbors": null,
+      "weights": null,
+      "metric": null,
+      "epochs_trained": 9,
+      "learning_rate": 0.0005,
+      "dropout_rate": 0.3
+    }
+  },
+  {
+    "id": "cnn_1d_2026-04-17T23:34:12.567770",
+    "model_type": "cnn_1d",
+    "timestamp": "2026-04-17T23:34:12.567770",
+    "accuracy_test": 0.0173,
+    "accuracy_cv_mean": null,
+    "n_samples": 861,
+    "n_classes": 6,
+    "classes": [
+      "A",
+      "B",
+      "F",
+      "K",
+      "M",
+      "O"
+    ],
+    "params": {
+      "n_neighbors": null,
+      "weights": null,
+      "metric": null,
+      "epochs_trained": 9,
+      "learning_rate": 0.001,
+      "dropout_rate": 0.3
+    }
+  },
+  {
+    "id": "cnn_1d_2026-04-17T23:47:51.144481",
+    "model_type": "cnn_1d",
+    "timestamp": "2026-04-17T23:47:51.144481",
+    "accuracy_test": 0.0222,
+    "accuracy_cv_mean": null,
+    "n_samples": 1350,
+    "n_classes": 7,
+    "classes": [
+      "A",
+      "B",
+      "F",
+      "G",
+      "K",
+      "M",
+      "O"
+    ],
+    "params": {
+      "n_neighbors": null,
+      "weights": null,
+      "metric": null,
+      "epochs_trained": 9,
+      "learning_rate": 0.001,
+      "dropout_rate": 0.3
+    }
+  }
+]

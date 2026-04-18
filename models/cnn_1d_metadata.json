@@ -1,25 +1,70 @@
 {
   "model_type": "cnn_1d",
-  "n_samples": 861,
-  "n_classes": 6,
+  "n_samples": 1350,
+  "n_classes": 7,
   "classes": [
     "A",
     "B",
     "F",
+    "G",
     "K",
     "M",
     "O"
   ],
   "test_size": 0.2,
-  "timestamp": "2026-02-28T20:49:08.911013",
-  "accuracy_test": 0.45086705684661865,
-  "final_loss": 1.7787644863128662,
-  "epochs_trained": 6,
+  "timestamp": "2026-04-17T23:47:51.144481",
+  "accuracy_test": 0.02222222276031971,
+  "final_loss": 3.5288150310516357,
+  "epochs_trained": 9,
   "spectrum_length": 1000,
-  "epochs": 40,
+  "epochs": 30,
   "batch_size": 32,
-  "learning_rate": 0.0005,
+  "learning_rate": 0.001,
   "dropout_rate": 0.3,
   "dense_units": 128,
-  "training_time_seconds": 124.16758847236633
+  "per_class_metrics": {
+    "A": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 31
+    },
+    "B": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 19
+    },
+    "F": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 73
+    },
+    "G": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 80
+    },
+    "K": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 55
+    },
+    "M": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 6
+    },
+    "O": {
+      "precision": 0.0222,
+      "recall": 1.0,
+      "f1": 0.0435,
+      "support": 6
+    }
+  },
+  "training_time_seconds": 501.78860688209534
 }

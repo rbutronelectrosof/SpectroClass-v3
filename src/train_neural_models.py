@@ -748,6 +748,108 @@ def train_cnn_2d(image_dir, labels_dict, epochs=20, batch_size=32,
 
 
 # ============================================================================
+# AUMENTO DE DATOS ESPECTRAL (Data Augmentation)
+# ============================================================================
+
+def augment_minority_spectra(X_train, y_train, target_per_class=None,
+                              max_augment_ratio=5, noise_factor=0.015,
+                              random_state=42):
+    """
+    Genera espectros sintéticos para clases minoritarias mediante ruido gaussiano.
+
+    ESTRATEGIA GENERAL:
+    - Clases con muchas muestras: sin cambios
+    - Clases con pocas muestras: duplicar con pequeñas perturbaciones hasta
+      alcanzar `target_per_class` (o la mediana del dataset, lo que sea menor)
+
+    PARÁMETROS:
+    -----------
+    X_train : array (n_samples, spectrum_length) — espectros normalizados
+    y_train : array (n_samples,) — etiquetas enteras
+    target_per_class : int o None
+        Objetivo de muestras por clase. Si None, se usa la mediana de conteos.
+    max_augment_ratio : int
+        Máximo multiplicador: nunca generar más de N× las muestras originales
+        de una clase (evita que clases con 2 muestras dominen con 1000 copias).
+    noise_factor : float
+        Fracción del desvío estándar del espectro que se usa como σ del ruido.
+        0.015 (1.5%) preserva líneas espectrales; 0.05 (5%) da más variedad.
+    random_state : int
+        Semilla para reproducibilidad.
+
+    NOTA DE DISEÑO:
+    No se aplica al conjunto de test. Aplicar augmentación antes del split
+    causaría data-leakage (variantes sintéticas del mismo espectro en train y test).
+    Llamar SIEMPRE después de train_test_split.
+    """
+    rng = np.random.RandomState(random_state)
+
+    unique_classes, counts = np.unique(y_train, return_counts=True)
+    median_count = int(np.median(counts))
+
+    if target_per_class is None:
+        # Target = mediana del dataset actual (conservador y auto-adaptativo)
+        target_per_class = median_count
+
+    print(f"\n  [Augmentación] Conteos originales: "
+          f"{ {str(k): int(c) for k, c in zip(unique_classes, counts)} }")
+    print(f"  [Augmentación] Target por clase: {target_per_class}  "
+          f"(max_ratio: {max_augment_ratio}×)")
+
+    X_aug = [X_train]
+    y_aug = [y_train]
+    augmented_counts = {}
+
+    for cls, count in zip(unique_classes, counts):
+        if count >= target_per_class:
+            augmented_counts[str(cls)] = 0
+            continue  # clase ya tiene suficientes muestras
+
+        # Cuántas muestras sintéticas generar (respetando max_augment_ratio)
+        max_new   = count * max_augment_ratio - count
+        n_needed  = min(target_per_class - count, max_new)
+        n_needed  = max(n_needed, 0)
+
+        if n_needed == 0:
+            augmented_counts[str(cls)] = 0
+            continue
+
+        cls_mask    = (y_train == cls)
+        cls_spectra = X_train[cls_mask]  # espectros reales de esta clase
+
+        # Generar n_needed variantes sintéticas
+        idx_choices = rng.choice(len(cls_spectra), size=n_needed, replace=True)
+        base_specs  = cls_spectra[idx_choices]  # (n_needed, L)
+
+        # Ruido gaussiano proporcional al desvío de cada espectro
+        spec_std  = base_specs.std(axis=1, keepdims=True) + 1e-8
+        noise     = rng.normal(0, noise_factor * spec_std,
+                               size=base_specs.shape).astype(np.float32)
+        synthetic = (base_specs + noise).astype(np.float32)
+
+        X_aug.append(synthetic)
+        y_aug.append(np.full(n_needed, cls, dtype=y_train.dtype))
+        augmented_counts[str(cls)] = n_needed
+
+    X_out = np.concatenate(X_aug, axis=0)
+    y_out = np.concatenate(y_aug, axis=0)
+
+    # Mezclar para que las muestras sintéticas no queden todas al final
+    shuffle_idx = rng.permutation(len(X_out))
+    X_out = X_out[shuffle_idx]
+    y_out = y_out[shuffle_idx]
+
+    added = sum(augmented_counts.values())
+    print(f"  [Augmentación] Muestras añadidas: {added} "
+          f"(total: {len(y_out)} = {len(y_train)} reales + {added} sintéticas)")
+    if added:
+        print(f"  [Augmentación] Por clase: "
+              f"{ {k: v for k, v in augmented_counts.items() if v > 0} }")
+
+    return X_out, y_out
+
+
+# ============================================================================
 # PIPELINE PRINCIPAL DE ENTRENAMIENTO
 # ============================================================================
 
@@ -785,8 +887,9 @@ def train_and_save_model(model_type, catalog_path, output_dir, **kwargs):
     # ========================================
     # PASO 2: Filtrar clases con pocas muestras
     # ========================================
-    # Necesitamos minimo 5 muestras por clase para hacer un split estratificado
-    MIN_SAMPLES_PER_CLASS = 5
+    # Umbral configurable: clases con menos de min_samples no son entrenables
+    # (10 por defecto: permite estratificación 80/20 y algo de validación cruzada)
+    MIN_SAMPLES_PER_CLASS = kwargs.get('min_samples_per_class', 10)
     print(f"\nFiltrando clases con menos de {MIN_SAMPLES_PER_CLASS} muestras...")
 
     try:
@@ -797,8 +900,11 @@ def train_and_save_model(model_type, catalog_path, output_dir, **kwargs):
         raise
 
     if len(valid_classes) < len(unique_labels):
-        removed = set(unique_labels) - set(valid_classes)
-        print(f"\n[!] Eliminando clases con muy pocas muestras: {removed}")
+        removed = {str(lbl): int(c) for lbl, c in zip(unique_labels, counts)
+                   if lbl not in set(valid_classes)}
+        print(f"\n[!] Clases excluidas por pocas muestras (< {MIN_SAMPLES_PER_CLASS}):")
+        for cls, cnt in removed.items():
+            print(f"     {cls}: {cnt} muestras")
 
         valid_set = set(valid_classes)
         filtered_indices = [i for i, lbl in enumerate(labels) if lbl in valid_set]
@@ -993,7 +1099,20 @@ def train_and_save_model(model_type, catalog_path, output_dir, **kwargs):
         )
         print(f"  Train: {len(X_train)}, Test: {len(X_test)}")
 
-        # Verificar distribución de clases en train
+        # ── Augmentación de clases minoritarias ──────────────────────────────
+        # IMPORTANTE: se aplica SOLO al conjunto de entrenamiento, NUNCA al test.
+        # Esto evita data-leakage (variantes sintéticas del mismo espectro en
+        # train y test a la vez). El modelo aprende más patrones de clases raras
+        # sin ver datos "contaminados" en la evaluación.
+        if kwargs.get('augment', True):
+            X_train, y_train = augment_minority_spectra(
+                X_train, y_train,
+                target_per_class=kwargs.get('augment_target', None),
+                max_augment_ratio=kwargs.get('max_augment_ratio', 5),
+                noise_factor=kwargs.get('noise_factor', 0.015),
+            )
+
+        # Verificar distribución de clases en train (post-augmentación)
         unique_tr, counts_tr = np.unique(y_train, return_counts=True)
         print(f"  Clases en y_train: { {str(encoder.classes_[k]): int(c) for k, c in zip(unique_tr, counts_tr)} }")
 
