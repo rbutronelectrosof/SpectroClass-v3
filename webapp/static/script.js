@@ -3296,8 +3296,8 @@ async function trainNeuralModel() {
                             document.getElementById('nnResultsDetails').innerHTML =
                                 `<p>Modelo ${typeNames[type]} guardado correctamente.</p>`;
                             resultsDiv.scrollIntoView({ behavior: 'smooth' });
-                            // Cargar métricas finales (historial completo + CM + per-class)
-                            loadTrainingHistory();
+                            // Cargar métricas finales y asegurar que se muestra el modelo correcto
+                            loadTrainingHistory(type);
                         }, 800);
                     } else {
                         progressFill.style.width = '100%';
@@ -6077,9 +6077,16 @@ function switchMetricsModel(model, btn) {
     if (_metricsData) _renderMetrics(_metricsData);
 }
 
-async function loadTrainingHistory() {
+async function loadTrainingHistory(trainedModelType) {
     const panel = document.getElementById('nnMetricsPanel');
     panel.style.display = 'block';
+
+    // Si se pasó el tipo recién entrenado, seleccionar esa pestaña automáticamente
+    // (evita el bug donde el usuario tenía KNN seleccionado y el CNN aparece en blanco)
+    if (trainedModelType && trainedModelType !== _currentMetricsModel) {
+        const btn = document.querySelector(`.nm-tab[data-model="${trainedModelType}"]`);
+        switchMetricsModel(trainedModelType, btn);
+    }
 
     try {
         const res  = await fetch('/neural_history');
@@ -6087,7 +6094,8 @@ async function loadTrainingHistory() {
         if (!data.success) { _showNoData('Error al cargar métricas.'); return; }
         _metricsData = data;
         _renderMetrics(data);
-        panel.scrollIntoView({ behavior: 'smooth' });
+        // Scroll suave DESPUÉS de renderizar (evita medir canvas durante scroll)
+        setTimeout(() => panel.scrollIntoView({ behavior: 'smooth' }), 120);
     } catch (e) {
         _showNoData('No se pudo contactar con el servidor.');
     }
@@ -6156,15 +6164,18 @@ function _chartDefaults() {
 }
 
 function _renderAccChart(history) {
-    const ctx = document.getElementById('chartAccuracy').getContext('2d');
-    if (_chartAcc) _chartAcc.destroy();
+    const canvas = document.getElementById('chartAccuracy');
+    if (!canvas) return;
+    if (_chartAcc) { _chartAcc.destroy(); _chartAcc = null; }
+    // Restaurar altura después de destroy() para que Chart.js mida bien el contenedor
+    _fixCanvasSize(canvas);
     const epochs = history.accuracy.map((_, i) => i + 1);
-    _chartAcc = new Chart(ctx, {
+    _chartAcc = new Chart(canvas.getContext('2d'), {
         type: 'line',
         data: {
             labels: epochs,
             datasets: [
-                { label: 'Train Acc', data: history.accuracy,     borderColor: '#68d391', backgroundColor: 'rgba(104,211,145,0.15)', tension: 0.3, fill: true, pointRadius: 3 },
+                { label: 'Train Acc', data: history.accuracy,     borderColor: '#68d391', backgroundColor: 'rgba(104,211,145,0.15)', tension: 0.3, fill: true,  pointRadius: 3 },
                 { label: 'Val Acc',   data: history.val_accuracy, borderColor: '#63b3ed', backgroundColor: 'rgba(99,179,237,0.10)',  tension: 0.3, fill: false, borderDash: [5,3], pointRadius: 3 },
             ],
         },
@@ -6180,15 +6191,17 @@ function _renderAccChart(history) {
 }
 
 function _renderLossChart(history) {
-    const ctx = document.getElementById('chartLoss').getContext('2d');
-    if (_chartLoss) _chartLoss.destroy();
+    const canvas = document.getElementById('chartLoss');
+    if (!canvas) return;
+    if (_chartLoss) { _chartLoss.destroy(); _chartLoss = null; }
+    _fixCanvasSize(canvas);
     const epochs = history.loss.map((_, i) => i + 1);
-    _chartLoss = new Chart(ctx, {
+    _chartLoss = new Chart(canvas.getContext('2d'), {
         type: 'line',
         data: {
             labels: epochs,
             datasets: [
-                { label: 'Train Loss', data: history.loss,     borderColor: '#fc8181', backgroundColor: 'rgba(252,129,129,0.15)', tension: 0.3, fill: true, pointRadius: 3 },
+                { label: 'Train Loss', data: history.loss,     borderColor: '#fc8181', backgroundColor: 'rgba(252,129,129,0.15)', tension: 0.3, fill: true,  pointRadius: 3 },
                 { label: 'Val Loss',   data: history.val_loss, borderColor: '#f6ad55', backgroundColor: 'rgba(246,173,85,0.10)',  tension: 0.3, fill: false, borderDash: [5,3], pointRadius: 3 },
             ],
         },
@@ -6254,9 +6267,15 @@ let _liveLossData = [];
 function _initLiveCharts() {
     _liveAccData  = [];
     _liveLossData = [];
-    const accCtx  = document.getElementById('chartAccuracy')?.getContext('2d');
-    const lossCtx = document.getElementById('chartLoss')?.getContext('2d');
-    if (!accCtx || !lossCtx) return;
+
+    const accCanvas  = document.getElementById('chartAccuracy');
+    const lossCanvas = document.getElementById('chartLoss');
+    if (!accCanvas || !lossCanvas) return;
+
+    // Fijar dimensiones explícitas ANTES de crear el chart para evitar
+    // el loop resize → blank → resize que causa Chart.js 4 con responsive:true
+    _fixCanvasSize(accCanvas);
+    _fixCanvasSize(lossCanvas);
 
     // Mostrar el panel durante entrenamiento
     document.getElementById('nnMetricsPanel').style.display = 'block';
@@ -6265,29 +6284,53 @@ function _initLiveCharts() {
     document.getElementById('nmPerClassSection').style.display = 'none';
     document.getElementById('nmNoData').style.display = 'none';
 
-    if (_chartAcc)  _chartAcc.destroy();
-    if (_chartLoss) _chartLoss.destroy();
+    if (_chartAcc)  { _chartAcc.destroy();  _chartAcc  = null; }
+    if (_chartLoss) { _chartLoss.destroy(); _chartLoss = null; }
 
-    _chartAcc = new Chart(accCtx, {
+    // Opciones para gráficas en VIVO:
+    // - animation: false  → sin animación, evita conflictos con actualizaciones rápidas
+    // - responsive: false → desactiva el ResizeObserver; cada appendLog() causaría reflow
+    //                       que dispara redibujado completo (pantalla en blanco momentáneo)
+    const liveOpts = {
+        animation: false,
+        responsive: false,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#a0aec0', font: { size: 11 } } } },
+        scales: {
+            x: { ticks: { color: '#718096', font: { size: 10 } }, grid: { color: '#2d3748' } },
+            y: { ticks: { color: '#718096' }, grid: { color: '#2d3748' } },
+        },
+    };
+
+    _chartAcc = new Chart(accCanvas.getContext('2d'), {
         type: 'line',
         data: { labels: [], datasets: [
-            { label: 'Train Acc', data: [], borderColor: '#68d391', backgroundColor: 'rgba(104,211,145,0.15)', tension: 0.3, fill: true, pointRadius: 3 },
-            { label: 'Val Acc',   data: [], borderColor: '#63b3ed', backgroundColor: 'rgba(99,179,237,0.10)',  tension: 0.3, fill: false, borderDash: [5,3], pointRadius: 3 },
+            { label: 'Train Acc', data: [], borderColor: '#68d391', backgroundColor: 'rgba(104,211,145,0.15)', tension: 0.3, fill: true,  pointRadius: 2 },
+            { label: 'Val Acc',   data: [], borderColor: '#63b3ed', backgroundColor: 'rgba(99,179,237,0.10)',  tension: 0.3, fill: false, borderDash: [5,3], pointRadius: 2 },
         ]},
-        options: { ..._chartDefaults(),
-            scales: { ..._chartDefaults().scales,
-                y: { ..._chartDefaults().scales.y, min: 0, max: 1,
-                     ticks: { color: '#718096', callback: v => (v*100).toFixed(0)+'%' } } } },
+        options: { ...liveOpts,
+            scales: { ...liveOpts.scales,
+                y: { ...liveOpts.scales.y, min: 0, max: 1,
+                     ticks: { color: '#718096', font: { size: 10 }, callback: v => (v*100).toFixed(0)+'%' } } } },
     });
 
-    _chartLoss = new Chart(lossCtx, {
+    _chartLoss = new Chart(lossCanvas.getContext('2d'), {
         type: 'line',
         data: { labels: [], datasets: [
-            { label: 'Train Loss', data: [], borderColor: '#fc8181', backgroundColor: 'rgba(252,129,129,0.15)', tension: 0.3, fill: true, pointRadius: 3 },
-            { label: 'Val Loss',   data: [], borderColor: '#f6ad55', backgroundColor: 'rgba(246,173,85,0.10)',  tension: 0.3, fill: false, borderDash: [5,3], pointRadius: 3 },
+            { label: 'Train Loss', data: [], borderColor: '#fc8181', backgroundColor: 'rgba(252,129,129,0.15)', tension: 0.3, fill: true,  pointRadius: 2 },
+            { label: 'Val Loss',   data: [], borderColor: '#f6ad55', backgroundColor: 'rgba(246,173,85,0.10)',  tension: 0.3, fill: false, borderDash: [5,3], pointRadius: 2 },
         ]},
-        options: _chartDefaults(),
+        options: liveOpts,
     });
+}
+
+// Fija el tamaño del canvas con estilos inline para que Chart.js no lo recalcule
+function _fixCanvasSize(canvas) {
+    const card = canvas.closest('.nm-chart-card') || canvas.parentElement;
+    const h = parseInt(canvas.getAttribute('height') || '220', 10);
+    canvas.style.width  = '100%';
+    canvas.style.height = h + 'px';
+    if (card) card.style.minHeight = (h + 50) + 'px';
 }
 
 function _updateLiveCharts(epochData) {
@@ -6296,7 +6339,7 @@ function _updateLiveCharts(epochData) {
     _chartAcc.data.labels.push(ep);
     _chartAcc.data.datasets[0].data.push(epochData.acc);
     _chartAcc.data.datasets[1].data.push(epochData.val_acc);
-    _chartAcc.update('none');
+    _chartAcc.update('none');   // 'none' = sin animación por epoch
 
     _chartLoss.data.labels.push(ep);
     _chartLoss.data.datasets[0].data.push(epochData.loss);
