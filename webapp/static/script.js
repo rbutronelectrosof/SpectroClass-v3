@@ -2303,6 +2303,12 @@ async function trainModel() {
                             if (bar) { bar.style.width = Math.min(event.accuracy, 100) + '%'; bar.style.background = event.accuracy >= 80 ? '#22c55e' : event.accuracy >= 60 ? '#f59e0b' : '#ef4444'; }
                             // Actualizar banner del modelo actual
                             _updateCurrentModelBanner({ accuracy: event.accuracy, n_samples: event.n_samples, timestamp: new Date().toLocaleDateString() });
+                            // Guardar info para botón "Guardar modelo"
+                            _lastTrainedClassic = { type: config.model_type, accuracy: event.accuracy };
+                            const saveBar = document.getElementById('trainSaveBar');
+                            const saveStatus = document.getElementById('trainSaveStatus');
+                            if (saveBar)   saveBar.style.display = 'flex';
+                            if (saveStatus) saveStatus.textContent = '';
                         }, 800);
                     } else {
                         progressFill.style.width = '100%';
@@ -3299,6 +3305,10 @@ async function trainNeuralModel() {
                             document.getElementById('nnResultsDetails').innerHTML =
                                 `<p>Modelo ${typeNames[type]} guardado correctamente.</p>`;
                             resultsDiv.scrollIntoView({ behavior: 'smooth' });
+                            // Guardar info para botón "Guardar modelo"
+                            _lastTrainedNeural = { type, accuracy: event.accuracy };
+                            const saveStatus = document.getElementById('nnSaveStatus');
+                            if (saveStatus) saveStatus.textContent = '';
                             // Cargar métricas finales y asegurar que se muestra el modelo correcto
                             loadTrainingHistory(type);
                         }, 800);
@@ -6073,6 +6083,10 @@ let _chartLoss = null;
 let _currentMetricsModel = 'cnn_1d';
 let _metricsData = null;  // Datos cargados desde /neural_history
 
+// Último modelo entrenado (para botón "Guardar modelo")
+let _lastTrainedClassic = { type: null, accuracy: null };
+let _lastTrainedNeural  = { type: null, accuracy: null };
+
 function switchMetricsModel(model, btn) {
     _currentMetricsModel = model;
     document.querySelectorAll('.nm-tab').forEach(b => b.classList.remove('active'));
@@ -6120,9 +6134,17 @@ function _renderMetrics(data) {
     noD.style.display = hasAny ? 'none' : 'block';
     if (!hasAny) { noD.textContent = 'Aún no hay métricas guardadas para este modelo. Entrena el modelo primero.'; return; }
 
-    // Badge de accuracy
+    // Badge de accuracy (con CV si está disponible)
     const badge = document.getElementById('nmAccuracyBadge');
-    badge.textContent = m.accuracy != null ? `Accuracy: ${m.accuracy}%` : '—';
+    if (m.accuracy != null) {
+        let txt = `Accuracy: ${m.accuracy}%`;
+        if (m.accuracy_cv != null) txt += `  ·  CV: ${m.accuracy_cv}%`;
+        badge.textContent = txt;
+        badge.style.color = m.accuracy >= 80 ? '#68d391' : m.accuracy >= 60 ? '#fbbf24' : '#fc8181';
+    } else {
+        badge.textContent = '—';
+        badge.style.color = '';
+    }
 
     // Gráficas de épocas (solo CNN con historial)
     const chartsSection = document.getElementById('nmChartsSection');
@@ -6302,6 +6324,65 @@ function _renderPerClass(perClass, container) {
     });
     html += '</tbody></table>';
     container.innerHTML = html;
+}
+
+// ── Guardar / activar modelo entrenado para clasificación ───────────────────
+
+const _MODEL_NAMES = {
+    decision_tree:     'Árbol de Decisión',
+    random_forest:     'Random Forest',
+    gradient_boosting: 'Gradient Boosting',
+    knn:               'KNN',
+    cnn_1d:            'CNN 1D',
+    cnn_2d:            'CNN 2D',
+};
+
+async function saveTrainedModel(origin) {
+    const isNeural = (origin === 'neural');
+    const info     = isNeural ? _lastTrainedNeural : _lastTrainedClassic;
+    const btn      = document.getElementById(isNeural ? 'btnSaveNNModel' : 'btnSaveClassicModel');
+    const statusEl = document.getElementById(isNeural ? 'nnSaveStatus'   : 'trainSaveStatus');
+
+    if (!info.type) {
+        if (statusEl) statusEl.textContent = '⚠ Entrena un modelo primero.';
+        return;
+    }
+
+    const origText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="dm-spinner"></span> Guardando…';
+    if (statusEl) statusEl.textContent = '';
+
+    try {
+        const res  = await fetch('/activate_model', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ model_type: info.type, accuracy: info.accuracy }),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            const name = _MODEL_NAMES[info.type] || info.type;
+            if (statusEl) {
+                statusEl.style.color = 'var(--success, #22c55e)';
+                statusEl.textContent = `✅ ${name} activado — se usará en la próxima clasificación.`;
+            }
+            showToast(`Modelo ${name} guardado y activado.`, 'ok');
+        } else {
+            if (statusEl) {
+                statusEl.style.color = 'var(--danger, #ef4444)';
+                statusEl.textContent = `❌ ${data.error || 'Error al guardar.'}`;
+            }
+        }
+    } catch (e) {
+        if (statusEl) {
+            statusEl.style.color = 'var(--danger, #ef4444)';
+            statusEl.textContent = `❌ Error de red: ${e.message}`;
+        }
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = origText;
+    }
 }
 
 // ── Actualización en tiempo real durante entrenamiento CNN ──────────────────

@@ -1883,6 +1883,85 @@ def get_neural_metrics():
     })
 
 
+@app.route('/activate_model', methods=['POST'])
+def activate_model():
+    """Marca un modelo entrenado como activo para que participe en la votación ensemble.
+
+    Escribe / actualiza models/active_models.json con los modelos activados.
+    El archivo guarda: {model_type: {active, weight, accuracy, activated_at}}
+    """
+    import json as _json
+    from datetime import datetime as _dt
+
+    data = request.json or {}
+    model_type = data.get('model_type')          # 'decision_tree'|'random_forest'|'gradient_boosting'|'knn'|'cnn_1d'
+    accuracy   = data.get('accuracy')            # float (porcentaje, ej: 84.5)
+    weight     = float(data.get('weight', 0.0))  # 0 = auto (se calculará al clasificar)
+
+    if not model_type:
+        return jsonify({'success': False, 'error': 'model_type requerido'}), 400
+
+    models_dir  = os.path.join(project_root, 'models')
+    config_path = os.path.join(models_dir, 'active_models.json')
+
+    # Verificar que el modelo existe en disco
+    model_files = {
+        'knn':               ['knn_model.pkl'],
+        'cnn_1d':            ['cnn_model.h5', 'cnn_1d_model.h5'],
+        'cnn_2d':            ['cnn_2d_model.h5'],
+        'decision_tree':     ['decision_tree.pkl'],
+        'random_forest':     ['decision_tree.pkl'],      # mismo archivo, tipo guardado en metadata
+        'gradient_boosting': ['decision_tree.pkl'],
+    }
+    files_to_check = model_files.get(model_type, [])
+    exists = any(os.path.exists(os.path.join(models_dir, f)) for f in files_to_check)
+    if not exists:
+        return jsonify({'success': False,
+                        'error': f'No se encontró el archivo del modelo {model_type} en models/'}), 404
+
+    # Cargar config actual
+    active = {}
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, 'r') as f:
+                active = _json.load(f)
+        except Exception:
+            active = {}
+
+    # Actualizar / agregar entrada
+    active[model_type] = {
+        'active':       True,
+        'weight':       weight,
+        'accuracy':     accuracy,
+        'activated_at': _dt.now().isoformat(timespec='seconds'),
+    }
+
+    with open(config_path, 'w') as f:
+        _json.dump(active, f, indent=2)
+
+    return jsonify({
+        'success': True,
+        'model_type': model_type,
+        'active_models': list(active.keys()),
+        'message': f'Modelo {model_type} guardado y activado para clasificación.'
+    })
+
+
+@app.route('/active_models', methods=['GET'])
+def get_active_models():
+    """Devuelve los modelos actualmente activados."""
+    import json as _json
+    models_dir  = os.path.join(project_root, 'models')
+    config_path = os.path.join(models_dir, 'active_models.json')
+    if not os.path.exists(config_path):
+        return jsonify({'success': True, 'active_models': {}})
+    try:
+        with open(config_path, 'r') as f:
+            return jsonify({'success': True, 'active_models': _json.load(f)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/neural_history', methods=['GET'])
 def neural_history():
     """Devuelve historiales de entrenamiento, matrices de confusión y métricas por clase."""
@@ -1906,6 +1985,20 @@ def neural_history():
                     return meta.get('per_class_metrics'), meta.get('accuracy_test'), meta.get('classes', [])
         return None, None, []
 
+    def load_classic_meta(model_type):
+        """Carga metadata del modelo clásico (DT/RF/GB guardados en metadata.json)."""
+        meta = load_json(os.path.join(models_dir, 'metadata.json'))
+        if not meta:
+            return None, None, None, []
+        # Solo devolver si el modelo guardado coincide con el tipo solicitado
+        if meta.get('model_type') != model_type:
+            return None, None, None, []
+        pcm   = meta.get('per_class_metrics')
+        acc   = meta.get('accuracy_test')
+        cv    = meta.get('accuracy_cv_mean')
+        clss  = meta.get('classes', [])
+        return pcm, acc, cv, clss
+
     # CNN 1D
     cnn1d_hist = load_json(os.path.join(models_dir, 'cnn_1d_history.json'))
     cnn1d_cm   = load_json(os.path.join(models_dir, 'cnn_1d_confusion_matrix.json'))
@@ -1915,21 +2008,46 @@ def neural_history():
     knn_cm  = load_json(os.path.join(models_dir, 'knn_confusion_matrix.json'))
     knn_pcm, knn_acc, knn_classes = load_meta_pcm('knn')
 
+    # Clásicos (DT / RF / GB) — todos comparten el mismo metadata.json y dt_confusion_matrix.json
+    dt_meta = load_json(os.path.join(models_dir, 'metadata.json'))
+    dt_cm   = load_json(os.path.join(models_dir, 'dt_confusion_matrix.json'))
+
+    def _classic_entry(model_type):
+        if not dt_meta or dt_meta.get('model_type') != model_type:
+            return {'accuracy': None, 'per_class': None, 'confusion_matrix': None, 'classes': []}
+        acc = dt_meta.get('accuracy_test')
+        pcm = dt_meta.get('per_class_metrics')
+        # Reordenar per_class si existe
+        if pcm:
+            SPECTRAL = ['O','B','A','F','G','K','M']
+            pcm = {k: pcm[k] for k in sorted(pcm, key=lambda c: SPECTRAL.index(c.upper()) if c.upper() in SPECTRAL else 99)}
+        return {
+            'accuracy':         round(acc * 100, 1) if acc is not None else None,
+            'accuracy_cv':      round(dt_meta.get('accuracy_cv_mean', 0) * 100, 1) if dt_meta.get('accuracy_cv_mean') else None,
+            'per_class':        pcm,
+            'confusion_matrix': dt_cm,
+            'classes':          dt_meta.get('classes', []),
+            'n_samples':        dt_meta.get('n_samples') or (dt_meta.get('n_train', 0) + dt_meta.get('n_test', 0)),
+        }
+
     return jsonify({
         'success': True,
         'cnn_1d': {
-            'history':         cnn1d_hist,
+            'history':          cnn1d_hist,
             'confusion_matrix': cnn1d_cm,
-            'per_class':       cnn1d_pcm,
-            'accuracy':        round(cnn1d_acc * 100, 1) if cnn1d_acc else None,
-            'classes':         cnn1d_classes,
+            'per_class':        cnn1d_pcm,
+            'accuracy':         round(cnn1d_acc * 100, 1) if cnn1d_acc else None,
+            'classes':          cnn1d_classes,
         },
         'knn': {
             'confusion_matrix': knn_cm,
-            'per_class':       knn_pcm,
-            'accuracy':        round(knn_acc * 100, 1) if knn_acc else None,
-            'classes':         knn_classes,
+            'per_class':        knn_pcm,
+            'accuracy':         round(knn_acc * 100, 1) if knn_acc else None,
+            'classes':          knn_classes,
         },
+        'decision_tree':     _classic_entry('decision_tree'),
+        'random_forest':     _classic_entry('random_forest'),
+        'gradient_boosting': _classic_entry('gradient_boosting'),
     })
 
 

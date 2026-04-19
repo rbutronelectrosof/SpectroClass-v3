@@ -1216,6 +1216,14 @@
                                 </div>
                             </div>
                             <div id="trainDetailsOutput" class="output-content"></div>
+
+                            <!-- Botón guardar modelo -->
+                            <div id="trainSaveBar" style="margin-top:16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                                <button class="btn-primary" id="btnSaveClassicModel" onclick="saveTrainedModel('classic')" style="display:flex; align-items:center; gap:8px;">
+                                    💾 Guardar modelo para clasificación
+                                </button>
+                                <span id="trainSaveStatus" style="font-size:0.85rem; color:var(--muted)"></span>
+                            </div>
                         </div>
                     </div>
 
@@ -2454,6 +2462,14 @@
                             </div>
                         </div>
                         <div id="nnResultsDetails" class="results-details"></div>
+
+                        <!-- Botón guardar modelo neural -->
+                        <div style="margin-top:16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                            <button class="btn-primary" id="btnSaveNNModel" onclick="saveTrainedModel('neural')" style="display:flex; align-items:center; gap:8px;">
+                                💾 Guardar modelo para clasificación
+                            </button>
+                            <span id="nnSaveStatus" style="font-size:0.85rem; color:var(--muted)"></span>
+                        </div>
                     </div>
 
                     <!-- ═══════════════════════════════════════════════════════
@@ -2465,8 +2481,11 @@
                         <div class="nn-metrics-header">
                             <h3>📊 Métricas de Entrenamiento</h3>
                             <div class="nn-metrics-tabs">
-                                <button class="nm-tab active" data-model="cnn_1d" onclick="switchMetricsModel('cnn_1d',this)">CNN 1D</button>
-                                <button class="nm-tab" data-model="knn" onclick="switchMetricsModel('knn',this)">KNN</button>
+                                <button class="nm-tab active" data-model="cnn_1d"           onclick="switchMetricsModel('cnn_1d',this)">CNN 1D</button>
+                                <button class="nm-tab"        data-model="knn"              onclick="switchMetricsModel('knn',this)">KNN</button>
+                                <button class="nm-tab"        data-model="decision_tree"    onclick="switchMetricsModel('decision_tree',this)">Árbol</button>
+                                <button class="nm-tab"        data-model="random_forest"    onclick="switchMetricsModel('random_forest',this)">Random Forest</button>
+                                <button class="nm-tab"        data-model="gradient_boosting" onclick="switchMetricsModel('gradient_boosting',this)">Grad. Boost</button>
                             </div>
                             <button class="btn-secondary btn-sm" onclick="loadTrainingHistory()" style="margin-left:auto;">
                                 🔄 Actualizar
