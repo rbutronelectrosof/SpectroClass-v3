@@ -6233,7 +6233,8 @@ function _renderLossChart(history) {
 }
 
 function _renderConfusionMatrix(cmData, container) {
-    const { matrix, labels } = cmData;
+    // Reordenar al orden espectral canónico antes de renderizar
+    let { matrix, labels } = _cmReorderSpectral(cmData.matrix, cmData.labels);
     const maxVal = Math.max(...matrix.flat().filter(v => v > 0));
 
     let html = '<table class="nm-confusion-table"><thead><tr><th>Real \\ Pred</th>';
@@ -6257,8 +6258,29 @@ function _renderConfusionMatrix(cmData, container) {
     container.innerHTML = html;
 }
 
+/** Reordena la matriz de confusión y sus etiquetas al orden O-B-A-F-G-K-M.
+ *  Si las etiquetas no son letras espectrales se devuelve sin cambios. */
+function _cmReorderSpectral(matrix, labels) {
+    const SPECTRAL = ['O', 'B', 'A', 'F', 'G', 'K', 'M'];
+    const upper = labels.map(l => String(l).toUpperCase());
+    if (!upper.every(u => SPECTRAL.includes(u))) return { matrix, labels };
+
+    const ordered  = SPECTRAL.filter(c => upper.includes(c));
+    const idxMap   = ordered.map(c => upper.indexOf(c));
+    const newMatrix = idxMap.map(ri => idxMap.map(ci => matrix[ri][ci]));
+    const newLabels = idxMap.map(i => labels[i]);
+    return { matrix: newMatrix, labels: newLabels };
+}
+
 function _renderPerClass(perClass, container) {
-    const classes = Object.keys(perClass);
+    const SPECTRAL = ['O', 'B', 'A', 'F', 'G', 'K', 'M'];
+    // Ordenar clases al orden espectral; las no espectrales van al final alfabéticamente
+    const classes = Object.keys(perClass).sort((a, b) => {
+        const ia = SPECTRAL.indexOf(a.toUpperCase());
+        const ib = SPECTRAL.indexOf(b.toUpperCase());
+        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+
     let html = `<table class="nm-perclass-table">
         <thead><tr>
             <th>Clase</th><th>Precisión</th><th>Recall</th><th>F1-Score</th><th>Soporte</th>

@@ -91,6 +91,36 @@ from spectral_classification_corrected import (
 # FUNCIONES AUXILIARES
 # ============================================================================
 
+# Orden espectral Harvard canónico
+SPECTRAL_ORDER = ['O', 'B', 'A', 'F', 'G', 'K', 'M']
+
+
+def _reorder_spectral(cm_matrix, labels):
+    """Reordena la matriz de confusión y sus etiquetas al orden O-B-A-F-G-K-M.
+
+    Si las etiquetas no son letras espectrales, devuelve sin cambios.
+    """
+    upper = [str(l).upper() for l in labels]
+    # Sólo aplicar si todas las etiquetas son letras espectrales
+    if not all(u in SPECTRAL_ORDER for u in upper):
+        return cm_matrix, labels
+
+    ordered = [c for c in SPECTRAL_ORDER if c in upper]
+    idx_map = [upper.index(c) for c in ordered]
+
+    reordered_matrix = [[cm_matrix[ri][ci] for ci in idx_map] for ri in idx_map]
+    reordered_labels = [labels[i] for i in idx_map]
+    return reordered_matrix, reordered_labels
+
+
+def _sort_per_class_spectral(per_class_dict):
+    """Devuelve un dict con las clases en orden O-B-A-F-G-K-M."""
+    def _key(cls):
+        u = str(cls).upper()
+        return SPECTRAL_ORDER.index(u) if u in SPECTRAL_ORDER else 99
+    return {k: per_class_dict[k] for k in sorted(per_class_dict, key=_key)}
+
+
 def convert_to_native(obj):
     """
     Convierte tipos numpy a tipos nativos de Python para guardar en JSON.
@@ -1028,6 +1058,18 @@ def train_and_save_model(model_type, catalog_path, output_dir, **kwargs):
         cm = confusion_matrix(y_test, y_pred).tolist()
         class_labels = [str(c) for c in encoder.classes_]
 
+        # Reordenar matriz y métricas al orden espectral O-B-A-F-G-K-M
+        cm, class_labels = _reorder_spectral(cm, class_labels)
+        per_class_raw = {
+            cls: {
+                'precision': round(float(report[str(i)]['precision']), 4),
+                'recall':    round(float(report[str(i)]['recall']), 4),
+                'f1':        round(float(report[str(i)]['f1-score']), 4),
+                'support':   int(report[str(i)]['support']),
+            } for i, cls in enumerate([str(c) for c in encoder.classes_])
+            if str(i) in report
+        }
+
         results.update({
             'accuracy_test': float(accuracy),
             'accuracy_cv_mean': float(cv_scores.mean()),
@@ -1035,14 +1077,7 @@ def train_and_save_model(model_type, catalog_path, output_dir, **kwargs):
             'n_neighbors': kwargs.get('n_neighbors', 5),
             'weights': kwargs.get('weights', 'uniform'),
             'metric': kwargs.get('metric', 'euclidean'),
-            'per_class_metrics': {
-                cls: {
-                    'precision': round(float(report[str(i)]['precision']), 4),
-                    'recall':    round(float(report[str(i)]['recall']), 4),
-                    'f1':        round(float(report[str(i)]['f1-score']), 4),
-                    'support':   int(report[str(i)]['support']),
-                } for i, cls in enumerate(class_labels) if str(i) in report
-            },
+            'per_class_metrics': _sort_per_class_spectral(per_class_raw),
         })
 
         # Guardar matriz de confusión
@@ -1193,6 +1228,18 @@ def train_and_save_model(model_type, catalog_path, output_dir, **kwargs):
         cm_cnn = confusion_matrix(y_test, y_pred_cnn).tolist()
         class_labels_cnn = [str(c) for c in encoder.classes_]
 
+        # Reordenar al orden espectral O-B-A-F-G-K-M
+        cm_cnn, class_labels_cnn = _reorder_spectral(cm_cnn, class_labels_cnn)
+        per_class_raw_cnn = {
+            cls: {
+                'precision': round(float(report_cnn[str(i)]['precision']), 4),
+                'recall':    round(float(report_cnn[str(i)]['recall']), 4),
+                'f1':        round(float(report_cnn[str(i)]['f1-score']), 4),
+                'support':   int(report_cnn[str(i)]['support']),
+            } for i, cls in enumerate([str(c) for c in encoder.classes_])
+            if str(i) in report_cnn
+        }
+
         results.update({
             'accuracy_test': float(accuracy),
             'final_loss': float(test_loss),
@@ -1203,14 +1250,7 @@ def train_and_save_model(model_type, catalog_path, output_dir, **kwargs):
             'learning_rate': kwargs.get('learning_rate', 0.001),
             'dropout_rate': kwargs.get('dropout_rate', 0.3),
             'dense_units': kwargs.get('dense_units', 128),
-            'per_class_metrics': {
-                cls: {
-                    'precision': round(float(report_cnn[str(i)]['precision']), 4),
-                    'recall':    round(float(report_cnn[str(i)]['recall']), 4),
-                    'f1':        round(float(report_cnn[str(i)]['f1-score']), 4),
-                    'support':   int(report_cnn[str(i)]['support']),
-                } for i, cls in enumerate(class_labels_cnn) if str(i) in report_cnn
-            },
+            'per_class_metrics': _sort_per_class_spectral(per_class_raw_cnn),
         })
 
         # Guardar historial de entrenamiento por época
