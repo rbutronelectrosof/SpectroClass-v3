@@ -7151,7 +7151,9 @@ async function dmAugPreview() {
         </div>`;
 
     applyBtn.style.display = data.total_synthetic > 0 ? '' : 'none';
-    document.getElementById('dmAugResult').textContent = '';
+    const augRes = document.getElementById('dmAugResult');
+    augRes.textContent = '';
+    augRes.style.display = 'none';
 }
 
 async function dmAugApply() {
@@ -7167,6 +7169,7 @@ async function dmAugApply() {
     if (previewBtn) previewBtn.disabled = true;
     applyBtn.innerHTML = '<span class="dm-spinner"></span> Generando…';
     resultEl.className = 'dm-msg';
+    resultEl.style.display = '';
     resultEl.textContent = '⌛ Leyendo espectros y generando variantes sintéticas…';
 
     try {
@@ -7250,6 +7253,7 @@ function dmExport(fmt) {
     const catalog = dmCatalog();
     const info = document.getElementById('dmExportInfo');
     info.className = 'dm-msg ok';
+    info.style.display = '';
     info.textContent = `⌛ Generando ${fmt.toUpperCase()}…`;
     const url = `/dataset/export?catalog=${encodeURIComponent(catalog)}&format=${fmt}`;
     // Trigger download

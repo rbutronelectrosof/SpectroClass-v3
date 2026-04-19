@@ -684,12 +684,40 @@
 
                     <div class="label-with-help" style="justify-content:center;margin-bottom:0.5rem;">
                         <h2 style="margin:0;">🗄️ Gestión de Dataset</h2>
+                        <span class="help-icon">?
+                            <div class="tooltip">
+                                <div class="tooltip-title">Gestión de Dataset</div>
+                                <p>Conjunto de herramientas para mantener y mejorar el catálogo de espectros de entrenamiento.</p>
+                                <p style="margin-top:6px"><b>Flujo recomendado:</b></p>
+                                <ol style="margin:4px 0 0 1rem;">
+                                    <li>Vista General → entender el balance</li>
+                                    <li>Inspector + Calidad → identificar problemáticos</li>
+                                    <li>Limpieza → eliminar los malos</li>
+                                    <li>Reclasificar → corregir etiquetas erróneas</li>
+                                    <li>Compensación → equilibrar clases pequeñas</li>
+                                </ol>
+                                <p style="margin-top:6px">📖 Ver sección <b>Gestión de Dataset</b> en Ayuda para más detalles.</p>
+                            </div>
+                        </span>
                     </div>
                     <p class="batch-description">Inspecciona, limpia, reclasifica y mejora tu conjunto de datos de entrenamiento</p>
 
                     <!-- Selector de catálogo -->
                     <div class="dm-catalog-bar">
-                        <label class="dm-catalog-label">Catálogo:</label>
+                        <label class="dm-catalog-label">Catálogo:
+                            <span class="help-icon" style="font-size:0.75rem;">?
+                                <div class="tooltip">
+                                    <div class="tooltip-title">Ruta del Catálogo</div>
+                                    <p>Ruta relativa al directorio raíz del proyecto, o absoluta.</p>
+                                    <p style="margin-top:5px">Ejemplos válidos:</p>
+                                    <ul style="margin:3px 0 0 1rem;">
+                                        <li><code>data/elodie/</code></li>
+                                        <li><code>data/mis_espectros/</code></li>
+                                    </ul>
+                                    <p style="margin-top:5px">Los archivos deben tener <code>_tipo</code> en el nombre para ser reconocidos como espectros etiquetados.<br>Ej: <code>HD001234_tipoA5.txt</code></p>
+                                </div>
+                            </span>
+                        </label>
                         <input type="text" id="dmCatalogPath" value="data/elodie/"
                                class="dm-catalog-input-field" placeholder="data/elodie/">
                         <button class="btn-secondary" onclick="dmLoadPanel()" style="padding:0.4rem 0.9rem;font-size:0.85rem;">
@@ -699,13 +727,13 @@
 
                     <!-- Sub-tab navigation -->
                     <nav class="dm-subnav" id="dmSubnav">
-                        <button class="dm-tab-btn active" data-dmtab="overview">📊 Vista General</button>
-                        <button class="dm-tab-btn" data-dmtab="inspector">🔍 Inspector</button>
-                        <button class="dm-tab-btn" data-dmtab="cleanup">🗑️ Limpieza</button>
-                        <button class="dm-tab-btn" data-dmtab="reclassify">🏷️ Reclasificar</button>
-                        <button class="dm-tab-btn" data-dmtab="augment">⚖️ Compensación</button>
-                        <button class="dm-tab-btn" data-dmtab="quality">🔬 Calidad</button>
-                        <button class="dm-tab-btn" data-dmtab="export">📤 Exportar</button>
+                        <button class="dm-tab-btn active" data-dmtab="overview" title="Distribución de clases, totales y balance del dataset">📊 Vista General</button>
+                        <button class="dm-tab-btn" data-dmtab="inspector" title="Lista paginada de espectros con visor integrado">🔍 Inspector</button>
+                        <button class="dm-tab-btn" data-dmtab="cleanup" title="Selección y descarte reversible de espectros problemáticos">🗑️ Limpieza</button>
+                        <button class="dm-tab-btn" data-dmtab="reclassify" title="Renombrar archivos para corregir el tipo espectral asignado">🏷️ Reclasificar</button>
+                        <button class="dm-tab-btn" data-dmtab="augment" title="Generar espectros sintéticos para equilibrar clases subrepresentadas">⚖️ Compensación</button>
+                        <button class="dm-tab-btn" data-dmtab="quality" title="Detectar espectros con flujo cero, ruido excesivo o rango λ inválido">🔬 Calidad</button>
+                        <button class="dm-tab-btn" data-dmtab="export" title="Exportar resumen del dataset completo en CSV o JSON">📤 Exportar</button>
                     </nav>
 
                     <!-- ── 1. VISTA GENERAL ── -->
@@ -724,14 +752,25 @@
                         <!-- Filtros -->
                         <div class="dm-filter-bar">
                             <input type="text" id="dmFilterName" placeholder="Buscar por nombre…"
-                                   oninput="dmInspectorSearch()" class="dm-filter-input">
-                            <select id="dmFilterClass" onchange="dmInspectorSearch()" class="dm-filter-select">
+                                   oninput="dmInspectorSearch()" class="dm-filter-input"
+                                   title="Filtra por cualquier parte del nombre de archivo">
+                            <select id="dmFilterClass" onchange="dmInspectorSearch()" class="dm-filter-select"
+                                    title="Mostrar solo espectros de una clase espectral">
                                 <option value="">Todas las clases</option>
                             </select>
-                            <label class="dm-check-label">
+                            <label class="dm-check-label" title="Muestra también los archivos movidos a _descartados/">
                                 <input type="checkbox" id="dmIncDiscarded" onchange="dmInspectorSearch()">
                                 Incluir descartados
                             </label>
+                            <span class="help-icon" style="font-size:0.75rem;">?
+                                <div class="tooltip">
+                                    <div class="tooltip-title">Inspector de Espectros</div>
+                                    <p>Lista todos los espectros etiquetados del catálogo.</p>
+                                    <p style="margin-top:5px"><b>Clic en una fila</b> → abre el espectro graficado inline y pre-llena el panel de Reclasificación.</p>
+                                    <p style="margin-top:5px"><b>Clase</b> = primera letra del tipo espectral en el nombre del archivo.<br>Ej: <code>_tipoA5</code> → clase <b>A</b></p>
+                                    <p style="margin-top:5px"><b>Incluir descartados</b>: muestra también los archivos en <code>_descartados/</code>, marcados en rojo.</p>
+                                </div>
+                            </span>
                         </div>
                         <div id="dmInspectorTable"></div>
                         <div id="dmInspectorPager" class="dm-pager"></div>
@@ -753,7 +792,8 @@
                         <div class="dm-filter-bar">
                             <label style="color:#a0aec0;font-size:0.85rem;">Mostrar clases con menos de</label>
                             <input type="number" id="dmCleanupMaxN" value="5" min="1" max="9999"
-                                   class="dm-filter-input" style="width:70px;" oninput="dmCleanupFilter()">
+                                   class="dm-filter-input" style="width:70px;" oninput="dmCleanupFilter()"
+                                   title="Filtro rápido para encontrar clases minoritarias o problemáticas">
                             <label style="color:#a0aec0;font-size:0.85rem;">espectros</label>
                             <button class="btn-secondary" onclick="dmCleanupFilter()" style="padding:0.3rem 0.8rem;font-size:0.82rem;">
                                 Filtrar
@@ -761,6 +801,15 @@
                             <button class="btn-secondary" onclick="dmCleanupShowAll()" style="padding:0.3rem 0.8rem;font-size:0.82rem;">
                                 Mostrar todos
                             </button>
+                            <span class="help-icon" style="font-size:0.75rem;">?
+                                <div class="tooltip">
+                                    <div class="tooltip-title">Limpieza — Acción Reversible</div>
+                                    <p>"Mover a _descartados/" <b>no borra</b> los archivos: los mueve a la subcarpeta <code>_descartados/</code> dentro del catálogo.</p>
+                                    <p style="margin-top:5px">Podés restaurarlos en cualquier momento desde el panel inferior de esta misma pantalla.</p>
+                                    <p style="margin-top:5px"><b>Filtro rápido:</b> "clases con menos de N espectros" es ideal para encontrar los espectros problemáticos o mal etiquetados que no aportan al entrenamiento.</p>
+                                    <p style="margin-top:5px">Los archivos en <code>_descartados/</code> <b>no se usan</b> en el entrenamiento.</p>
+                                </div>
+                            </span>
                         </div>
                         <div id="dmCleanupTable"></div>
                         <div id="dmCleanupActions" class="dm-action-bar" style="display:none;">
@@ -780,26 +829,37 @@
 
                     <!-- ── 4. RECLASIFICAR ── -->
                     <div id="dm-reclassify" class="dm-panel" style="display:none;">
-                        <p class="dm-hint">Selecciona un espectro del inspector, o escribe el nombre del archivo.</p>
+                        <p class="dm-hint">Selecciona un espectro en el Inspector (clic en la fila) — se pre-llena automáticamente. O escribí el nombre manualmente.</p>
                         <div class="dm-form-row">
                             <label class="dm-form-label">Archivo:</label>
                             <input type="text" id="dmReFile" class="dm-filter-input"
-                                   placeholder="HD000108_tipoO6pe.txt" style="flex:1;">
-                            <select id="dmReSource" class="dm-filter-select">
+                                   placeholder="HD000108_tipoO6pe.txt" style="flex:1;"
+                                   title="Nombre exacto del archivo, incluyendo extensión .txt">
+                            <select id="dmReSource" class="dm-filter-select" title="¿El archivo está en el catálogo principal o en _descartados/?">
                                 <option value="catalog">Catálogo</option>
                                 <option value="discarded">Descartados</option>
                             </select>
+                            <span class="help-icon" style="font-size:0.75rem;">?
+                                <div class="tooltip">
+                                    <div class="tooltip-title">Reclasificación por Renombrado</div>
+                                    <p>Cambia el tipo espectral <b>renombrando</b> el archivo en disco.</p>
+                                    <p style="margin-top:5px">El sistema reemplaza la parte <code>_tipo&lt;sptype&gt;</code> del nombre:</p>
+                                    <p style="margin-top:3px"><code>HD001234_tipoA5.txt</code><br>→ nuevo tipo <b>F2V</b><br>→ <code>HD001234_tipoF2V.txt</code></p>
+                                    <p style="margin-top:5px"><b>Formato del tipo:</b> letras y números solamente.<br>Ej: <code>B3V</code>, <code>A0</code>, <code>K5III</code>, <code>M</code></p>
+                                    <p style="margin-top:5px">El contenido del archivo <b>no se modifica</b>, solo el nombre.</p>
+                                </div>
+                            </span>
                         </div>
                         <div class="dm-form-row" style="margin-top:0.6rem;">
                             <label class="dm-form-label">Nuevo tipo:</label>
                             <input type="text" id="dmReNewSptype" class="dm-filter-input"
-                                   placeholder="Ej: B3V, A0, K5III" style="width:140px;">
+                                   placeholder="Ej: B3V, A0, K5III" style="width:140px;"
+                                   title="Tipo espectral completo. Se usará exactamente como lo escribas.">
                             <button class="btn-primary" onclick="dmDoReclassify()" style="padding:0.4rem 1rem;">
                                 Renombrar
                             </button>
                         </div>
                         <div id="dmReResult" class="dm-msg" style="margin-top:0.8rem;"></div>
-                        <!-- Lista rápida del catálogo -->
                         <div id="dmReList" style="margin-top:1rem;"></div>
                     </div>
 
@@ -807,29 +867,65 @@
                     <div id="dm-augment" class="dm-panel" style="display:none;">
                         <div class="dm-form-row" style="flex-wrap:wrap;gap:0.8rem;">
                             <div class="dm-form-group">
-                                <label class="dm-form-label">Target por clase</label>
+                                <label class="dm-form-label">Target por clase
+                                    <span class="help-icon" style="font-size:0.75rem;">?
+                                        <div class="tooltip">
+                                            <div class="tooltip-title">Target por Clase</div>
+                                            <p>Cantidad de espectros a la que se quiere llevar cada clase minoritaria.</p>
+                                            <p style="margin-top:5px"><b>Vacío (Auto)</b>: usa la mediana del dataset actual como target. Es la opción más conservadora y auto-adaptativa.</p>
+                                            <p style="margin-top:5px"><b>Número fijo</b>: ideal si querés un balance exacto. Ej: <code>50</code> para tener al menos 50 por clase.</p>
+                                        </div>
+                                    </span>
+                                </label>
                                 <input type="number" id="dmAugTarget" class="dm-filter-input"
                                        placeholder="Auto (mediana)" min="1" style="width:140px;">
                             </div>
                             <div class="dm-form-group">
-                                <label class="dm-form-label">Multiplicador máx.</label>
+                                <label class="dm-form-label">Multiplicador máx.
+                                    <span class="help-icon" style="font-size:0.75rem;">?
+                                        <div class="tooltip">
+                                            <div class="tooltip-title">Multiplicador Máximo</div>
+                                            <p>Limita cuántas copias sintéticas se generan por espectro real.</p>
+                                            <p style="margin-top:5px">Con <b>5×</b>: una clase con 4 espectros reales puede tener como máximo 4×5 = 20 espectros totales.</p>
+                                            <p style="margin-top:5px">⚠️ Valores muy altos (>10) pueden hacer que el modelo aprenda solo ruido de clases con muy pocas muestras reales.</p>
+                                        </div>
+                                    </span>
+                                </label>
                                 <input type="number" id="dmAugMaxRatio" value="5" min="1" max="20"
                                        class="dm-filter-input" style="width:90px;">
                             </div>
                             <div class="dm-form-group">
-                                <label class="dm-form-label">Factor de ruido</label>
+                                <label class="dm-form-label">Factor de ruido
+                                    <span class="help-icon" style="font-size:0.75rem;">?
+                                        <div class="tooltip">
+                                            <div class="tooltip-title">Factor de Ruido Gaussiano</div>
+                                            <p>Fracción del desvío estándar del espectro que se usa como amplitud del ruido añadido.</p>
+                                            <p style="margin-top:5px"><b>0.015</b> (1.5%) → variaciones muy sutiles. Las líneas espectrales se preservan casi perfectamente.</p>
+                                            <p style="margin-top:5px"><b>0.05</b> (5%) → más variedad, pero las líneas débiles pueden distorsionarse.</p>
+                                            <p style="margin-top:5px">📖 Ver <b>Espectros Sintéticos</b> en Ayuda para entender el proceso completo.</p>
+                                        </div>
+                                    </span>
+                                </label>
                                 <input type="number" id="dmAugNoise" value="0.015" min="0.001" max="0.2"
                                        step="0.001" class="dm-filter-input" style="width:100px;">
                             </div>
                         </div>
                         <div class="dm-action-bar" style="margin-top:0.8rem;">
                             <button class="btn-secondary" onclick="dmAugPreview()">👁️ Vista previa</button>
-                            <button class="btn-primary"   onclick="dmAugApply()" id="dmAugApplyBtn" style="display:none;">
+                            <button class="btn-primary" onclick="dmAugApply()" id="dmAugApplyBtn" style="display:none;">
                                 ⚡ Generar sintéticos
                             </button>
+                            <span class="help-icon" style="font-size:0.75rem;">?
+                                <div class="tooltip">
+                                    <div class="tooltip-title">Vista Previa vs. Aplicar</div>
+                                    <p><b>Vista previa</b>: calcula cuántos sintéticos se generarían por clase, sin escribir nada en disco. Siempre hacé esto primero.</p>
+                                    <p style="margin-top:5px"><b>Generar sintéticos</b>: escribe los archivos reales en <code>_augmented/</code>, subcarpeta del catálogo. Los originales no se modifican.</p>
+                                    <p style="margin-top:5px">Los archivos en <code>_augmented/</code> se usan automáticamente en el próximo entrenamiento CNN.</p>
+                                </div>
+                            </span>
                         </div>
                         <div id="dmAugPreviewTable" style="margin-top:1rem;"></div>
-                        <div id="dmAugResult" class="dm-msg" style="margin-top:0.6rem;"></div>
+                        <div id="dmAugResult" class="dm-msg" style="margin-top:0.6rem;display:none;"></div>
                     </div>
 
                     <!-- ── 6. CALIDAD ── -->
@@ -838,18 +934,41 @@
                             <button class="btn-primary" onclick="dmRunQuality()" id="dmQualityBtn">
                                 🔬 Analizar calidad
                             </button>
+                            <span class="help-icon" style="font-size:0.75rem;">?
+                                <div class="tooltip">
+                                    <div class="tooltip-title">Análisis de Calidad</div>
+                                    <p>Escanea cada espectro y detecta problemas automáticamente:</p>
+                                    <ul style="margin:5px 0 0 1rem;">
+                                        <li><b>flujo_cero / flujo_muy_bajo</b>: el espectro no tiene señal útil</li>
+                                        <li><b>nan_inf</b>: puntos con valores no numéricos (corrupción de datos)</li>
+                                        <li><b>rango_lambda_corto</b>: cobertura espectral &lt; 100 Å (inútil para clasificar)</li>
+                                        <li><b>pocos_puntos</b>: menos de 50 puntos de datos</li>
+                                        <li><b>snr_bajo</b>: relación señal/ruido estimada &lt; 3 (dominado por ruido)</li>
+                                    </ul>
+                                    <p style="margin-top:5px">No elimina nada — solo marca. Luego podés ir a Limpieza para descartar los problemáticos.</p>
+                                </div>
+                            </span>
                         </div>
                         <div id="dmQualityResult" style="margin-top:1rem;"></div>
                     </div>
 
                     <!-- ── 7. EXPORTAR ── -->
                     <div id="dm-export" class="dm-panel" style="display:none;">
-                        <p class="dm-hint">Genera un resumen del dataset: archivos activos, descartados y augmentados.</p>
+                        <p class="dm-hint">Genera un resumen completo del estado del dataset.</p>
                         <div class="dm-action-bar" style="gap:0.8rem;">
                             <button class="btn-primary" onclick="dmExport('csv')">📥 Exportar CSV</button>
                             <button class="btn-secondary" onclick="dmExport('json')">📄 Exportar JSON</button>
+                            <span class="help-icon" style="font-size:0.75rem;">?
+                                <div class="tooltip">
+                                    <div class="tooltip-title">Exportación del Dataset</div>
+                                    <p>Genera un archivo con el estado de <b>todos</b> los espectros: activos, descartados y sintéticos.</p>
+                                    <p style="margin-top:5px"><b>CSV</b>: fácil de abrir en Excel o importar a Python/pandas.</p>
+                                    <p style="margin-top:5px"><b>JSON</b>: incluye un resumen de conteos además de la lista completa. Útil para scripts.</p>
+                                    <p style="margin-top:5px">Columnas: <code>status, filename, sptype, class, size_kb, mtime</code></p>
+                                </div>
+                            </span>
                         </div>
-                        <div id="dmExportInfo" class="dm-msg" style="margin-top:0.8rem;"></div>
+                        <div id="dmExportInfo" class="dm-msg" style="margin-top:0.8rem;display:none;"></div>
                     </div>
 
                 </div><!-- /batch-container -->
@@ -2847,6 +2966,7 @@
                         <a href="#grupo-ml"         class="help-nav-btn hng-indigo">🧠 ML / IA</a>
                         <a href="#grupo-tablas"     class="help-nav-btn hng-red">📋 Tablas MK</a>
                         <a href="#grupo-normalizacion" class="help-nav-btn" style="background:linear-gradient(135deg,#0e7c5a,#14a876); color:#fff;">🔬 Normalización</a>
+                        <a href="#grupo-dataset" class="help-nav-btn" style="background:linear-gradient(135deg,#553c9a,#6b46c1); color:#fff;">🗄️ Dataset</a>
                         <a href="#grupo-referencia" class="help-nav-btn hng-gray">📖 Referencia</a>
                     </nav>
 
@@ -5129,6 +5249,233 @@ print(<span class="mlc-str">"✅ Modelo CNN 2D guardado en models/cnn2d_model.h5
                     </div>
 
                     </div><!-- /grupo-referencia -->
+
+                    <!-- ══════════════════════════════════════════════════════════ -->
+                    <!-- GRUPO G — GESTIÓN DE DATASET                               -->
+                    <!-- ══════════════════════════════════════════════════════════ -->
+                    <div class="help-group" id="grupo-dataset">
+                        <div class="help-group-header" style="background:linear-gradient(135deg,#553c9a22,#6b46c122); border-left:4px solid #6b46c1;">
+                            <span class="help-group-icon">🗄️</span>
+                            <div>
+                                <div class="help-group-title">Gestión de Dataset</div>
+                                <div class="help-group-subtitle">Limpieza · Reclasificación · Espectros Sintéticos · Calidad</div>
+                            </div>
+                        </div>
+
+                        <!-- ════════════════════════════════════════ -->
+                        <!-- OVERVIEW DEL PANEL                       -->
+                        <!-- ════════════════════════════════════════ -->
+                        <div class="help-section">
+                            <h3>🗄️ Panel de Gestión de Dataset</h3>
+                            <p>Accesible en <strong>Procesamiento por Lotes → Gestión de Dataset</strong>. Reúne 7 herramientas para mantener la calidad del catálogo de entrenamiento.</p>
+
+                            <table class="help-table" style="margin-top:0.8rem;">
+                                <tr><th>Panel</th><th>Qué hace</th><th>Cuándo usarlo</th></tr>
+                                <tr>
+                                    <td>📊 Vista General</td>
+                                    <td>Tabla y gráfico de distribución por clase</td>
+                                    <td>Primer diagnóstico del balance</td>
+                                </tr>
+                                <tr>
+                                    <td>🔍 Inspector</td>
+                                    <td>Lista paginada + visor de espectro inline</td>
+                                    <td>Identificar espectros problemáticos visualmente</td>
+                                </tr>
+                                <tr>
+                                    <td>🗑️ Limpieza</td>
+                                    <td>Mover espectros a <code>_descartados/</code> (reversible)</td>
+                                    <td>Eliminar espectros con clasificación incorrecta</td>
+                                </tr>
+                                <tr>
+                                    <td>🏷️ Reclasificar</td>
+                                    <td>Renombra el archivo cambiando el tipo espectral</td>
+                                    <td>Corregir etiquetas erróneas sin borrar datos</td>
+                                </tr>
+                                <tr>
+                                    <td>⚖️ Compensación</td>
+                                    <td>Genera espectros sintéticos para clases minoritarias</td>
+                                    <td>Dataset desbalanceado (ver sección abajo)</td>
+                                </tr>
+                                <tr>
+                                    <td>🔬 Calidad</td>
+                                    <td>Detecta flujo cero, NaN, SNR bajo, λ corto</td>
+                                    <td>Antes de entrenar un nuevo modelo</td>
+                                </tr>
+                                <tr>
+                                    <td>📤 Exportar</td>
+                                    <td>CSV/JSON con estado completo del dataset</td>
+                                    <td>Auditoría, reproducibilidad, backup de metadatos</td>
+                                </tr>
+                            </table>
+
+                            <div class="help-tip" style="margin-top:1rem;">
+                                💡 <strong>Flujo recomendado:</strong> Vista General → Inspector → Calidad → Limpieza → Reclasificar → Compensación → Exportar para auditoría.
+                            </div>
+                        </div>
+
+                        <!-- ════════════════════════════════════════ -->
+                        <!-- CONVENCIÓN DE NOMBRES                    -->
+                        <!-- ════════════════════════════════════════ -->
+                        <div class="help-section">
+                            <h3>📁 Convención de Nombres de Archivo</h3>
+                            <p>El sistema reconoce el tipo espectral de un archivo por su nombre. El patrón esperado es:</p>
+                            <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:0.7rem 1rem;font-family:monospace;font-size:0.88rem;color:#90cdf4;margin:0.6rem 0;">
+                                NOMBRE_OBJETO_tipo<span style="color:#f6ad55;">SPTYPE</span>.txt
+                            </div>
+                            <table class="help-table">
+                                <tr><th>Ejemplo</th><th>Objeto</th><th>Tipo espectral</th><th>Clase ML</th></tr>
+                                <tr><td><code>HD001234_tipoA5.txt</code></td><td>HD001234</td><td>A5</td><td>A</td></tr>
+                                <tr><td><code>BD+02_tipoB3V.txt</code></td><td>BD+02</td><td>B3V</td><td>B</td></tr>
+                                <tr><td><code>WR042_tipoWC7.txt</code></td><td>WR042</td><td>WC7</td><td>W</td></tr>
+                                <tr><td><code>sdO_1_tiposdO.txt</code></td><td>sdO_1</td><td>sdO</td><td>s</td></tr>
+                            </table>
+                            <p style="margin-top:0.6rem; color:#718096; font-size:0.85rem;">La <strong>clase ML</strong> es siempre la primera letra del tipo espectral (mayúscula). Todos los subtipos numéricos (A5, A0, A2…) se agrupan bajo la misma clase A.</p>
+                        </div>
+
+                        <!-- ════════════════════════════════════════ -->
+                        <!-- ESPECTROS SINTÉTICOS — SECCIÓN PRINCIPAL -->
+                        <!-- ════════════════════════════════════════ -->
+                        <div class="help-section">
+                            <div class="help-section-title-row">
+                                <h3>⚖️ Espectros Sintéticos — Origen y Generación</h3>
+                                <span class="help-icon tooltip-left">?
+                                    <div class="tooltip">Los espectros sintéticos <b>no son predicciones</b> de cómo debería verse una estrella. Son variaciones controladas de espectros reales existentes.</div>
+                                </span>
+                            </div>
+
+                            <h4 style="color:#a78bfa;margin:0.8rem 0 0.4rem;">¿Por qué se generan?</h4>
+                            <p>Los algoritmos de machine learning necesitan suficientes ejemplos de cada clase para aprender sus características. Cuando una clase tiene muy pocos espectros (Ej: S=4, WC=1), el modelo tiende a ignorarla o a predecir siempre la clase más común (<em>mode collapse</em>).</p>
+
+                            <p style="margin-top:0.5rem;">La solución es <strong>aumentar artificialmente</strong> el número de ejemplos de las clases subrepresentadas antes de entrenar.</p>
+
+                            <h4 style="color:#a78bfa;margin:0.8rem 0 0.4rem;">¿Cómo se generan? (Ruido Gaussiano)</h4>
+                            <p>El proceso es el siguiente para cada espectro sintético nuevo:</p>
+                            <ol style="margin:0.5rem 0 0 1.2rem; line-height:1.9;">
+                                <li>Se elige aleatoriamente un espectro real de la clase minoritaria como <strong>base</strong>.</li>
+                                <li>Se calcula el <strong>desvío estándar</strong> del flujo del espectro base (σ<sub>espectro</sub>).</li>
+                                <li>Se genera un vector de <strong>ruido gaussiano</strong>: cada punto recibe una perturbación aleatoria con distribución N(0, factor × σ<sub>espectro</sub>).</li>
+                                <li>El espectro sintético = espectro base + ruido.</li>
+                                <li>Se guarda como archivo <code>.txt</code> en <code>_augmented/</code>.</li>
+                            </ol>
+
+                            <div style="background:#0f172a;border:1px solid #553c9a;border-radius:8px;padding:0.8rem 1.1rem;margin:0.8rem 0;font-size:0.85rem;">
+                                <div style="color:#a78bfa;font-weight:600;margin-bottom:0.4rem;">Fórmula simplificada</div>
+                                <code style="color:#90cdf4;">
+                                    flujo_sintético[i] = flujo_real[i] + N(0, <span style="color:#f6ad55;">factor_ruido</span> × σ<sub>espectro</sub>)
+                                </code>
+                                <div style="color:#718096;margin-top:0.5rem;">donde <span style="color:#f6ad55;">factor_ruido</span> = 0.015 por defecto (1.5% del desvío del espectro)</div>
+                            </div>
+
+                            <h4 style="color:#a78bfa;margin:0.8rem 0 0.4rem;">¿Qué preserva y qué cambia?</h4>
+                            <table class="help-table">
+                                <tr><th></th><th>Preservado ✅</th><th>Modificado ⚠️</th></tr>
+                                <tr>
+                                    <td><strong>Líneas fuertes</strong><br><small>(Hα, Hβ, CaII K…)</small></td>
+                                    <td>Posición y profundidad casi idénticas. El ruido 1.5% es menor que la profundidad de la línea.</td>
+                                    <td>Perfil levemente suavizado o ruidoso.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Líneas débiles</strong><br><small>(He I en estrellas B frías…)</small></td>
+                                    <td>Posición preservada.</td>
+                                    <td>Con factor > 5%, líneas débiles pueden volverse invisibles.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Continuo</strong></td>
+                                    <td>Forma general preservada.</td>
+                                    <td>Pequeñas fluctuaciones añadidas.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Longitudes de onda</strong></td>
+                                    <td>Idénticas al espectro original base.</td>
+                                    <td>—</td>
+                                </tr>
+                            </table>
+
+                            <h4 style="color:#a78bfa;margin:0.8rem 0 0.4rem;">¿Dónde se guardan?</h4>
+                            <p>En la subcarpeta <code>_augmented/</code> dentro del catálogo. Los archivos se nombran:</p>
+                            <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:0.6rem 1rem;font-family:monospace;font-size:0.85rem;color:#68d391;margin:0.4rem 0;">
+                                HD001234_tipoA5_syn001.txt<br>
+                                HD001234_tipoA5_syn002.txt<br>
+                                HD001234_tipoA5_syn003.txt
+                            </div>
+                            <p style="margin-top:0.4rem;">El sufijo <code>_synNNN</code> identifica las variantes. La clase se deduce del nombre original (<code>_tipoA5</code> → clase A).</p>
+
+                            <h4 style="color:#a78bfa;margin:0.8rem 0 0.4rem;">¿El modelo los usa automáticamente?</h4>
+                            <p>Sí, pero de forma separada:</p>
+                            <ul style="margin:0.4rem 0 0 1.2rem;line-height:1.8;">
+                                <li><strong>CNN 1D</strong>: el pipeline de entrenamiento genera sus propios sintéticos en memoria durante el entrenamiento (función <code>augment_minority_spectra()</code>). No lee la carpeta <code>_augmented/</code> directamente.</li>
+                                <li><strong>KNN / Árbol de decisión</strong>: leen todos los <code>.txt</code> del catálogo, incluyendo los de <code>_augmented/</code> si están en la misma carpeta raíz.</li>
+                            </ul>
+                            <div class="help-tip">
+                                💡 <strong>Recomendación:</strong> Para CNN, usa la augmentación automática del entrenamiento (ya integrada). Para KNN/DT, genera los sintéticos con este panel y copialos a la carpeta raíz del catálogo antes de entrenar.
+                            </div>
+                        </div>
+
+                        <!-- ════════════════════════════════════════ -->
+                        <!-- MÉTRICAS DE CALIDAD                      -->
+                        <!-- ════════════════════════════════════════ -->
+                        <div class="help-section">
+                            <h3>🔬 Métricas de Calidad Explicadas</h3>
+                            <table class="help-table">
+                                <tr><th>Métrica</th><th>Significado</th><th>Cuándo es un problema</th></tr>
+                                <tr>
+                                    <td><code>flujo_cero</code></td>
+                                    <td>El valor máximo absoluto del flujo es &lt; 10⁻¹⁰</td>
+                                    <td>Siempre — espectro sin datos útiles</td>
+                                </tr>
+                                <tr>
+                                    <td><code>flujo_muy_bajo</code></td>
+                                    <td>Flujo máximo &lt; 0.001 (pero no cero)</td>
+                                    <td>Probable error de unidades o conversión</td>
+                                </tr>
+                                <tr>
+                                    <td><code>nan_inf</code></td>
+                                    <td>Puntos con valores NaN o infinitos</td>
+                                    <td>Siempre — causa errores en el entrenamiento</td>
+                                </tr>
+                                <tr>
+                                    <td><code>rango_lambda_corto</code></td>
+                                    <td>Cobertura espectral total &lt; 100 Å</td>
+                                    <td>No contiene suficientes líneas para clasificar</td>
+                                </tr>
+                                <tr>
+                                    <td><code>pocos_puntos</code></td>
+                                    <td>Menos de 50 puntos de datos</td>
+                                    <td>Resolución insuficiente para CNN 1D</td>
+                                </tr>
+                                <tr>
+                                    <td><code>snr_bajo</code></td>
+                                    <td>SNR estimado &lt; 3</td>
+                                    <td>El ruido domina la señal; las líneas son indetectables</td>
+                                </tr>
+                            </table>
+                            <p style="margin-top:0.6rem; color:#718096; font-size:0.84rem;">
+                                <strong>Estimación de SNR:</strong> se calcula como |media(flujo)| / desv.std(flujo − media_móvil). Es una estimación aproximada, no el SNR astronómico real.
+                            </p>
+                        </div>
+
+                        <!-- ════════════════════════════════════════ -->
+                        <!-- ESTRUCTURA DE CARPETAS                   -->
+                        <!-- ════════════════════════════════════════ -->
+                        <div class="help-section">
+                            <h3>📂 Estructura de Carpetas del Catálogo</h3>
+                            <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:0.9rem 1.2rem;font-family:monospace;font-size:0.84rem;line-height:1.9;">
+                                <span style="color:#718096;">data/elodie/</span><br>
+                                <span style="color:#68d391;">├── HD001234_tipoA5.txt</span> <span style="color:#4a5568;">← espectro activo</span><br>
+                                <span style="color:#68d391;">├── HD002345_tipoF2V.txt</span><br>
+                                <span style="color:#718096;">├── ...</span><br>
+                                <span style="color:#fc8181;">├── _descartados/</span><br>
+                                <span style="color:#fc8181;">│   └── HD999_tipoQ.txt</span> <span style="color:#4a5568;">← descartados (reversible)</span><br>
+                                <span style="color:#68d391;">└── _augmented/</span><br>
+                                <span style="color:#68d391;">    ├── HD001234_tipoA5_syn001.txt</span> <span style="color:#4a5568;">← sintéticos generados</span><br>
+                                <span style="color:#68d391;">    └── HD001234_tipoA5_syn002.txt</span>
+                            </div>
+                            <p style="margin-top:0.6rem; color:#718096; font-size:0.84rem;">
+                                Las subcarpetas <code>_descartados/</code> y <code>_augmented/</code> se crean automáticamente la primera vez que se usan. El entrenamiento solo escanea la carpeta raíz, no las subcarpetas.
+                            </p>
+                        </div>
+
+                    </div><!-- /grupo-dataset -->
 
                     <!-- Botón volver arriba -->
                     <div style="text-align:center; margin-top:2rem;">
