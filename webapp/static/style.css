@@ -6003,3 +6003,16 @@ details[open] summary {
 .dm-quality-ok   { color: #48bb78; font-weight: 600; }
 .dm-quality-warn { color: #f6ad55; }
 .dm-quality-err  { color: #fc8181; font-weight: 600; }
+
+/* Spinner inline para botones de carga */
+.dm-spinner {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: dm-spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 4px;
+}
+@keyframes dm-spin { to { transform: rotate(360deg); } }

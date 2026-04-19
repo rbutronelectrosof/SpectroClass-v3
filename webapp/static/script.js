@@ -7155,75 +7155,94 @@ async function dmAugPreview() {
 }
 
 async function dmAugApply() {
-    const target   = document.getElementById('dmAugTarget')?.value;
-    const maxRatio = document.getElementById('dmAugMaxRatio')?.value || 5;
-    const noise    = parseFloat(document.getElementById('dmAugNoise')?.value || 0.015);
-    const resultEl = document.getElementById('dmAugResult');
+    const target    = document.getElementById('dmAugTarget')?.value;
+    const maxRatio  = document.getElementById('dmAugMaxRatio')?.value || 5;
+    const noise     = parseFloat(document.getElementById('dmAugNoise')?.value || 0.015);
+    const resultEl  = document.getElementById('dmAugResult');
+    const applyBtn  = document.getElementById('dmAugApplyBtn');
+    const previewBtn = document.querySelector('[onclick="dmAugPreview()"]');
+
+    // Deshabilitar botones y mostrar spinner
+    applyBtn.disabled  = true;
+    if (previewBtn) previewBtn.disabled = true;
+    applyBtn.innerHTML = '<span class="dm-spinner"></span> Generando…';
     resultEl.className = 'dm-msg';
-    resultEl.textContent = '⌛ Generando espectros sintéticos…';
+    resultEl.textContent = '⌛ Leyendo espectros y generando variantes sintéticas…';
 
-    const res  = await fetch('/dataset/augment_apply', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            catalog: dmCatalog(),
-            target_per_class: target ? parseInt(target) : null,
-            max_augment_ratio: parseInt(maxRatio),
-            noise_factor: noise,
-        }),
-    });
-    const data = await res.json();
-
-    if (data.error) {
+    try {
+        const res  = await fetch('/dataset/augment_apply', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                catalog:           dmCatalog(),
+                target_per_class:  target ? parseInt(target) : null,
+                max_augment_ratio: parseInt(maxRatio),
+                noise_factor:      noise,
+            }),
+        });
+        const data = await res.json();
+        if (data.error) {
+            resultEl.className = 'dm-msg err';
+            resultEl.textContent = `❌ ${data.error}`;
+        } else {
+            resultEl.className = 'dm-msg ok';
+            resultEl.innerHTML = `✅ ${data.generated} espectros sintéticos generados en <code>${data.aug_dir}</code>`;
+            await dmLoadOverview();
+        }
+    } catch (e) {
         resultEl.className = 'dm-msg err';
-        resultEl.textContent = `❌ ${data.error}`;
-    } else {
-        resultEl.className = 'dm-msg ok';
-        resultEl.innerHTML = `✅ ${data.generated} espectros sintéticos generados en <code>${data.aug_dir}</code>`;
-        await dmLoadOverview();
+        resultEl.textContent = `❌ Error de red: ${e.message}`;
+    } finally {
+        applyBtn.disabled  = false;
+        if (previewBtn) previewBtn.disabled = false;
+        applyBtn.innerHTML = '⚡ Generar sintéticos';
     }
 }
 
 // ── 6. CALIDAD ──────────────────────────────────────────────────────
 async function dmRunQuality() {
-    const btn = document.getElementById('dmQualityBtn');
+    const btn    = document.getElementById('dmQualityBtn');
     const res_el = document.getElementById('dmQualityResult');
-    btn.disabled = true;
-    btn.textContent = '⌛ Analizando…';
+    btn.disabled  = true;
+    btn.innerHTML = '<span class="dm-spinner"></span> Analizando…';
     res_el.innerHTML = '';
 
-    const res  = await fetch(`/dataset/quality?catalog=${encodeURIComponent(dmCatalog())}`);
-    const data = await res.json();
-    btn.disabled = false;
-    btn.textContent = '🔬 Analizar calidad';
+    try {
+        const res  = await fetch(`/dataset/quality?catalog=${encodeURIComponent(dmCatalog())}`);
+        const data = await res.json();
+        if (data.error) { res_el.innerHTML = `<p class="dm-msg err">${data.error}</p>`; return; }
 
-    if (data.error) { res_el.innerHTML = `<p class="dm-msg err">${data.error}</p>`; return; }
+        const rows = data.results.map(r => {
+            const issues = r.issues.length ? r.issues.join(', ') : '—';
+            const snr    = r.snr_est != null ? r.snr_est : '—';
+            const cls    = r.ok ? 'dm-quality-ok' : (r.issues.some(i=>i.startsWith('error')) ? 'dm-quality-err' : 'dm-quality-warn');
+            return `<tr>
+                <td>${r.ok ? '✅' : '⚠️'}</td>
+                <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                    title="${escHtml(r.filename)}">${escHtml(r.filename)}</td>
+                <td><span class="dm-badge">${r.class}</span></td>
+                <td>${r.n_points || '—'}</td>
+                <td>${snr}</td>
+                <td class="${cls}">${issues}</td>
+            </tr>`;
+        }).join('');
 
-    const rows = data.results.map(r => {
-        const issues = r.issues.length ? r.issues.join(', ') : '—';
-        const snr    = r.snr_est != null ? r.snr_est : '—';
-        const cls    = r.ok ? 'dm-quality-ok' : (r.issues.some(i=>i.startsWith('error')) ? 'dm-quality-err' : 'dm-quality-warn');
-        return `<tr>
-            <td>${r.ok ? '✅' : '⚠️'}</td>
-            <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
-                title="${escHtml(r.filename)}">${escHtml(r.filename)}</td>
-            <td><span class="dm-badge">${r.class}</span></td>
-            <td>${r.n_points || '—'}</td>
-            <td>${snr}</td>
-            <td class="${cls}">${issues}</td>
-        </tr>`;
-    }).join('');
-
-    res_el.innerHTML = `
-        <div class="dm-aug-summary" style="margin-bottom:0.8rem;">
-            Total: ${data.total} &nbsp;|&nbsp;
-            <span style="color:#48bb78;">✅ OK: ${data.ok}</span> &nbsp;|&nbsp;
-            <span style="color:#f6ad55;">⚠️ Con problemas: ${data.with_issues}</span>
-        </div>
-        <table class="dm-quality-table">
-            <thead><tr><th></th><th>Archivo</th><th>Clase</th><th>Puntos</th><th>SNR est.</th><th>Problemas</th></tr></thead>
-            <tbody>${rows}</tbody>
-        </table>`;
+        res_el.innerHTML = `
+            <div class="dm-aug-summary" style="margin-bottom:0.8rem;">
+                Total: ${data.total} &nbsp;|&nbsp;
+                <span style="color:#48bb78;">✅ OK: ${data.ok}</span> &nbsp;|&nbsp;
+                <span style="color:#f6ad55;">⚠️ Con problemas: ${data.with_issues}</span>
+            </div>
+            <table class="dm-quality-table">
+                <thead><tr><th></th><th>Archivo</th><th>Clase</th><th>Puntos</th><th>SNR est.</th><th>Problemas</th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+    } catch(e) {
+        res_el.innerHTML = `<p class="dm-msg err">❌ Error: ${e.message}</p>`;
+    } finally {
+        btn.disabled  = false;
+        btn.innerHTML = '🔬 Analizar calidad';
+    }
 }
 
 // ── 7. EXPORTAR ─────────────────────────────────────────────────────
