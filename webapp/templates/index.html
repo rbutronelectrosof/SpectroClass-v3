@@ -1716,7 +1716,7 @@
                                                     </div>
                                                 </span>
                                             </div>
-                                            <span class="wm-accuracy">~84% accuracy</span>
+                                            <span class="wm-accuracy" id="wmAccKNN">—</span>
                                         </div>
                                         <span class="wm-badge" id="badgeKNN">0.20</span>
                                     </div>
@@ -1753,7 +1753,7 @@
                                                     </div>
                                                 </span>
                                             </div>
-                                            <span class="wm-accuracy">~45%+ accuracy</span>
+                                            <span class="wm-accuracy" id="wmAccCNN1D">—</span>
                                         </div>
                                         <span class="wm-badge" id="badgeCNN1D">0.20</span>
                                     </div>
@@ -2063,9 +2063,6 @@
                                     <option value="minkowski">Minkowski</option>
                                 </select>
                                 <small>Euclidiana es el estándar para la mayoría de casos</small>
-                                <small style="display:block; margin-top:4px; color:#14a876;">
-                                    💡 <b>Sugerencia:</b> La métrica <b>Coseno</b> dio los mejores resultados de entrenamiento en este catálogo — se recomienda probarla.
-                                </small>
                             </div>
                         </div>
                     </div>
@@ -3216,7 +3213,7 @@
                             <div class="help-method-card">
                                 <div class="help-method-icon">🧠</div>
                                 <h4>KNN + CNN 1D + CNN 2D</h4>
-                                <div class="help-method-acc">KNN ~84% · CNN 1D ~45%+ · CNN 2D experimental</div>
+                                <div class="help-method-acc" id="helpMethodAccNN">KNN — · CNN 1D — · CNN 2D experimental</div>
                                 <p>Tres modelos neuronales independientes. KNN usa los EWs como features (rápido, preciso). CNN 1D procesa el espectro completo (necesita más datos). CNN 2D usa imágenes del espectro (experimental).</p>
                                 <div class="help-method-footer">Pesos por defecto: KNN 20% · CNN 1D 20% · CNN 2D 0%</div>
                             </div>

@@ -2377,6 +2377,33 @@ async function loadCurrentModelBanner() {
             });
         }
     } catch (_) {}
+
+    // Actualizar accuracy real en las tarjetas de pesos de votación (KNN, CNN 1D)
+    _refreshWeightCardAccuracies();
+}
+
+async function _refreshWeightCardAccuracies() {
+    try {
+        const res  = await fetch('/neural_history');
+        const data = await res.json();
+        if (!data.success) return;
+
+        const fmt = (acc) => acc != null ? `${acc}% accuracy` : '—';
+
+        const knnEl   = document.getElementById('wmAccKNN');
+        const cnnEl   = document.getElementById('wmAccCNN1D');
+        const helpEl  = document.getElementById('helpMethodAccNN');
+
+        if (knnEl)  knnEl.textContent  = fmt(data.knn?.accuracy);
+        if (cnnEl)  cnnEl.textContent  = fmt(data.cnn_1d?.accuracy);
+
+        // Actualizar texto de ayuda también
+        if (helpEl) {
+            const kAcc = data.knn?.accuracy   != null ? `KNN ${data.knn.accuracy}%`     : 'KNN —';
+            const cAcc = data.cnn_1d?.accuracy != null ? `CNN 1D ${data.cnn_1d.accuracy}%` : 'CNN 1D —';
+            helpEl.textContent = `${kAcc} · ${cAcc} · CNN 2D experimental`;
+        }
+    } catch (_) {}
 }
 
 // Llamar al cargar la página y al activar la pestaña de herramientas
@@ -3309,6 +3336,8 @@ async function trainNeuralModel() {
                             _lastTrainedNeural = { type, accuracy: event.accuracy };
                             const saveStatus = document.getElementById('nnSaveStatus');
                             if (saveStatus) saveStatus.textContent = '';
+                            // Actualizar badges de accuracy en pesos de votación
+                            _refreshWeightCardAccuracies();
                             // Cargar métricas finales y asegurar que se muestra el modelo correcto
                             loadTrainingHistory(type);
                         }, 800);
