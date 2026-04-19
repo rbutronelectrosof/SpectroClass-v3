@@ -2179,6 +2179,51 @@
                                 <small>Recomendado: 128 (reducir si hay pocos datos)</small>
                             </div>
                         </div>
+
+                        <!-- Balanceo de clases -->
+                        <div style="margin-top:16px; padding:12px; background:var(--card-bg,#1e1e2e); border-radius:8px; border:1px solid var(--border,#333);">
+                            <div class="label-with-help" style="margin-bottom:10px">
+                                <h4 style="margin:0">⚖️ Balanceo de Clases</h4>
+                                <span class="help-icon">?
+                                    <div class="tooltip">
+                                        <div class="tooltip-title">Balanceo Automático de Dataset</div>
+                                        <p>Antes de entrenar, SpectroClass balancea el dataset para que todas las clases tengan similar número de muestras.</p>
+                                        <ul>
+                                            <li><b>Sobremuestreo:</b> genera espectros sintéticos (ruido gaussiano) para clases pequeñas</li>
+                                            <li><b>Submuestreo:</b> reduce aleatoriamente las clases con demasiadas muestras</li>
+                                        </ul>
+                                        <p>Sin balanceo, clases grandes (F, K con 200-350 espectros) dominan el entrenamiento y el modelo tiende a predecir siempre esas clases.</p>
+                                    </div>
+                                </span>
+                            </div>
+                            <div style="display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start;">
+                                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                                    <input type="checkbox" id="cnnDownsample" checked>
+                                    <span>
+                                        <b>Submuestrear clases mayoritarias</b>
+                                        <span class="help-icon">?
+                                            <div class="tooltip">
+                                                <div class="tooltip-title">Submuestrear clases grandes</div>
+                                                <p>Reduce aleatoriamente las clases con más muestras hasta el objetivo de balanceo.</p>
+                                                <p><b>Recomendado activado.</b> Sin esto, F (350+) y K (260+) seguirán dominando aunque se generen sintéticos para O, M, S, G — el modelo colapsa prediciendo siempre A/F/K.</p>
+                                            </div>
+                                        </span>
+                                    </span>
+                                </label>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <label for="cnnMaxAugRatio" style="white-space:nowrap">Ratio máx. aumento:</label>
+                                    <input type="number" id="cnnMaxAugRatio" value="5" min="1" max="20" step="1" style="width:70px">
+                                    <span class="help-icon">?
+                                        <div class="tooltip">
+                                            <div class="tooltip-title">Factor Máximo de Augmentación</div>
+                                            <p>Límite de cuántas veces puede crecer una clase mediante sintéticos.</p>
+                                            <p>Ejemplo con ratio=5: si O tiene 15 espectros, el máximo es 15×5=75 sintéticos → total 90.</p>
+                                            <p>Valores altos generan más datos pero más similares entre sí.</p>
+                                        </div>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Panel de parámetros CNN 2D específicos -->

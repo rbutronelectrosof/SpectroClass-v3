@@ -753,98 +753,143 @@ def train_cnn_2d(image_dir, labels_dict, epochs=20, batch_size=32,
 
 def augment_minority_spectra(X_train, y_train, target_per_class=None,
                               max_augment_ratio=5, noise_factor=0.015,
+                              downsample_majority=True,
                               random_state=42):
     """
-    Genera espectros sintéticos para clases minoritarias mediante ruido gaussiano.
+    Equilibra el conjunto de entrenamiento con oversampling + downsampling.
 
-    ESTRATEGIA GENERAL:
-    - Clases con muchas muestras: sin cambios
-    - Clases con pocas muestras: duplicar con pequeñas perturbaciones hasta
-      alcanzar `target_per_class` (o la mediana del dataset, lo que sea menor)
+    ESTRATEGIA:
+    ──────────
+    Todas las clases se llevan a `target_per_class` muestras:
+    • Clases con MÁS muestras que target → se subesamplea aleatoriamente
+      (downsampling).  Activa solo si downsample_majority=True.
+    • Clases con MENOS muestras que target → se generan variantes sintéticas
+      con ruido gaussiano (oversampling), hasta max_augment_ratio × original.
+
+    POR QUÉ ES NECESARIO EL DOWNSAMPLING:
+    ──────────────────────────────────────
+    Si solo se hace oversampling de minorías sin reducir mayorías, el modelo
+    sigue viendo F=280 y K=207 en cada época mientras M=22+sintéticos=60.
+    Los pesos de clase compensan parcialmente, pero la CNN sigue expuesta
+    a patrones de F/K muchas más veces → converge hacia esas clases
+    o hacia la que tiene la mejor relación "muestras × peso" (suele ser
+    la clase de conteo intermedio → colapso a clase 'A').
+
+    CÁLCULO DEL TARGET POR DEFECTO:
+    ────────────────────────────────
+    Con target=None se usa el MÁXIMO alcanzable por la clase más pequeña
+    con el ratio permitido: target = min(counts) × max_augment_ratio.
+    Esto garantiza que TODAS las clases pueden llegar al target ya sea
+    subsampling (mayorías) o oversampling (minorías), sin exceder el ratio.
 
     PARÁMETROS:
-    -----------
-    X_train : array (n_samples, spectrum_length) — espectros normalizados
-    y_train : array (n_samples,) — etiquetas enteras
-    target_per_class : int o None
-        Objetivo de muestras por clase. Si None, se usa la mediana de conteos.
-    max_augment_ratio : int
-        Máximo multiplicador: nunca generar más de N× las muestras originales
-        de una clase (evita que clases con 2 muestras dominen con 1000 copias).
-    noise_factor : float
-        Fracción del desvío estándar del espectro que se usa como σ del ruido.
-        0.015 (1.5%) preserva líneas espectrales; 0.05 (5%) da más variedad.
-    random_state : int
-        Semilla para reproducibilidad.
+    ───────────
+    X_train          : (n_samples, L)  — espectros Z-score normalizados
+    y_train          : (n_samples,)    — etiquetas enteras (encoded)
+    target_per_class : int o None      — si None, auto (ver arriba)
+    max_augment_ratio: int             — cap de oversampling por clase
+    noise_factor     : float           — σ del ruido = factor × std(espectro)
+    downsample_majority: bool          — si False, no toca las clases grandes
+    random_state     : int             — semilla de reproducibilidad
 
-    NOTA DE DISEÑO:
-    No se aplica al conjunto de test. Aplicar augmentación antes del split
-    causaría data-leakage (variantes sintéticas del mismo espectro en train y test).
-    Llamar SIEMPRE después de train_test_split.
+    RETORNA:
+    ────────
+    X_out, y_out  — dataset balanceado y mezclado
     """
     rng = np.random.RandomState(random_state)
 
     unique_classes, counts = np.unique(y_train, return_counts=True)
-    median_count = int(np.median(counts))
 
+    # ── Calcular target ─────────────────────────────────────────────────────
     if target_per_class is None:
-        # Target = mediana del dataset actual (conservador y auto-adaptativo)
-        target_per_class = median_count
+        # Target = lo que puede alcanzar la clase más pequeña con el ratio dado.
+        # min(counts) × ratio es el techo de oversampling; no tiene sentido
+        # poner un target más alto porque alguna clase no podría llegar.
+        min_count         = int(min(counts))
+        auto_target       = min_count * max_augment_ratio
+        # Pero tampoco bajamos por debajo de la mediana (caso de datasets
+        # donde la clase más pequeña tiene 1 o 2 muestras).
+        median_count      = int(np.median(counts))
+        target_per_class  = max(auto_target, median_count)
 
-    print(f"\n  [Augmentación] Conteos originales: "
-          f"{ {str(k): int(c) for k, c in zip(unique_classes, counts)} }")
-    print(f"  [Augmentación] Target por clase: {target_per_class}  "
-          f"(max_ratio: {max_augment_ratio}×)")
+    print(f"\n  [Balance] Conteos originales por clase:")
+    for cls, cnt in zip(unique_classes, counts):
+        action = "↓ downsample" if (cnt > target_per_class and downsample_majority) \
+                 else ("↑ oversample" if cnt < target_per_class else "  ok")
+        print(f"    clase {cls}: {cnt:4d}  {action}")
+    print(f"  [Balance] Target por clase: {target_per_class}  "
+          f"(max_oversample_ratio: {max_augment_ratio}×, "
+          f"downsample_majority: {downsample_majority})")
 
-    X_aug = [X_train]
-    y_aug = [y_train]
-    augmented_counts = {}
+    X_parts   = []
+    y_parts   = []
+    summary   = {}   # cls → (original, final, synthetic_added, downsampled_removed)
 
     for cls, count in zip(unique_classes, counts):
-        if count >= target_per_class:
-            augmented_counts[str(cls)] = 0
-            continue  # clase ya tiene suficientes muestras
+        cls_mask = (y_train == cls)
+        cls_X    = X_train[cls_mask]
+        cls_y    = y_train[cls_mask]
 
-        # Cuántas muestras sintéticas generar (respetando max_augment_ratio)
-        max_new   = count * max_augment_ratio - count
-        n_needed  = min(target_per_class - count, max_new)
-        n_needed  = max(n_needed, 0)
+        if count > target_per_class and downsample_majority:
+            # ── DOWNSAMPLING ────────────────────────────────────────────────
+            keep      = rng.choice(count, size=target_per_class, replace=False)
+            cls_X     = cls_X[keep]
+            cls_y     = cls_y[keep]
+            X_parts.append(cls_X)
+            y_parts.append(cls_y)
+            summary[str(cls)] = (count, target_per_class, 0, count - target_per_class)
 
-        if n_needed == 0:
-            augmented_counts[str(cls)] = 0
-            continue
+        elif count < target_per_class:
+            # ── OVERSAMPLING (ruido gaussiano) ───────────────────────────────
+            max_new  = count * max_augment_ratio - count
+            n_needed = int(min(target_per_class - count, max_new))
+            n_needed = max(n_needed, 0)
 
-        cls_mask    = (y_train == cls)
-        cls_spectra = X_train[cls_mask]  # espectros reales de esta clase
+            X_parts.append(cls_X)   # originales siempre incluidos
+            y_parts.append(cls_y)
 
-        # Generar n_needed variantes sintéticas
-        idx_choices = rng.choice(len(cls_spectra), size=n_needed, replace=True)
-        base_specs  = cls_spectra[idx_choices]  # (n_needed, L)
+            if n_needed > 0:
+                idx     = rng.choice(count, size=n_needed, replace=True)
+                bases   = cls_X[idx]
+                std_per = bases.std(axis=1, keepdims=True) + 1e-8
+                noise   = rng.normal(0, noise_factor * std_per,
+                                     size=bases.shape).astype(np.float32)
+                synth   = (bases + noise).astype(np.float32)
+                X_parts.append(synth)
+                y_parts.append(np.full(n_needed, cls, dtype=y_train.dtype))
 
-        # Ruido gaussiano proporcional al desvío de cada espectro
-        spec_std  = base_specs.std(axis=1, keepdims=True) + 1e-8
-        noise     = rng.normal(0, noise_factor * spec_std,
-                               size=base_specs.shape).astype(np.float32)
-        synthetic = (base_specs + noise).astype(np.float32)
+            final = count + n_needed
+            capped = (target_per_class - count) > max_new and count < target_per_class
+            summary[str(cls)] = (count, final, n_needed,
+                                 0)  # 0 = no downsampled
+            if capped:
+                print(f"  [Balance] ⚠  clase {cls}: limitada por ratio "
+                      f"({count}×{max_augment_ratio}={count*max_augment_ratio} "
+                      f"< target {target_per_class})")
+        else:
+            # Exactamente en target o mayoría sin downsampling
+            X_parts.append(cls_X)
+            y_parts.append(cls_y)
+            summary[str(cls)] = (count, count, 0, 0)
 
-        X_aug.append(synthetic)
-        y_aug.append(np.full(n_needed, cls, dtype=y_train.dtype))
-        augmented_counts[str(cls)] = n_needed
+    X_out = np.concatenate(X_parts, axis=0)
+    y_out = np.concatenate(y_parts, axis=0)
 
-    X_out = np.concatenate(X_aug, axis=0)
-    y_out = np.concatenate(y_aug, axis=0)
+    # Mezclar
+    idx   = rng.permutation(len(X_out))
+    X_out = X_out[idx]
+    y_out = y_out[idx]
 
-    # Mezclar para que las muestras sintéticas no queden todas al final
-    shuffle_idx = rng.permutation(len(X_out))
-    X_out = X_out[shuffle_idx]
-    y_out = y_out[shuffle_idx]
-
-    added = sum(augmented_counts.values())
-    print(f"  [Augmentación] Muestras añadidas: {added} "
-          f"(total: {len(y_out)} = {len(y_train)} reales + {added} sintéticas)")
-    if added:
-        print(f"  [Augmentación] Por clase: "
-              f"{ {k: v for k, v in augmented_counts.items() if v > 0} }")
+    # Resumen
+    total_synth = sum(v[2] for v in summary.values())
+    total_drop  = sum(v[3] for v in summary.values())
+    print(f"\n  [Balance] Resultado:")
+    for cls, (orig, final, added, removed) in summary.items():
+        note = (f" +{added} sintéticos" if added else "") + \
+               (f" -{removed} subsampled" if removed else "")
+        print(f"    clase {cls}: {orig} → {final}{note}")
+    print(f"  [Balance] Total train: {len(y_train)} → {len(y_out)} "
+          f"(+{total_synth} sintéticos, -{total_drop} subsampled)")
 
     return X_out, y_out
 
@@ -1099,22 +1144,33 @@ def train_and_save_model(model_type, catalog_path, output_dir, **kwargs):
         )
         print(f"  Train: {len(X_train)}, Test: {len(X_test)}")
 
-        # ── Augmentación de clases minoritarias ──────────────────────────────
-        # IMPORTANTE: se aplica SOLO al conjunto de entrenamiento, NUNCA al test.
-        # Esto evita data-leakage (variantes sintéticas del mismo espectro en
-        # train y test a la vez). El modelo aprende más patrones de clases raras
-        # sin ver datos "contaminados" en la evaluación.
+        # ── Balance del dataset de entrenamiento ─────────────────────────────
+        # Se aplica SOLO al train set (NUNCA al test) para evitar data-leakage.
+        #
+        # Estrategia:
+        #   • Clases grandes (F=281, K=207) → subsampling hasta target
+        #   • Clases chicas (M=22, O=12)   → oversampling con ruido gaussiano
+        #
+        # Sin downsampling de mayorías el modelo colapsa hacia la clase
+        # dominante o hacia la clase de "conteo intermedio" (ej. clase A)
+        # porque su gradiente ponderado supera al de F/K aunque sean más
+        # numerosas (ver diagnóstico de overfitting extremo en Ayuda).
         if kwargs.get('augment', True):
             X_train, y_train = augment_minority_spectra(
                 X_train, y_train,
-                target_per_class=kwargs.get('augment_target', None),
-                max_augment_ratio=kwargs.get('max_augment_ratio', 5),
-                noise_factor=kwargs.get('noise_factor', 0.015),
+                target_per_class      = kwargs.get('augment_target', None),
+                max_augment_ratio     = kwargs.get('max_augment_ratio', 5),
+                noise_factor          = kwargs.get('noise_factor', 0.015),
+                downsample_majority   = kwargs.get('downsample_majority', True),
             )
 
-        # Verificar distribución de clases en train (post-augmentación)
+        # Verificar distribución final de clases en train
         unique_tr, counts_tr = np.unique(y_train, return_counts=True)
-        print(f"  Clases en y_train: { {str(encoder.classes_[k]): int(c) for k, c in zip(unique_tr, counts_tr)} }")
+        print(f"\n  Distribución final train:")
+        for k, c in zip(unique_tr, counts_tr):
+            print(f"    {encoder.classes_[k]}: {c}")
+        print(f"  Total train: {len(y_train)}")
+        print(f"  Total test:  {len(y_test)}")
 
         # Entrenar CNN
         model, history = train_cnn_1d(
@@ -1379,6 +1435,18 @@ TIPS PARA MEJORAR:
     parser.add_argument('--max-files', type=int, default=None,
                         help='Maximo numero de archivos a procesar (para pruebas)')
 
+    # Augmentation / balanceo
+    parser.add_argument('--no-augment', action='store_true', default=False,
+                        help='Desactiva la aumentacion de datos (CNN 1D)')
+    parser.add_argument('--no-downsample', action='store_true', default=False,
+                        help='No reduce las clases mayoritarias al balancear (solo sobremuestrea minors)')
+    parser.add_argument('--augment-target', type=int, default=None,
+                        help='Objetivo de muestras por clase tras balancear (None = auto)')
+    parser.add_argument('--max-augment-ratio', type=float, default=5,
+                        help='Maximo factor de aumento sobre la clase original (default 5)')
+    parser.add_argument('--noise-factor', type=float, default=0.015,
+                        help='Intensidad del ruido gaussiano al generar sinteticos (default 0.015)')
+
     args = parser.parse_args()
 
     # Entrenar
@@ -1395,7 +1463,12 @@ TIPS PARA MEJORAR:
         learning_rate=args.learning_rate,
         dropout_rate=args.dropout,
         dense_units=args.dense_units,
-        max_files=args.max_files
+        max_files=args.max_files,
+        augment=not args.no_augment,
+        downsample_majority=not args.no_downsample,
+        augment_target=args.augment_target,
+        max_augment_ratio=args.max_augment_ratio,
+        noise_factor=args.noise_factor,
     )
 
     return results

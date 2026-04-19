@@ -1546,11 +1546,14 @@ def train_neural_stream():
                     '--weights',     data.get('weights', 'distance'),
                     '--metric',      data.get('metric', 'euclidean')]
         else:
-            cmd += ['--epochs',        str(data.get('epochs', 50)),
-                    '--batch-size',    str(data.get('batch_size', 32)),
-                    '--learning-rate', str(data.get('learning_rate', 0.001)),
-                    '--dropout',       str(data.get('dropout_rate', 0.3)),
-                    '--dense-units',   str(data.get('dense_units', 128))]
+            cmd += ['--epochs',           str(data.get('epochs', 50)),
+                    '--batch-size',       str(data.get('batch_size', 32)),
+                    '--learning-rate',    str(data.get('learning_rate', 0.001)),
+                    '--dropout',          str(data.get('dropout_rate', 0.3)),
+                    '--dense-units',      str(data.get('dense_units', 128)),
+                    '--max-augment-ratio',str(data.get('max_augment_ratio', 5))]
+            if not data.get('downsample_majority', True):
+                cmd.append('--no-downsample')
             if model_type == 'cnn_2d':
                 cmd += ['--image-size', str(data.get('image_size', 64)),
                         '--image-dir',  data.get('image_dir', 'espectros png/'),
@@ -1717,6 +1720,10 @@ def train_neural():
             '--test-size', str(test_size),
         ]
 
+        # Parámetros de augmentación/balanceo
+        downsample_majority = data.get('downsample_majority', True)
+        max_augment_ratio   = data.get('max_augment_ratio', 5)
+
         # Agregar parámetros específicos según tipo de modelo
         if model_type == 'knn':
             cmd.extend([
@@ -1731,7 +1738,10 @@ def train_neural():
                 '--learning-rate', str(learning_rate),
                 '--dropout', str(dropout_rate),
                 '--dense-units', str(dense_units),
+                '--max-augment-ratio', str(max_augment_ratio),
             ])
+            if not downsample_majority:
+                cmd.append('--no-downsample')
 
         # Ejecutar entrenamiento
         result = subprocess.run(

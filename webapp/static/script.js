@@ -3197,6 +3197,8 @@ async function trainNeuralModel() {
         config.learning_rate = parseFloat(document.getElementById('cnnLearningRate').value);
         config.dropout_rate = parseFloat(document.getElementById('cnnDropout').value);
         config.dense_units = parseInt(document.getElementById('cnnDenseUnits').value);
+        config.downsample_majority = document.getElementById('cnnDownsample').checked;
+        config.max_augment_ratio = parseInt(document.getElementById('cnnMaxAugRatio').value) || 5;
 
         if (type === 'cnn_2d') {
             config.image_size = parseInt(document.getElementById('cnn2dImageSize').value);
