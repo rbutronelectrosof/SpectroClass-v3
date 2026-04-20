@@ -1,60 +1,67 @@
 {
   "model_type": "knn",
-  "n_samples": 861,
-  "n_classes": 6,
+  "n_samples": 1570,
+  "n_classes": 7,
   "classes": [
     "A",
     "B",
     "F",
+    "G",
     "K",
     "M",
     "O"
   ],
   "test_size": 0.2,
-  "timestamp": "2026-04-17T16:14:27.248470",
-  "accuracy_test": 0.8728323699421965,
-  "accuracy_cv_mean": 0.8792109154456245,
-  "accuracy_cv_std": 0.01778028897988701,
-  "n_neighbors": 5,
+  "timestamp": "2026-04-19T18:55:50.914867",
+  "accuracy_test": 0.8057324840764332,
+  "accuracy_cv_mean": 0.7898089171974523,
+  "accuracy_cv_std": 0.028909059153911416,
+  "n_neighbors": 3,
   "weights": "distance",
-  "metric": "cosine",
+  "metric": "euclidean",
   "per_class_metrics": {
-    "A": {
-      "precision": 0.7778,
-      "recall": 0.75,
-      "f1": 0.7636,
-      "support": 28
+    "O": {
+      "precision": 0.8929,
+      "recall": 1.0,
+      "f1": 0.9434,
+      "support": 25
     },
     "B": {
-      "precision": 0.8,
-      "recall": 0.6154,
-      "f1": 0.6957,
-      "support": 13
+      "precision": 0.88,
+      "recall": 0.88,
+      "f1": 0.88,
+      "support": 25
+    },
+    "A": {
+      "precision": 0.7857,
+      "recall": 0.7097,
+      "f1": 0.7458,
+      "support": 31
     },
     "F": {
-      "precision": 0.9041,
-      "recall": 0.9296,
-      "f1": 0.9167,
-      "support": 71
+      "precision": 0.7625,
+      "recall": 0.8356,
+      "f1": 0.7974,
+      "support": 73
+    },
+    "G": {
+      "precision": 0.7595,
+      "recall": 0.75,
+      "f1": 0.7547,
+      "support": 80
     },
     "K": {
-      "precision": 0.8947,
-      "recall": 0.9808,
-      "f1": 0.9358,
-      "support": 52
+      "precision": 0.8636,
+      "recall": 0.6909,
+      "f1": 0.7677,
+      "support": 55
     },
     "M": {
-      "precision": 0.75,
-      "recall": 0.5,
-      "f1": 0.6,
-      "support": 6
-    },
-    "O": {
-      "precision": 1.0,
-      "recall": 0.6667,
-      "f1": 0.8,
-      "support": 3
+      "precision": 0.8333,
+      "recall": 1.0,
+      "f1": 0.9091,
+      "support": 25
     }
   },
-  "training_time_seconds": 89.90232968330383
+  "training_time_seconds": 143.625346660614
 }

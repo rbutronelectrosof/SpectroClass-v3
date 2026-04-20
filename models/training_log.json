@@ -99,5 +99,305 @@
       "learning_rate": 0.001,
       "dropout_rate": 0.3
     }
+  },
+  {
+    "id": "cnn_1d_2026-04-18T16:03:02.451556",
+    "model_type": "cnn_1d",
+    "timestamp": "2026-04-18T16:03:02.451556",
+    "accuracy_test": 0.5704,
+    "accuracy_cv_mean": null,
+    "n_samples": 1350,
+    "n_classes": 7,
+    "classes": [
+      "A",
+      "B",
+      "F",
+      "G",
+      "K",
+      "M",
+      "O"
+    ],
+    "params": {
+      "n_neighbors": null,
+      "weights": null,
+      "metric": null,
+      "epochs_trained": 9,
+      "learning_rate": 0.001,
+      "dropout_rate": 0.3
+    }
+  },
+  {
+    "id": "cnn_1d_2026-04-19T01:22:57.967975",
+    "model_type": "cnn_1d",
+    "timestamp": "2026-04-19T01:22:57.967975",
+    "accuracy_test": 0.0987,
+    "accuracy_cv_mean": null,
+    "n_samples": 1570,
+    "n_classes": 7,
+    "classes": [
+      "A",
+      "B",
+      "F",
+      "G",
+      "K",
+      "M",
+      "O"
+    ],
+    "params": {
+      "n_neighbors": null,
+      "weights": null,
+      "metric": null,
+      "epochs_trained": 9,
+      "learning_rate": 0.001,
+      "dropout_rate": 0.3
+    }
+  },
+  {
+    "id": "cnn_1d_2026-04-19T17:36:14.108468",
+    "model_type": "cnn_1d",
+    "timestamp": "2026-04-19T17:36:14.108468",
+    "accuracy_test": 0.8408,
+    "accuracy_cv_mean": null,
+    "n_samples": 1570,
+    "n_classes": 7,
+    "classes": [
+      "A",
+      "B",
+      "F",
+      "G",
+      "K",
+      "M",
+      "O"
+    ],
+    "params": {
+      "n_neighbors": null,
+      "weights": null,
+      "metric": null,
+      "epochs_trained": 30,
+      "learning_rate": 0.001,
+      "dropout_rate": 0.3
+    }
+  },
+  {
+    "id": "knn_2026-04-19T17:47:17.192332",
+    "model_type": "knn",
+    "timestamp": "2026-04-19T17:47:17.192332",
+    "accuracy_test": 0.7898,
+    "accuracy_cv_mean": 0.7892,
+    "n_samples": 1570,
+    "n_classes": 7,
+    "classes": [
+      "A",
+      "B",
+      "F",
+      "G",
+      "K",
+      "M",
+      "O"
+    ],
+    "params": {
+      "n_neighbors": 3,
+      "weights": "uniform",
+      "metric": "euclidean",
+      "epochs_trained": null,
+      "learning_rate": null,
+      "dropout_rate": null
+    }
+  },
+  {
+    "id": "knn_2026-04-19T18:12:48.125318",
+    "model_type": "knn",
+    "timestamp": "2026-04-19T18:12:48.125318",
+    "accuracy_test": 0.8057,
+    "accuracy_cv_mean": 0.7898,
+    "n_samples": 1570,
+    "n_classes": 7,
+    "classes": [
+      "A",
+      "B",
+      "F",
+      "G",
+      "K",
+      "M",
+      "O"
+    ],
+    "params": {
+      "n_neighbors": 3,
+      "weights": "distance",
+      "metric": "euclidean",
+      "epochs_trained": null,
+      "learning_rate": null,
+      "dropout_rate": null
+    }
+  },
+  {
+    "id": "knn_2026-04-19T18:33:44.317866",
+    "model_type": "knn",
+    "timestamp": "2026-04-19T18:33:44.317866",
+    "accuracy_test": 0.793,
+    "accuracy_cv_mean": 0.7745,
+    "n_samples": 1570,
+    "n_classes": 7,
+    "classes": [
+      "A",
+      "B",
+      "F",
+      "G",
+      "K",
+      "M",
+      "O"
+    ],
+    "params": {
+      "n_neighbors": 3,
+      "weights": "distance",
+      "metric": "cosine",
+      "epochs_trained": null,
+      "learning_rate": null,
+      "dropout_rate": null
+    }
+  },
+  {
+    "id": "cnn_1d_2026-04-19T18:45:42.608266",
+    "model_type": "cnn_1d",
+    "timestamp": "2026-04-19T18:45:42.608266",
+    "accuracy_test": 0.8503,
+    "accuracy_cv_mean": null,
+    "n_samples": 1570,
+    "n_classes": 7,
+    "classes": [
+      "A",
+      "B",
+      "F",
+      "G",
+      "K",
+      "M",
+      "O"
+    ],
+    "params": {
+      "n_neighbors": null,
+      "weights": null,
+      "metric": null,
+      "epochs_trained": 29,
+      "learning_rate": 0.001,
+      "dropout_rate": 0.3
+    }
+  },
+  {
+    "id": "knn_2026-04-19T18:52:21.373339",
+    "model_type": "knn",
+    "timestamp": "2026-04-19T18:52:21.373339",
+    "accuracy_test": 0.793,
+    "accuracy_cv_mean": 0.7745,
+    "n_samples": 1570,
+    "n_classes": 7,
+    "classes": [
+      "A",
+      "B",
+      "F",
+      "G",
+      "K",
+      "M",
+      "O"
+    ],
+    "params": {
+      "n_neighbors": 3,
+      "weights": "distance",
+      "metric": "cosine",
+      "epochs_trained": null,
+      "learning_rate": null,
+      "dropout_rate": null
+    }
+  },
+  {
+    "id": "knn_2026-04-19T18:55:50.914867",
+    "model_type": "knn",
+    "timestamp": "2026-04-19T18:55:50.914867",
+    "accuracy_test": 0.8057,
+    "accuracy_cv_mean": 0.7898,
+    "n_samples": 1570,
+    "n_classes": 7,
+    "classes": [
+      "A",
+      "B",
+      "F",
+      "G",
+      "K",
+      "M",
+      "O"
+    ],
+    "params": {
+      "n_neighbors": 3,
+      "weights": "distance",
+      "metric": "euclidean",
+      "epochs_trained": null,
+      "learning_rate": null,
+      "dropout_rate": null
+    }
+  },
+  {
+    "id": "random_forest_2026-04-19T19:14:29.005276",
+    "model_type": "random_forest",
+    "timestamp": "2026-04-19T19:14:29.005276",
+    "accuracy_test": 0.8599,
+    "accuracy_cv_mean": 0.8548,
+    "n_samples": 1570,
+    "n_classes": 7,
+    "classes": [
+      "A",
+      "B",
+      "F",
+      "G",
+      "K",
+      "M",
+      "O"
+    ],
+    "params": {
+      "max_depth": 9,
+      "n_estimators": 350
+    }
+  },
+  {
+    "id": "decision_tree_2026-04-19T23:49:18.773465",
+    "model_type": "decision_tree",
+    "timestamp": "2026-04-19T23:49:18.773465",
+    "accuracy_test": 0.7962,
+    "accuracy_cv_mean": 0.793,
+    "n_samples": 1570,
+    "n_classes": 7,
+    "classes": [
+      "A",
+      "B",
+      "F",
+      "G",
+      "K",
+      "M",
+      "O"
+    ],
+    "params": {
+      "max_depth": 9,
+      "n_estimators": 100
+    }
+  },
+  {
+    "id": "random_forest_2026-04-20T00:10:20.785955",
+    "model_type": "random_forest",
+    "timestamp": "2026-04-20T00:10:20.785955",
+    "accuracy_test": 0.8599,
+    "accuracy_cv_mean": 0.8548,
+    "n_samples": 1570,
+    "n_classes": 7,
+    "classes": [
+      "A",
+      "B",
+      "F",
+      "G",
+      "K",
+      "M",
+      "O"
+    ],
+    "params": {
+      "max_depth": 9,
+      "n_estimators": 350
+    }
   }
 ]

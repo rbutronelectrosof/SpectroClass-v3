@@ -1,0 +1,20 @@
+{
+  "cnn_1d": {
+    "active": true,
+    "weight": 0.0,
+    "accuracy": 85.03,
+    "activated_at": "2026-04-19T18:48:55"
+  },
+  "knn": {
+    "active": true,
+    "weight": 0.0,
+    "accuracy": 80.57,
+    "activated_at": "2026-04-19T18:56:14"
+  },
+  "random_forest": {
+    "active": true,
+    "weight": 0.0,
+    "accuracy": 85.99,
+    "activated_at": "2026-04-20T00:10:31"
+  }
+}
