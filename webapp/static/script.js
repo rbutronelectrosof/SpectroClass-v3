@@ -2303,6 +2303,9 @@ async function trainModel() {
                             if (bar) { bar.style.width = Math.min(event.accuracy, 100) + '%'; bar.style.background = event.accuracy >= 80 ? '#22c55e' : event.accuracy >= 60 ? '#f59e0b' : '#ef4444'; }
                             // Actualizar banner del modelo actual
                             _updateCurrentModelBanner({ accuracy: event.accuracy, n_samples: event.n_samples, timestamp: new Date().toLocaleDateString() });
+                            // Actualizar accuracy en tarjeta de pesos
+                            const dtEl = document.getElementById('wmAccDT');
+                            if (dtEl && event.accuracy != null) dtEl.textContent = `${parseFloat(event.accuracy).toFixed(1)}% accuracy`;
                             // Guardar info para botón "Guardar modelo"
                             _lastTrainedClassic = { type: config.model_type, accuracy: event.accuracy };
                             const saveBar = document.getElementById('trainSaveBar');
@@ -2364,22 +2367,27 @@ function _updateCurrentModelBanner(info) {
 }
 
 async function loadCurrentModelBanner() {
+    // Siempre refrescamos las tarjetas, independientemente de si hay modelo clásico
+    _refreshWeightCardAccuracies();
+
     try {
         const resp = await fetch('/get_metrics');
         if (!resp.ok) return;
         const data = await resp.json();
         if (data.accuracy_test !== undefined) {
             _updateCurrentModelBanner({
-                accuracy:    data.accuracy_test,   // ya viene en % desde la API
+                accuracy:    data.accuracy_test,
                 n_samples:   (data.n_train || 0) + (data.n_test || 0),
                 timestamp:   data.timestamp || '—',
                 model_type:  data.model_type || 'Árbol de Decisión'
             });
+            // Actualizar accuracy del Árbol/RF/GB en la tarjeta de pesos
+            const dtEl = document.getElementById('wmAccDT');
+            if (dtEl && data.accuracy_test != null) {
+                dtEl.textContent = `${(data.accuracy_test).toFixed(1)}% accuracy`;
+            }
         }
     } catch (_) {}
-
-    // Actualizar accuracy real en las tarjetas de pesos de votación (KNN, CNN 1D)
-    _refreshWeightCardAccuracies();
 }
 
 async function _refreshWeightCardAccuracies() {
@@ -2388,26 +2396,36 @@ async function _refreshWeightCardAccuracies() {
         const data = await res.json();
         if (!data.success) return;
 
-        const fmt = (acc) => acc != null ? `${acc}% accuracy` : '—';
+        const fmt = (acc) => acc != null ? `${parseFloat(acc).toFixed(1)}% accuracy` : '—';
 
-        const knnEl   = document.getElementById('wmAccKNN');
-        const cnnEl   = document.getElementById('wmAccCNN1D');
-        const helpEl  = document.getElementById('helpMethodAccNN');
+        // KNN y CNN 1D
+        const knnEl  = document.getElementById('wmAccKNN');
+        const cnnEl  = document.getElementById('wmAccCNN1D');
+        if (knnEl) knnEl.textContent = fmt(data.knn?.accuracy);
+        if (cnnEl) cnnEl.textContent = fmt(data.cnn_1d?.accuracy);
 
-        if (knnEl)  knnEl.textContent  = fmt(data.knn?.accuracy);
-        if (cnnEl)  cnnEl.textContent  = fmt(data.cnn_1d?.accuracy);
+        // Árbol / RF / GB — usan el mismo metadata.json; mostrar el que esté guardado
+        const dtEl = document.getElementById('wmAccDT');
+        if (dtEl) {
+            const classic = data.decision_tree || data.random_forest || data.gradient_boosting;
+            dtEl.textContent = classic?.accuracy != null ? fmt(classic.accuracy) : '—';
+        }
 
-        // Actualizar texto de ayuda también
+        // Texto de ayuda
+        const helpEl = document.getElementById('helpMethodAccNN');
         if (helpEl) {
-            const kAcc = data.knn?.accuracy   != null ? `KNN ${data.knn.accuracy}%`     : 'KNN —';
-            const cAcc = data.cnn_1d?.accuracy != null ? `CNN 1D ${data.cnn_1d.accuracy}%` : 'CNN 1D —';
+            const kAcc = data.knn?.accuracy    != null ? `KNN ${parseFloat(data.knn.accuracy).toFixed(1)}%`      : 'KNN —';
+            const cAcc = data.cnn_1d?.accuracy != null ? `CNN 1D ${parseFloat(data.cnn_1d.accuracy).toFixed(1)}%` : 'CNN 1D —';
             helpEl.textContent = `${kAcc} · ${cAcc} · CNN 2D experimental`;
         }
     } catch (_) {}
 }
 
 // Llamar al cargar la página y al activar la pestaña de herramientas
-document.addEventListener('DOMContentLoaded', () => { loadCurrentModelBanner(); });
+document.addEventListener('DOMContentLoaded', () => {
+    loadCurrentModelBanner();
+    _refreshWeightCardAccuracies();   // garantía: corre aunque falle /get_metrics
+});
 
 
 function browseCatalog() {
