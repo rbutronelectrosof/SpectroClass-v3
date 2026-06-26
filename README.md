@@ -67,21 +67,44 @@ El resultado incluye el **tipo MK completo** (ej. `G2V`, `K3III`, `B2Ia`), confi
 
 ## 🚀 Inicio rápido
 
-```bash
-# 1. Clonar
+### Windows
+
+```bat
+:: 1. Clonar el repositorio
 git clone https://github.com/RobertoButron/SpectroClass.git
 cd SpectroClass
 
-# 2. Instalar dependencias
+:: 2. Instalar dependencias (crea un entorno virtual automáticamente)
+INSTALAR.bat
+
+:: 3. Iniciar el servidor web (abre el navegador automáticamente)
+iniciar.bat
+```
+
+Si preferís lanzarlo manualmente:
+
+```bat
+venv\Scripts\activate
+python webapp\app.py
+```
+
+### Linux / macOS
+
+```bash
+# 1. Clonar el repositorio
+git clone https://github.com/RobertoButron/SpectroClass.git
+cd SpectroClass
+
+# 2. Crear entorno virtual e instalar dependencias
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 
-# 3. Iniciar servidor
+# 3. Iniciar el servidor web
 python webapp/app.py
 ```
 
 Abrir **http://localhost:5000** en el navegador, cargar un espectro `.txt` o `.fits` y obtener la clasificación en segundos.
-
-**Windows:** ejecutar `INSTALAR.bat` para instalación automática.
 
 ---
 
@@ -420,6 +443,43 @@ inicio
 
 El sistema reconoce el tipo espectral directamente desde el nombre del archivo:
 `HD001835_tipoG3.txt` → tipo G, subtipo G3.
+
+---
+
+## 🗂️ Catálogo ampliado: `eloidecompleto/`
+
+La carpeta `eloidecompleto/` contiene **1 572 espectros** — los 891 del catálogo ELODIE original más versiones sintéticas aumentadas (sufijo `_synNNN.txt`, p.ej. `BD+362219_tipoM1_syn020.txt`) generadas para balancear tipos poco representados (O, B, M).
+
+> **Repositorio del catálogo:**
+> [`https://github.com/RobertoButron/SpectroClass`](https://github.com/RobertoButron/SpectroClass)
+> (incluido en el repositorio principal, dentro de la carpeta `eloidecompleto/`)
+
+### Cómo usar este catálogo para entrenar
+
+**Desde la interfaz web** (recomendado):
+
+1. Iniciar el servidor (`iniciar.bat` en Windows / `python webapp/app.py` en Linux).
+2. Abrir **http://localhost:5000** y seleccionar la pestaña **🛠️ Herramientas**.
+3. En el campo *Directorio del catálogo*, escribir la ruta a la carpeta:
+   - Windows: `eloidecompleto`
+   - Linux / macOS: `eloidecompleto`  *(ruta relativa al directorio raíz del proyecto)*
+4. Hacer clic en **Entrenar Árbol ML** — el progreso se muestra en tiempo real.
+5. Para KNN y CNN-1D, ir a la pestaña **🧠 Redes Neuronales** y repetir el mismo proceso.
+
+**Desde la línea de comandos:**
+
+```bash
+# Árbol de decisión ML
+python src/train_and_validate.py --catalog eloidecompleto/ --output-dir models/
+
+# KNN
+python src/train_neural_models.py --model knn --catalog eloidecompleto/ --output models/
+
+# CNN-1D (requiere TensorFlow)
+python src/train_neural_models.py --model cnn_1d --catalog eloidecompleto/ --epochs 50
+```
+
+Los modelos entrenados se guardan automáticamente en `models/` y quedan activos para la siguiente clasificación.
 
 ---
 
