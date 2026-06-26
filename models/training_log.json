@@ -399,5 +399,26 @@
       "max_depth": 9,
       "n_estimators": 350
     }
+  },
+  {
+    "id": "gradient_boosting_2026-06-11T17:33:19.492645",
+    "model_type": "gradient_boosting",
+    "timestamp": "2026-06-11T17:33:19.492645",
+    "accuracy_test": 0.8837,
+    "accuracy_cv_mean": 0.8844,
+    "n_samples": 857,
+    "n_classes": 6,
+    "classes": [
+      "A",
+      "B",
+      "F",
+      "K",
+      "M",
+      "O"
+    ],
+    "params": {
+      "max_depth": 7,
+      "n_estimators": 100
+    }
   }
 ]

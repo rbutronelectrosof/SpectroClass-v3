@@ -31,7 +31,9 @@
       "Bash(cp /mnt/c/Users/Eduardo/Desktop/knn_imgs/render_page3.png '/mnt/c/Users/Eduardo/Desktop/crreccion espestrocopiv3 -final/webapp/static/knn_p3.png')",
       "Bash(python -c \"import ast, sys; ast.parse\\(open\\('webapp/app.py'\\).read\\(\\)\\); print\\('OK - sin errores de sintaxis'\\)\")",
       "Bash(ls \"/mnt/c/Users/Eduardo/Desktop/crreccion espestrocopiv3 -final/models/\"*.json)",
-      "Bash(xargs -I{} basename {})"
+      "Bash(xargs -I{} basename {})",
+      "Bash(python -c \"import src.spectral_classification_corrected as m; print\\('OK — funciones:', [f for f in dir\\(m\\) if 'classify' in f.lower\\(\\)]\\)\")",
+      "Bash(chmod +x \"/mnt/c/Users/Eduardo/Desktop/crreccion espestrocopiv3 -final/INSTALAR.sh\" \"/mnt/c/Users/Eduardo/Desktop/crreccion espestrocopiv3 -final/INICIAR.sh\")"
     ]
   }
 }

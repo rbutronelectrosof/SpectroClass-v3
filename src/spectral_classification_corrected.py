@@ -1577,6 +1577,38 @@ def classify_star_decision_tree(measurements, wavelengths=None, flux_normalized=
     Fe_II_4924 = measurements.get('Fe_II_4924', {}).get('ew', 0.0)
     Ti_II_4468 = measurements.get('Ti_II_4468', {}).get('ew', 0.0)
 
+    # ── NODO 2: N V 4604/4620 + O V 5114 (O3-O4 tempranas) ──────────────────
+    N_V_4604  = measurements.get('N_V_4604',  {}).get('ew', 0.0)
+    N_V_4620  = measurements.get('N_V_4620',  {}).get('ew', 0.0)
+    O_V_5114  = measurements.get('O_V_5114',  {}).get('ew', 0.0)
+    # ── NODO 5: N III 4634/4641 (O tardías O7-O9) ────────────────────────────
+    N_III_4634 = measurements.get('N_III_4634', {}).get('ew', 0.0)
+    N_III_4641 = measurements.get('N_III_4641', {}).get('ew', 0.0)
+    # ── NODO 11: O II 4070/4076 (luminosidad B1-B4) ──────────────────────────
+    O_II_4070  = measurements.get('O_II_4070',  {}).get('ew', 0.0)
+    O_II_4076  = measurements.get('O_II_4076',  {}).get('ew', 0.0)
+    # ── NODO 20: Sr II 4077 / Fe I 4071 (luminosidad F5-F9) ─────────────────
+    Sr_II_4077 = measurements.get('Sr_II_4077', {}).get('ew', 0.0)
+    Fe_I_4071  = measurements.get('Fe_I_4071',  {}).get('ew', 0.0)
+    # ── NODO 19: Banda CH G 4300 Å (frontera F/G) ────────────────────────────
+    CH_Gband   = measurements.get('CH_Gband',   {}).get('ew', 0.0)
+    # ── NODO 24: Y II 4376 Å (metalicidad subtipo G) ─────────────────────────
+    Y_II_4376  = measurements.get('Y_II_4376',  {}).get('ew', 0.0)
+    # ── NODO 25: Tripleta Mg b 5167/5173/5184 Å (luminosidad G/K) ────────────
+    Mg_I_5167  = measurements.get('Mg_I_5167',  {}).get('ew', 0.0)
+    Mg_I_5183  = measurements.get('Mg_I_5183',  {}).get('ew', 0.0)
+    # ── NODO 26: Triplete Cr I 4275/4290 Å (termómetro K, complementa 4254) ──
+    Cr_I_4275  = measurements.get('Cr_I_4275',  {}).get('ew', 0.0)
+    Cr_I_4290  = measurements.get('Cr_I_4290',  {}).get('ew', 0.0)
+    # ── NODO 27: Na I D 5890/5896 Å (luminosidad K) ──────────────────────────
+    Na_I_D1    = measurements.get('Na_I_D1',    {}).get('ew', 0.0)
+    Na_I_D2    = measurements.get('Na_I_D2',    {}).get('ew', 0.0)
+    # ── NODO 28: VO 7434/7865 + CaH 6382/6750 (enanas vs gigantes M tardías) ─
+    VO_7434    = measurements.get('VO_7434',    {}).get('ew', 0.0)
+    VO_7865    = measurements.get('VO_7865',    {}).get('ew', 0.0)
+    CaH_6382   = measurements.get('CaH_6382',   {}).get('ew', 0.0)
+    CaH_6750   = measurements.get('CaH_6750',   {}).get('ew', 0.0)
+
     # ============================================================
     # INICIALIZAR SALIDAS
     # ============================================================
@@ -1682,28 +1714,75 @@ def classify_star_decision_tree(measurements, wavelengths=None, flux_normalized=
 
                 # Subtipo O: comparar He I 4471 vs He II 4542
                 He_II_ref = He_II_4542 if He_II_4542 > 0.02 else He_II_4686
+                ratio_I_II = He_I_4471 / (He_II_ref + 0.01)
+                N_V_avg   = (N_V_4604  + N_V_4620)  / 2.0
+                N_III_avg = (N_III_4634 + N_III_4641) / 2.0
 
                 if He_I_4471 < He_II_ref:
-                    # O temprana (< O7)
-                    ratio = He_I_4471 / (He_II_ref + 0.01)
-                    if ratio < 0.5:
+                    # O temprana (He I < He II)
+                    # ── NODO 2: N V 4604/4620 + O V 5114 → O3-O4 ────────────
+                    if N_V_4604 > 0.50 or (N_V_avg > 0.40 and O_V_5114 > 0.05):
+                        subtype = 'O3'
+                        lineas_usadas.extend(['N V 4604', 'N V 4620', 'O V 5114'])
+                        justificacion.append(
+                            f"N V muy fuerte ({N_V_4604:.2f}) + O V 5114 ({O_V_5114:.2f})"
+                            f", He I/He II={ratio_I_II:.2f} → O3")
+                    elif N_V_4604 > 0.15 or N_V_avg > 0.12:
+                        subtype = 'O4'
+                        lineas_usadas.extend(['N V 4604', 'N V 4620'])
+                        justificacion.append(
+                            f"N V fuerte (avg={N_V_avg:.2f}), He I/He II={ratio_I_II:.2f} → O4")
+                    # ── NODO 3: He I/He II < 0.50 → O5 ──────────────────────
+                    elif ratio_I_II < 0.50:
                         subtype = 'O5'
-                        justificacion.append(f"He I 4471 ({He_I_4471:.2f}) << He II 4542 ({He_II_ref:.2f}) → O temprana")
+                        justificacion.append(
+                            f"He I/He II={ratio_I_II:.2f} < 0.50, N V débil → O5")
+                    # ── NODO 4 + NODO 5: He I/He II 0.50-1.0 + N III → O6/O7
+                    elif ratio_I_II < 1.00:
+                        if N_III_avg > 0.10:
+                            # Nodo 5: N III fuerte distingue O7 de O6
+                            subtype = 'O7'
+                            lineas_usadas.extend(['N III 4634', 'N III 4641'])
+                            justificacion.append(
+                                f"He I/He II={ratio_I_II:.2f}, N III fuerte"
+                                f" ({N_III_avg:.2f}) → O7")
+                        else:
+                            subtype = 'O6'
+                            justificacion.append(
+                                f"He I/He II={ratio_I_II:.2f} en 0.50-1.0,"
+                                f" N III débil ({N_III_avg:.2f}) → O6")
                     else:
                         subtype = 'O6-O7'
-                        justificacion.append(f"He I 4471 < He II 4542 → O6-O7")
+                        justificacion.append(
+                            f"He I 4471 < He II 4542 ratio={ratio_I_II:.2f} → O6-O7")
+
                 elif He_I_4387 >= He_II_ref:
-                    # O tardía (> O9)
+                    # O tardía (He I 4387 ≥ He II)
+                    # ── NODO 5 (continuación): N III confirma O tardía ────────
+                    if N_III_avg > 0.08:
+                        lineas_usadas.extend(['N III 4634', 'N III 4641'])
+                        justificacion.append(
+                            f"N III {N_III_avg:.2f} Å confirma O tardía")
+                    # ── NODO 6: Si III 4553 ≈ He II → O9.5 ──────────────────
                     if Si_III_4553 > 0.05 and abs(Si_III_4553 - He_II_ref) < He_II_ref * 0.5:
                         subtype = 'O9.5'
                         lineas_usadas.append('Si III 4553')
-                        justificacion.append("Si III 4553 ≈ He II 4542 → O9.5-B0")
+                        justificacion.append(
+                            f"Si III 4553 ({Si_III_4553:.2f}) ≈ He II ({He_II_ref:.2f}) → O9.5")
                     else:
                         subtype = 'O9'
-                        justificacion.append(f"He I 4387 ({He_I_4387:.2f}) >= He II 4542 → O tardía")
+                        justificacion.append(
+                            f"He I 4387 ({He_I_4387:.2f}) >= He II ({He_II_ref:.2f}) → O9")
+
                 else:
+                    # O8: He I ≈ He II
+                    if N_III_avg > 0.06:
+                        lineas_usadas.extend(['N III 4634', 'N III 4641'])
+                        justificacion.append(
+                            f"N III {N_III_avg:.2f} confirma O8 (no O9)")
                     subtype = 'O8'
-                    justificacion.append("He I ≈ He II → O7-O9")
+                    justificacion.append(
+                        f"He I ≈ He II (ratio={ratio_I_II:.2f}) → O8")
 
             # ============================================================
             # ESTRELLAS B: He I presente, He II ausente
@@ -1749,7 +1828,20 @@ def classify_star_decision_tree(measurements, wavelengths=None, flux_normalized=
                         confianza = min(confianza, 70)
                         advertencias.append("Líneas de Si débiles, subtipo incierto")
 
-                    # Confirmaciones O II, C II
+                    # ── NODO 11: O II 4070/4076 — luminosidad B1-B4 ──────────
+                    O_II_lum = (O_II_4070 + O_II_4076) / 2.0
+                    if O_II_lum > 0.05:
+                        lineas_usadas.extend(['O II 4070', 'O II 4076'])
+                        if O_II_lum > 0.25:
+                            justificacion.append(
+                                f"O II 4070/4076 fuerte ({O_II_lum:.2f}) → B Ib-III")
+                        elif O_II_lum > 0.10:
+                            justificacion.append(
+                                f"O II 4070/4076 moderado ({O_II_lum:.2f}) → B III-IV")
+                        else:
+                            justificacion.append(
+                                f"O II 4070/4076 débil ({O_II_lum:.2f}) → B V")
+                    # Confirmación O II 4591, C II
                     if O_II_4591 > 0.05:
                         justificacion.append("O II 4591 confirma B temprana")
                     if C_II_4267 > 0.05:
@@ -1817,6 +1909,29 @@ def classify_star_decision_tree(measurements, wavelengths=None, flux_normalized=
                 spectral_type = 'F'
                 subtype = 'F5'
                 justificacion.append(f"Ca II K > Hε → F tardía")
+                # ── NODO 19: CH G-band 4300 → frontera F tardía / G temprana ──
+                if CH_Gband > 0.20:
+                    subtype = 'F8-F9'
+                    lineas_usadas.append('CH G 4300')
+                    justificacion.append(
+                        f"CH G-band fuerte ({CH_Gband:.2f}) → F8-F9 (cerca de G)")
+                elif CH_Gband > 0.10:
+                    lineas_usadas.append('CH G 4300')
+                    justificacion.append(
+                        f"CH G-band ({CH_Gband:.2f}) → F5-F7")
+                # ── NODO 20: Sr II 4077 / Fe I 4071 → luminosidad F5-F9 ──────
+                ratio_Sr_Fe = Sr_II_4077 / (Fe_I_4071 + 0.01)
+                if Sr_II_4077 > 0.05:
+                    lineas_usadas.extend(['Sr II 4077', 'Fe I 4071'])
+                    if ratio_Sr_Fe > 2.0:
+                        justificacion.append(
+                            f"Sr II 4077/Fe I 4071={ratio_Sr_Fe:.2f} → F supergigante/gigante")
+                    elif ratio_Sr_Fe > 1.0:
+                        justificacion.append(
+                            f"Sr II 4077/Fe I 4071={ratio_Sr_Fe:.2f} → F gigante/subgigante")
+                    else:
+                        justificacion.append(
+                            f"Sr II 4077/Fe I 4071={ratio_Sr_Fe:.2f} → F secuencia principal")
 
         # CASO 2: Sin cobertura azul → usar criterios alternativos
         else:
@@ -1858,9 +1973,34 @@ def classify_star_decision_tree(measurements, wavelengths=None, flux_normalized=
                 elif ratio_H_metal > 1.5:
                     subtype = 'F5'
                     justificacion.append(f"Balmer ≈ metales (ratio={ratio_H_metal:.1f}) → F intermedia")
+                    # ── NODO 19: Ca I/Hδ + CH G-band afina F5-F9 ────────────
+                    ratio_CaI_Hd = Ca_I_4227 / (H_delta + 0.01)
+                    if CH_Gband > 0.15:
+                        lineas_usadas.append('CH G 4300')
+                        justificacion.append(
+                            f"CH G-band ({CH_Gband:.2f}) → F tardía")
+                    if ratio_CaI_Hd > 0.70:
+                        subtype = 'F8'
+                        justificacion.append(
+                            f"Ca I 4227/Hδ={ratio_CaI_Hd:.2f} > 0.70 → F8-F9")
+                    # ── NODO 20: Sr II 4077 / Fe I 4071 → luminosidad ────────
+                    ratio_Sr_Fe = Sr_II_4077 / (Fe_I_4071 + 0.01)
+                    if Sr_II_4077 > 0.05:
+                        lineas_usadas.extend(['Sr II 4077', 'Fe I 4071'])
+                        if ratio_Sr_Fe > 2.0:
+                            justificacion.append(
+                                f"Sr II/Fe I={ratio_Sr_Fe:.2f} → F gigante/supergigante")
+                        elif ratio_Sr_Fe > 1.0:
+                            justificacion.append(
+                                f"Sr II/Fe I={ratio_Sr_Fe:.2f} → F subgigante")
                 else:
                     subtype = 'F8'
                     justificacion.append(f"Metales comparables a Balmer → F tardía")
+                    # ── NODO 19: CH G-band confirma F8-F9 vs G temprana ──────
+                    if CH_Gband > 0.20:
+                        lineas_usadas.append('CH G 4300')
+                        justificacion.append(
+                            f"CH G-band ({CH_Gband:.2f}) → frontera F9/G0")
 
             elif H_avg > 2.0:
                 # Balmer moderado sin metales claros → A tardía
@@ -1886,7 +2026,6 @@ def classify_star_decision_tree(measurements, wavelengths=None, flux_normalized=
 
         # Balmer aún visible → F
         if H_avg > 2.0 and H_avg > metales_avg:
-            # PASO 11: ESTRELLAS F
             spectral_type = 'F'
             lineas_usadas.extend(['H gamma 4341', 'Fe I 4384'])
 
@@ -1897,9 +2036,36 @@ def classify_star_decision_tree(measurements, wavelengths=None, flux_normalized=
             elif ratio_H_metal > 1.5:
                 subtype = 'F5'
                 justificacion.append(f"HI > metales → F intermedia")
+                # ── NODO 19: Ca I/Hδ + CH G-band — afina F5-F9 ──────────────
+                ratio_CaI_Hd = Ca_I_4227 / (H_delta + 0.01)
+                if CH_Gband > 0.15:
+                    lineas_usadas.append('CH G 4300')
+                    justificacion.append(f"CH G-band ({CH_Gband:.2f}) → F7-F9")
+                if ratio_CaI_Hd > 0.70:
+                    subtype = 'F8'
+                    justificacion.append(
+                        f"Ca I 4227/Hδ={ratio_CaI_Hd:.2f} → F8-F9")
+                # ── NODO 20: Sr II 4077 / Fe I 4071 — luminosidad F ──────────
+                ratio_Sr_Fe = Sr_II_4077 / (Fe_I_4071 + 0.01)
+                if Sr_II_4077 > 0.05:
+                    lineas_usadas.extend(['Sr II 4077', 'Fe I 4071'])
+                    if ratio_Sr_Fe > 2.0:
+                        justificacion.append(
+                            f"Sr II/Fe I={ratio_Sr_Fe:.2f} → F gigante/supergigante")
+                    elif ratio_Sr_Fe > 1.0:
+                        justificacion.append(
+                            f"Sr II/Fe I={ratio_Sr_Fe:.2f} → F subgigante")
+                    else:
+                        justificacion.append(
+                            f"Sr II/Fe I={ratio_Sr_Fe:.2f} → F enana")
             else:
                 subtype = 'F8-G0'
                 justificacion.append(f"HI ≈ metales (ratio={ratio_H_metal:.1f}) → F9-G0")
+                # ── NODO 19: CH G-band distingue F9 de G0 ────────────────────
+                if CH_Gband > 0.20:
+                    lineas_usadas.append('CH G 4300')
+                    justificacion.append(
+                        f"CH G-band ({CH_Gband:.2f}) → frontera F9/G0")
 
         # Ca I muy intensa + bandas TiO → K tardía o M
         elif Ca_I_4227 > 0.5 and (Ca_I_4227 > H_avg or H_avg < 1.0):
@@ -1944,14 +2110,92 @@ def classify_star_decision_tree(measurements, wavelengths=None, flux_normalized=
                         subtype = 'M0-M2'
                         justificacion.append("TiO moderado → M temprana")
 
+                    # ── NODO 28: VO 7434/7865 + CaH 6382/6750 ───────────────
+                    # VO crece en M4+; CaH fuerte en enanas, débil en gigantes M
+                    VO_index  = VO_7434  + VO_7865
+                    CaH_index = CaH_6382 + CaH_6750
+                    if VO_index > 0.05 or CaH_index > 0.05:
+                        lineas_usadas.extend(
+                            ['VO 7434', 'VO 7865', 'CaH 6382', 'CaH 6750'])
+                        if VO_index > 0.30:
+                            justificacion.append(
+                                f"VO fuerte ({VO_index:.2f}) → M5+ confirmado")
+                            if subtype not in ('M5-M6', 'M6-M7'):
+                                subtype = 'M4-M5'
+                        TiO_total = (measurements.get('TiO_4762', {}).get('ew', 0.0)
+                                     + TiO_4955
+                                     + measurements.get('TiO_5167', {}).get('ew', 0.0))
+                        if CaH_index > 0.10:
+                            ratio_TiO_CaH = (TiO_total + 0.01) / (CaH_index + 0.01)
+                            if ratio_TiO_CaH > 3.0:
+                                justificacion.append(
+                                    f"TiO/CaH={ratio_TiO_CaH:.2f} (CaH débil) → M gigante")
+                            else:
+                                justificacion.append(
+                                    f"TiO/CaH={ratio_TiO_CaH:.2f} (CaH fuerte) → M enana")
+
                 elif tio_strength == 'debil':
                     spectral_type = 'K'
                     subtype = 'K5'
                     justificacion.append("TiO débil, Fe I 4957 simétrica → K5")
+                    # ── NODO 26/27: Cr I termómetro + Na I D luminosidad K ───
+                    Cr_trip_avg = (Cr_I_4254 + Cr_I_4275 + Cr_I_4290) / 3.0
+                    if Cr_I_4275 > 0.03 or Cr_I_4290 > 0.03:
+                        lineas_usadas.extend(['Cr I 4275', 'Cr I 4290'])
+                        ratio_Cr_Fe = Cr_trip_avg / (Fe_I_4260 + 0.01)
+                        if ratio_Cr_Fe > 1.2:
+                            subtype = 'K5-K7'
+                            justificacion.append(
+                                f"Triplete Cr I ({Cr_trip_avg:.2f}) >> Fe I → K5-K7")
+                        else:
+                            justificacion.append(
+                                f"Triplete Cr I ({Cr_trip_avg:.2f})/Fe I={ratio_Cr_Fe:.2f}")
+                    Na_D_avg = (Na_I_D1 + Na_I_D2) / 2.0
+                    if Na_D_avg > 0.05:
+                        lineas_usadas.extend(['Na I D1 5896', 'Na I D2 5890'])
+                        ratio_Na_Ca = Na_D_avg / (Ca_I_4227 + 0.01)
+                        if ratio_Na_Ca > 3.0:
+                            justificacion.append(
+                                f"Na I D ({Na_D_avg:.2f}) → K gigante/supergigante")
+                        elif ratio_Na_Ca > 1.5:
+                            justificacion.append(
+                                f"Na I D ({Na_D_avg:.2f}) → K subgigante")
+                        else:
+                            justificacion.append(
+                                f"Na I D ({Na_D_avg:.2f}) → K enana (V)")
                 else:
                     spectral_type = 'K'
                     subtype = 'K3-K5'
                     justificacion.append("Sin TiO, Ca I fuerte → K intermedia")
+                    # ── NODO 26/27: Cr I termómetro + Na I D luminosidad K ───
+                    Cr_trip_avg = (Cr_I_4254 + Cr_I_4275 + Cr_I_4290) / 3.0
+                    if Cr_I_4275 > 0.03 or Cr_I_4290 > 0.03:
+                        lineas_usadas.extend(['Cr I 4275', 'Cr I 4290'])
+                        ratio_Cr_Fe = Cr_trip_avg / (Fe_I_4260 + 0.01)
+                        if ratio_Cr_Fe > 1.2:
+                            subtype = 'K5-K7'
+                            justificacion.append(
+                                f"Triplete Cr I ({Cr_trip_avg:.2f}) >> Fe I → K5-K7")
+                        elif ratio_Cr_Fe > 0.80:
+                            justificacion.append(
+                                f"Triplete Cr I ({Cr_trip_avg:.2f}) ≈ Fe I → K3-K5")
+                        else:
+                            subtype = 'K0-K2'
+                            justificacion.append(
+                                f"Triplete Cr I ({Cr_trip_avg:.2f}) < Fe I → K temprana")
+                    Na_D_avg = (Na_I_D1 + Na_I_D2) / 2.0
+                    if Na_D_avg > 0.05:
+                        lineas_usadas.extend(['Na I D1 5896', 'Na I D2 5890'])
+                        ratio_Na_Ca = Na_D_avg / (Ca_I_4227 + 0.01)
+                        if ratio_Na_Ca > 3.0:
+                            justificacion.append(
+                                f"Na I D ({Na_D_avg:.2f}) → K gigante/supergigante")
+                        elif ratio_Na_Ca > 1.5:
+                            justificacion.append(
+                                f"Na I D ({Na_D_avg:.2f}) → K subgigante")
+                        else:
+                            justificacion.append(
+                                f"Na I D ({Na_D_avg:.2f}) → K enana (V)")
             else:
                 # Sin datos de espectro completo
                 if TiO_4955 > 0.3:
@@ -1975,13 +2219,39 @@ def classify_star_decision_tree(measurements, wavelengths=None, flux_normalized=
             Cr_vs_Fe = Cr_I_4254 / (Fe_I_4260 + 0.01)
 
             if H_delta > Ca_I_4227 and H_delta > Fe_I_4046 and H_delta > Fe_I_4144:
+                # ── NODO 22: Hδ > todos los metales → G0 ─────────────────────
                 spectral_type = 'G'
                 subtype = 'G0'
                 justificacion.append("HI > metales → G0")
+                # ── NODO 24: Fe I 4144/Hδ + Y II 4376 — metalicidad G ────────
+                ratio_FeHd = Fe_I_4144 / (H_delta + 0.01)
+                if Y_II_4376 > 0.05 and Fe_I_4383 > 0.05:
+                    ratio_Y_Fe = Y_II_4376 / (Fe_I_4383 + 0.01)
+                    lineas_usadas.extend(['Y II 4376', 'Fe I 4383'])
+                    if ratio_Y_Fe > 1.5:
+                        justificacion.append(
+                            f"Y II 4376/Fe I 4383={ratio_Y_Fe:.2f} → G gigante/supergigante")
+                    else:
+                        justificacion.append(
+                            f"Y II 4376/Fe I 4383={ratio_Y_Fe:.2f} → G enana")
+                # ── NODO 25: Tripleta Mg b 5167/5183 — luminosidad G ──────────
+                Mg_b_avg = (Mg_I_5167 + Mg_I_5183) / 2.0
+                if Mg_b_avg > 0.05:
+                    lineas_usadas.extend(['Mg b 5167', 'Mg b 5183'])
+                    ratio_Mg_Fe = Mg_b_avg / (Fe_I_4383 + 0.01)
+                    if ratio_Mg_Fe > 3.0:
+                        justificacion.append(
+                            f"Mg b fuerte ({Mg_b_avg:.2f} Å) → G gigante/supergigante")
+                    elif ratio_Mg_Fe > 1.5:
+                        justificacion.append(
+                            f"Mg b moderado ({Mg_b_avg:.2f} Å) → G subgigante")
+                    else:
+                        justificacion.append(
+                            f"Mg b débil ({Mg_b_avg:.2f} Å) → G secuencia principal")
+
             elif abs(H_delta - Ca_I_4227) < max(H_delta, Ca_I_4227) * 0.3:
+                # ── NODO 23: Hδ ≈ Ca I → G (refinar con Cr I/Fe I) ───────────
                 spectral_type = 'G'
-                # Refinar subtipo G con Cr I 4254 / Fe I 4260
-                # Cr < Fe → G más temprana; Cr > Fe → G tardía tendiendo a K
                 if Cr_I_4254 > 0.05 and Fe_I_4260 > 0.05:
                     if Cr_vs_Fe < 0.90:
                         subtype = 'G2-G5'
@@ -2001,8 +2271,33 @@ def classify_star_decision_tree(measurements, wavelengths=None, flux_normalized=
                 else:
                     subtype = 'G5'
                     justificacion.append("HI ≈ metales → G5")
+                # ── NODO 24: Y II 4376 + Fe I 4144/Hδ — metalicidad G ────────
+                if Y_II_4376 > 0.05 and Fe_I_4383 > 0.05:
+                    ratio_Y_Fe = Y_II_4376 / (Fe_I_4383 + 0.01)
+                    lineas_usadas.extend(['Y II 4376', 'Fe I 4383'])
+                    if ratio_Y_Fe > 1.5:
+                        justificacion.append(
+                            f"Y II/Fe I={ratio_Y_Fe:.2f} → G gigante/supergigante")
+                    else:
+                        justificacion.append(
+                            f"Y II/Fe I={ratio_Y_Fe:.2f} → G enana/subgigante")
+                # ── NODO 25: Tripleta Mg b — luminosidad G ────────────────────
+                Mg_b_avg = (Mg_I_5167 + Mg_I_5183) / 2.0
+                if Mg_b_avg > 0.05:
+                    lineas_usadas.extend(['Mg b 5167', 'Mg b 5183'])
+                    ratio_Mg_Fe = Mg_b_avg / (Fe_I_4383 + 0.01)
+                    if ratio_Mg_Fe > 3.0:
+                        justificacion.append(
+                            f"Mg b fuerte ({Mg_b_avg:.2f}) → G gigante")
+                    elif ratio_Mg_Fe > 1.5:
+                        justificacion.append(
+                            f"Mg b moderado ({Mg_b_avg:.2f}) → G subgigante")
+                    else:
+                        justificacion.append(
+                            f"Mg b débil ({Mg_b_avg:.2f}) → G enana")
+
             elif H_delta < Ca_I_4227 and H_delta < Fe_I_4046:
-                # Usar Cr/Fe para distinguir G tardía vs K
+                # Hδ < metales: G tardía o K
                 if Cr_vs_Fe < 1.0:
                     spectral_type = 'G'
                     subtype = 'G8'
@@ -2012,10 +2307,42 @@ def classify_star_decision_tree(measurements, wavelengths=None, flux_normalized=
                     subtype = 'K0'
                     justificacion.append(f"Cr I > Fe I (ratio={Cr_vs_Fe:.2f}) → K")
 
-                # Ca I >> Fe I → K7+
+                # Ca I >> Fe I → K tardía
                 if Ca_I_4227 > Fe_I_4046 * 2:
                     subtype = 'K5-K7'
                     justificacion.append("Ca I 4226 >> Fe I 4046 → K tardía")
+
+                # ── NODO 26: Triplete Cr I 4254/4275/4290 — termómetro K ─────
+                Cr_trip_avg = (Cr_I_4254 + Cr_I_4275 + Cr_I_4290) / 3.0
+                if Cr_I_4275 > 0.03 or Cr_I_4290 > 0.03:
+                    lineas_usadas.extend(['Cr I 4275', 'Cr I 4290'])
+                    ratio_Cr_Fe260 = Cr_trip_avg / (Fe_I_4260 + 0.01)
+                    if ratio_Cr_Fe260 > 1.2:
+                        justificacion.append(
+                            f"Triplete Cr I ({Cr_trip_avg:.2f}) >> Fe I → K5-K7")
+                        if spectral_type == 'K':
+                            subtype = 'K5-K7'
+                    elif ratio_Cr_Fe260 > 0.80:
+                        justificacion.append(
+                            f"Triplete Cr I ({Cr_trip_avg:.2f}) ≈ Fe I → K2-K5")
+                    else:
+                        justificacion.append(
+                            f"Triplete Cr I ({Cr_trip_avg:.2f}) < Fe I → K temprana")
+
+                # ── NODO 27: Na I D 5890/5896 — luminosidad K ────────────────
+                Na_D_avg = (Na_I_D1 + Na_I_D2) / 2.0
+                if Na_D_avg > 0.05:
+                    lineas_usadas.extend(['Na I D1 5896', 'Na I D2 5890'])
+                    ratio_Na_Ca = Na_D_avg / (Ca_I_4227 + 0.01)
+                    if ratio_Na_Ca > 3.0:
+                        justificacion.append(
+                            f"Na I D fuerte ({Na_D_avg:.2f}) → K gigante/supergigante")
+                    elif ratio_Na_Ca > 1.5:
+                        justificacion.append(
+                            f"Na I D/{Na_D_avg:.2f} → K subgigante")
+                    else:
+                        justificacion.append(
+                            f"Na I D débil ({Na_D_avg:.2f}) → K enana (V)")
             else:
                 spectral_type = 'G'
                 subtype = 'G5'

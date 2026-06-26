@@ -39,7 +39,7 @@ if not exist "models\decision_tree.pkl" (
     echo El sistema funcionara con clasificador fisico + template matching.
     echo Para mayor precision, entrena los modelos desde la interfaz web.
     echo.
-    timeout /t 3 >nul
+    timeout /t 5 >nul
 )
 
 echo Iniciando servidor web...

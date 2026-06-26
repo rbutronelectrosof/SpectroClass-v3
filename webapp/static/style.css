@@ -523,28 +523,28 @@ body {
 
 .lines-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 0.4rem;
+    grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
+    gap: 0.25rem;
 }
 
 .line-item {
     background: #f8f9fa;
-    padding: 0.35rem 0.5rem;
-    border-radius: 5px;
-    border-left: 3px solid var(--success);
+    padding: 0.2rem 0.35rem;
+    border-radius: 4px;
+    border-left: 2px solid var(--success);
 }
 
 .line-name {
     font-weight: 600;
-    font-size: 0.78rem;
+    font-size: 0.68rem;
     color: var(--dark);
-    margin-bottom: 0.1rem;
+    margin-bottom: 0.05rem;
 }
 
 .line-details {
-    font-size: 0.72rem;
+    font-size: 0.62rem;
     color: var(--gray);
-    line-height: 1.3;
+    line-height: 1.2;
 }
 
 .line-ew {
@@ -2531,34 +2531,34 @@ details[open] summary {
 
 /* Visualización de pesos */
 .current-weights h4 {
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
     color: var(--dark);
-    font-size: 0.95rem;
+    font-size: 0.78rem;
 }
 
 .weights-bars {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.3rem;
 }
 
 .weight-bar {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.4rem;
 }
 
 .weight-bar .weight-label {
-    min-width: 140px;
-    font-size: 0.85rem;
+    min-width: 110px;
+    font-size: 0.72rem;
     font-weight: 500;
     color: var(--dark);
 }
 
 .weight-bar .weight-fill {
-    height: 20px;
+    height: 10px;
     background: linear-gradient(90deg, var(--primary), #667eea);
-    border-radius: 4px;
+    border-radius: 3px;
     transition: width 0.3s ease;
 }
 
@@ -2567,10 +2567,10 @@ details[open] summary {
 }
 
 .weight-bar .weight-value {
-    min-width: 40px;
+    min-width: 32px;
     font-weight: bold;
     color: var(--dark);
-    font-size: 0.85rem;
+    font-size: 0.72rem;
 }
 
 /* Panel de modelos disponibles */
@@ -3563,13 +3563,13 @@ details[open] summary {
     display: inline-block;
     background: #2980b9;
     color: white;
-    border-radius: 10px;
-    padding: 0 0.4rem;
-    font-size: 0.68rem;
+    border-radius: 8px;
+    padding: 0 0.25rem;
+    font-size: 0.55rem;
     font-weight: 700;
     vertical-align: middle;
-    margin-left: 0.3rem;
-    letter-spacing: 0.03em;
+    margin-left: 0.2rem;
+    letter-spacing: 0.02em;
 }
 
 /* ═══════════════════════════════════════════════

@@ -30,7 +30,13 @@ import base64
 from datetime import datetime
 
 # ── Módulo de normalización de espectros crudos ────────────────────────────
-_NORMALIZADOR_PATH = r"C:\Users\Eduardo\Desktop\suppnet-main"
+import platform as _platform
+if _platform.system() == "Windows":
+    _NORMALIZADOR_PATH = r"C:\Users\Eduardo\Desktop\suppnet-main"
+elif _platform.system() == "Darwin":  # macOS
+    _NORMALIZADOR_PATH = os.path.expanduser("~/Desktop/suppnet-main")
+else:
+    _NORMALIZADOR_PATH = os.path.expanduser("~/suppnet-main")
 _normalizador_nn = None          # Se carga una vez al arranque
 NORMALIZADOR_DISPONIBLE = False
 _norm_cache = {}                 # {spectrum_id: {wave, flux, continuum, continuum_std}}
@@ -1109,27 +1115,34 @@ def health():
 
 @app.route('/run_script', methods=['POST'])
 def run_script():
-    """Ejecuta un script .bat desde la webapp"""
+    """Ejecuta un script desde la webapp (bat en Windows/WSL, sh en macOS/Linux)"""
+    import platform as _plat
     data = request.json
     script_name = data.get('script')
 
-    # Scripts permitidos (por seguridad)
-    allowed_scripts = {
-        '1_INSTALAR_DEPENDENCIAS': '1_INSTALAR_DEPENDENCIAS.bat',
-        '2_ENTRENAR_MODELOS': '2_ENTRENAR_MODELOS.bat',
-        '4_TEST_ESPECTRO': '4_TEST_ESPECTRO.bat',
-        '5_VER_METRICAS': '5_VER_METRICAS.bat',
+    _sys_name = _plat.system()
+
+    # Scripts permitidos: nombre_base -> (bat, sh)
+    _script_map = {
+        '1_INSTALAR_DEPENDENCIAS': ('1_INSTALAR_DEPENDENCIAS.bat', '1_INSTALAR_DEPENDENCIAS.sh'),
+        '2_ENTRENAR_MODELOS':      ('2_ENTRENAR_MODELOS.bat',      '2_ENTRENAR_MODELOS.sh'),
+        '4_TEST_ESPECTRO':         ('4_TEST_ESPECTRO.bat',         '4_TEST_ESPECTRO.sh'),
+        '5_VER_METRICAS':          ('5_VER_METRICAS.bat',          '5_VER_METRICAS.sh'),
     }
 
-    if script_name not in allowed_scripts:
+    if script_name not in _script_map:
         return jsonify({
             'success': False,
             'error': f'Script no permitido: {script_name}'
         }), 400
 
-    # Ruta al script
+    bat_file, sh_file = _script_map[script_name]
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    script_path = os.path.join(project_root, allowed_scripts[script_name])
+
+    if _sys_name == 'Darwin':
+        script_path = os.path.join(project_root, sh_file)
+    else:
+        script_path = os.path.join(project_root, bat_file)
 
     if not os.path.exists(script_path):
         return jsonify({
@@ -1138,24 +1151,31 @@ def run_script():
         }), 404
 
     try:
-        # Determinar si estamos en Windows o WSL
-        import platform
         utf8_env = {**os.environ, 'PYTHONIOENCODING': 'utf-8'}
-        if platform.system() == 'Windows':
-            # Windows nativo
+        if _sys_name == 'Windows':
             result = subprocess.run(
                 ['cmd', '/c', script_path],
                 capture_output=True,
                 text=True,
                 encoding='utf-8',
                 errors='replace',
-                timeout=600,  # 10 minutos máximo
+                timeout=600,
+                cwd=project_root,
+                env=utf8_env
+            )
+        elif _sys_name == 'Darwin':
+            result = subprocess.run(
+                ['bash', script_path],
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=600,
                 cwd=project_root,
                 env=utf8_env
             )
         else:
-            # WSL o Linux - ejecutar .bat a través de cmd.exe
-            # Convertir ruta WSL a Windows si es necesario
+            # WSL / Linux
             win_path = script_path.replace('/mnt/c/', 'C:\\').replace('/', '\\')
             result = subprocess.run(
                 ['cmd.exe', '/c', win_path],

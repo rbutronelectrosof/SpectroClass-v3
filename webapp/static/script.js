@@ -82,6 +82,8 @@ function setupTabs() {
 
             // Recargar banner de modelo actual al entrar en Herramientas
             if (tabName === 'herramientas') loadCurrentModelBanner();
+            // Refrescar pesos actuales al entrar en Redes Neuronales
+            if (tabName === 'neural') updateWeightsDisplay();
         });
     });
 }
@@ -586,11 +588,11 @@ function dibujarClasifEspectro(specData, todasLineas, lineasUsadasSet) {
 
     const W      = 900;
     const X_LEFT = 55;
-    const Y_TOP  = 210;
-    const Y_BOT  = 360;
-    const Y_TICK = 366;
-    const Y_TICK2= 375;
-    const Y_LABEL= 388;
+    const Y_TOP  = 245;   // espacio para 12 niveles de etiquetas × 18px = 216px
+    const Y_BOT  = 395;
+    const Y_TICK = 401;
+    const Y_TICK2= 410;
+    const Y_LABEL= 423;
 
     // Rango λ
     let LMIN, LMAX;
@@ -730,7 +732,7 @@ function dibujarClasifEspectro(specData, todasLineas, lineasUsadasSet) {
             if (Math.abs(_xPos[_j] - _xPos[_i]) < 55) _used.add(_slotOf[_j]);
         }
         let _s = 0; while (_used.has(_s)) _s++;
-        _slotOf[_i]  = Math.min(_s, 8);
+        _slotOf[_i]  = Math.min(_s, 11);
         _assigned[_i] = true;
     }
     // Pasada 2: líneas secundarias → se ubican en slots libres (más arriba)
@@ -742,7 +744,7 @@ function dibujarClasifEspectro(specData, todasLineas, lineasUsadasSet) {
             if (Math.abs(_xPos[_j] - _xPos[_i]) < 55) _used.add(_slotOf[_j]);
         }
         let _s = 0; while (_used.has(_s)) _s++;
-        _slotOf[_i]  = Math.min(_s, 8);
+        _slotOf[_i]  = Math.min(_s, 11);
         _assigned[_i] = true;
     }
 
@@ -904,8 +906,8 @@ function dibujarMiniSpec(specData, todasLineas, lineasUsadasSet) {
     const flux = specData.flux || [];
     if (wl.length < 2) { svg.innerHTML = ''; return; }
 
-    const W = 860, H = 190;
-    const PAD_L = 42, PAD_R = 16, PAD_T = 28, PAD_B = 28;
+    const W = 860, H = 242;
+    const PAD_L = 42, PAD_R = 16, PAD_T = 74, PAD_B = 28;
     const PW = W - PAD_L - PAD_R;
     const PH = H - PAD_T - PAD_B;
 
@@ -937,12 +939,22 @@ function dibujarMiniSpec(specData, todasLineas, lineasUsadasSet) {
         return lineasUsadasSet.has(k) && l.longitud_onda >= wMin && l.longitud_onda <= wMax;
     });
 
-    // Stagger etiquetas para evitar solapamiento
+    // Stagger etiquetas para evitar solapamiento — 4 niveles por proximidad
     keyLines.sort((a, b) => a.longitud_onda - b.longitud_onda);
+    const _kxPos  = keyLines.map(l => tx(l.longitud_onda));
+    const _kSlot  = new Array(keyLines.length).fill(0);
+    for (let _i = 0; _i < keyLines.length; _i++) {
+        const _used = new Set();
+        for (let _j = 0; _j < _i; _j++) {
+            if (Math.abs(_kxPos[_j] - _kxPos[_i]) < 52) _used.add(_kSlot[_j]);
+        }
+        let _s = 0; while (_used.has(_s)) _s++;
+        _kSlot[_i] = Math.min(_s, 4);
+    }
     const linesSVG = keyLines.map((l, idx) => {
-        const x   = tx(l.longitud_onda);
+        const x   = _kxPos[idx];
         const col = colorLinea(l.nombre);
-        const yLbl = idx % 2 === 0 ? PAD_T - 6 : PAD_T - 16;
+        const yLbl = PAD_T - 8 - _kSlot[idx] * 13;
         return `<line x1="${x.toFixed(1)}" y1="${PAD_T}" x2="${x.toFixed(1)}" y2="${(PAD_T + PH).toFixed(1)}"
                       stroke="${col}" stroke-width="1.5" opacity="0.8" stroke-dasharray="4,3"/>
                 <text x="${x.toFixed(1)}" y="${yLbl}" fill="${col}" font-size="9"
@@ -1188,7 +1200,7 @@ function dibujarPreambuloEspectro(specData, todasLineas) {
 
     const W      = 1400;
     const X_LEFT = 65;
-    const Y_TOP  = 210;   // espacio para 9 niveles de etiquetas × 18px = 162px
+    const Y_TOP  = 250;   // espacio para 12 niveles de etiquetas × 18px = 216px
     const Y_BOT  = 700;
     const Y_TICK = 710;
     const Y_TICK2= 728;
@@ -1351,7 +1363,7 @@ function dibujarPreambuloEspectro(specData, todasLineas) {
             if (Math.abs(_xPos[_j] - _xPos[_i]) < 75) _used.add(_slotOf[_j]);
         }
         let _s = 0; while (_used.has(_s)) _s++;
-        _slotOf[_i]   = Math.min(_s, 8);
+        _slotOf[_i]   = Math.min(_s, 11);
         _assigned[_i] = true;
     }
     // Pasada 2: líneas no detectadas → slots libres más arriba
@@ -1363,7 +1375,7 @@ function dibujarPreambuloEspectro(specData, todasLineas) {
             if (Math.abs(_xPos[_j] - _xPos[_i]) < 75) _used.add(_slotOf[_j]);
         }
         let _s = 0; while (_used.has(_s)) _s++;
-        _slotOf[_i]   = Math.min(_s, 8);
+        _slotOf[_i]   = Math.min(_s, 11);
         _assigned[_i] = true;
     }
 
@@ -5559,6 +5571,8 @@ function applyWeights() {
     globalWeights.knn           = knn;
     globalWeights.cnn_1d        = c1d;
     globalWeights.cnn_2d        = c2d;
+
+    updateWeightsDisplay();
 
     const btn = document.getElementById('btnApplyWeights');
     btn.textContent = '✓ Aplicado';

@@ -98,7 +98,7 @@
                                 </div>
                             </div>
                             <div style="overflow-x:auto;">
-                                <svg id="preambuloSVG" viewBox="0 0 1400 820" width="100%"
+                                <svg id="preambuloSVG" viewBox="0 0 1400 860" width="100%"
                                      preserveAspectRatio="xMidYMid meet"
                                      style="min-width:700px; min-height:440px; background:#0a0f1a; border-radius:8px; display:block;">
                                 </svg>
@@ -359,7 +359,7 @@
                                                 onclick="clasifResetZoom()">↺ Vista completa</button>
                                     </div>
                                 </div>
-                                <svg id="clasifSVG" width="100%" viewBox="0 0 900 410"
+                                <svg id="clasifSVG" width="100%" viewBox="0 0 900 445"
                                      style="display:block;border-radius:6px;background:#0a1628;min-height:360px;"></svg>
                                 <p class="clasif-zoom-hint" id="clasifZoomHint">
                                     Haz clic sobre una línea para ampliarla. Zoom ×2 (±80 Å) o ×6 (±25 Å).
@@ -444,7 +444,7 @@
                                 <!-- Mini espectro con líneas clave -->
                                 <div class="decision-section">
                                     <h4 class="decision-section-title">📈 Espectro — Líneas de Clasificación</h4>
-                                    <svg id="miniSpecSVG" width="100%" viewBox="0 0 860 180"
+                                    <svg id="miniSpecSVG" width="100%" viewBox="0 0 860 242"
                                          style="display:block;border-radius:6px;background:#0a1628;"></svg>
                                 </div>
 
@@ -971,6 +971,197 @@
                         <div id="dmExportInfo" class="dm-msg" style="margin-top:0.8rem;display:none;"></div>
                     </div>
 
+
+
+                    <!-- TEST DE ESPECTROS INDIVIDUAL -->
+                    <hr style="border-color:#334155;margin:2rem 0;">
+                    <div id="subtab-testear">
+                        <div class="config-panel">
+                            <h3>🔬 Test de Espectros Individual</h3>
+
+                            <div class="config-grid">
+                                <!-- Selector de archivo con búsqueda -->
+                                <div class="config-item full-width">
+                                    <div class="label-with-help">
+                                        <label for="testSpectrumFile">📄 Archivo de Espectro</label>
+                                        <span class="help-icon">?
+                                            <div class="tooltip">
+                                                <div class="tooltip-title">Selección de Espectro para Test</div>
+                                                <p>Elige el espectro que quieres clasificar individualmente para diagnóstico.</p>
+                                                <ul>
+                                                    <li><b>Buscar en catálogo:</b> filtra por nombre o tipo espectral</li>
+                                                    <li><b>Subir archivo:</b> carga desde tu PC, pen drive, etc.</li>
+                                                    <li><b>Escribir ruta:</b> ruta relativa o absoluta al archivo</li>
+                                                </ul>
+                                                <p style="margin-top:8px">Formatos admitidos: <code>.txt</code>, <code>.fits</code>, <code>.fit</code></p>
+                                            </div>
+                                        </span>
+                                    </div>
+
+                                    <!-- Buscador de catálogo -->
+                                    <div class="file-browser-panel">
+                                        <div class="file-browser-controls">
+                                            <select id="testCatalogSelect" onchange="loadCatalogFiles()">
+                                                <option value="data/elodie">📁 data/elodie (catálogo principal)</option>
+                                                <option value="data/espectros">📁 data/espectros</option>
+                                            </select>
+                                            <input type="text" id="testFileSearch" placeholder="🔍 Buscar archivo..." oninput="filterCatalogFiles()">
+                                            <select id="testTypeFilter" onchange="filterCatalogFiles()">
+                                                <option value="">Todos los tipos</option>
+                                                <option value="O">Tipo O</option>
+                                                <option value="B">Tipo B</option>
+                                                <option value="A">Tipo A</option>
+                                                <option value="F">Tipo F</option>
+                                                <option value="G">Tipo G</option>
+                                                <option value="K">Tipo K</option>
+                                                <option value="M">Tipo M</option>
+                                            </select>
+                                        </div>
+                                        <div id="catalogFileList" class="file-list">
+                                            <div class="file-list-hint">Selecciona un catálogo o escribe para buscar...</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Campo de entrada manual -->
+                                    <div class="input-with-btn" style="margin-top: 8px;">
+                                        <input type="text" id="testSpectrumFile" placeholder="Nombre, ruta relativa, o ruta absoluta (ej: E:\espectros\estrella.txt)">
+                                        <input type="file" id="testSpectrumFileInput" accept=".txt,.fits,.fit" style="display: none;">
+                                        <button class="btn-small" onclick="document.getElementById('testSpectrumFileInput').click()" title="Subir archivo desde tu PC o pen drive">📂 Subir archivo</button>
+                                    </div>
+                                    <small>Selecciona de la lista, escribe el nombre/ruta, o haz clic en <b>Subir archivo</b> para cargar desde cualquier ubicación (pen drive, escritorio, etc.)</small>
+                                </div>
+
+                                <!-- Modelo a usar -->
+                                <div class="config-item">
+                                    <div class="label-with-help">
+                                        <label for="testModelSelect">🧠 Modelo a Usar</label>
+                                        <span class="help-icon">?
+                                            <div class="tooltip">
+                                                <div class="tooltip-title">Métodos de Clasificación</div>
+                                                <ul>
+                                                    <li><b>Multi-Método:</b> Combina físico + ML + templates. Votación ponderada para mayor precisión (86.5%).</li>
+                                                    <li><b>Solo Físico:</b> Reglas basadas en líneas espectrales (He, H, Ca, TiO). Interpretable pero menos preciso.</li>
+                                                    <li><b>Solo ML:</b> Árbol de decisión o red neuronal. Requiere modelo entrenado.</li>
+                                                </ul>
+                                                <p style="margin-top:8px"><b>Recomendación:</b> Usa Multi-Método para resultados más confiables.</p>
+                                            </div>
+                                        </span>
+                                    </div>
+                                    <select id="testModelSelect">
+                                        <option value="multi_method" selected>Multi-Método (Recomendado)</option>
+                                        <option value="physical_only">Solo Físico</option>
+                                        <option value="ml_only">Solo Machine Learning</option>
+                                    </select>
+                                </div>
+
+                                <!-- Mostrar detalles -->
+                                <div class="config-item">
+                                    <div class="label-with-help">
+                                        <label for="testShowDetails">📋 Nivel de Detalle</label>
+                                        <span class="help-icon">?
+                                            <div class="tooltip">
+                                                <div class="tooltip-title">Información en Resultados</div>
+                                                <ul>
+                                                    <li><b>Básico:</b> Solo tipo espectral y confianza.</li>
+                                                    <li><b>Detallado:</b> Incluye líneas detectadas, alternativas, y contribución de cada método.</li>
+                                                    <li><b>Debug:</b> Todo lo anterior + valores de EW, profundidades, y diagnósticos internos.</li>
+                                                </ul>
+                                                <p style="margin-top:8px"><b>Para aprender:</b> Usa "Detallado" para ver cómo funciona la clasificación.</p>
+                                            </div>
+                                        </span>
+                                    </div>
+                                    <select id="testShowDetails">
+                                        <option value="basic">Básico</option>
+                                        <option value="detailed" selected>Detallado</option>
+                                        <option value="debug">Debug (muy detallado)</option>
+                                    </select>
+                                </div>
+
+                                <!-- Guardar gráfico -->
+                                <div class="config-item">
+                                    <div class="label-with-help">
+                                        <label>💾 Opciones de Salida</label>
+                                        <span class="help-icon">?
+                                            <div class="tooltip">
+                                                <div class="tooltip-title">Opciones de Guardado</div>
+                                                <ul>
+                                                    <li><b>Generar gráfico:</b> Crea una imagen PNG del espectro con las líneas marcadas</li>
+                                                    <li><b>Exportar a CSV:</b> Guarda las líneas detectadas y sus anchos equivalentes</li>
+                                                </ul>
+                                                <p style="margin-top:8px">Los archivos se guardan en la carpeta <code>results/</code>.</p>
+                                            </div>
+                                        </span>
+                                    </div>
+                                    <div class="checkbox-group">
+                                        <label><input type="checkbox" id="testSavePlot" checked> Generar gráfico</label>
+                                        <label><input type="checkbox" id="testSaveCSV"> Exportar a CSV</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="config-actions">
+                                <button class="btn-primary" id="btnTestSpectrum" onclick="testSpectrum()">
+                                    🔬 Ejecutar Test
+                                </button>
+                                <button class="btn-secondary" onclick="clearTestResults()">
+                                    🗑️ Limpiar Resultados
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Resultados del test -->
+                        <div id="testResults" class="test-results" style="display: none;">
+                            <h3>📊 Resultado del Test</h3>
+
+                            <div class="test-main-result">
+                                <div class="result-type-box">
+                                    <span class="test-type-badge" id="testResultType">-</span>
+                                    <span class="test-subtype" id="testResultSubtype">-</span>
+                                </div>
+                                <div class="result-confidence-box">
+                                    <div class="confidence-circle" id="testConfidenceCircle">
+                                        <span id="testConfidenceValue">-%</span>
+                                    </div>
+                                    <span class="confidence-label">Confianza</span>
+                                </div>
+                            </div>
+
+                            <div class="test-comparison" id="testComparison" style="display: none;">
+                                <h4>📋 Comparación con Tipo Original</h4>
+                                <div class="comparison-grid">
+                                    <div class="comparison-item">
+                                        <span class="comparison-label">Original:</span>
+                                        <span class="comparison-value" id="testOriginalType">-</span>
+                                    </div>
+                                    <div class="comparison-item">
+                                        <span class="comparison-label">Clasificado:</span>
+                                        <span class="comparison-value" id="testClassifiedType">-</span>
+                                    </div>
+                                    <div class="comparison-item">
+                                        <span class="comparison-label">Resultado:</span>
+                                        <span class="comparison-value" id="testMatchResult">-</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="test-details" id="testDetailsPanel">
+                                <h4>📈 Líneas Diagnóstico Medidas</h4>
+                                <div class="lines-table" id="testLinesTable"></div>
+                            </div>
+
+                            <!-- Panel debug: diagnósticos internos -->
+                            <div id="testDebugPanel" style="display:none; margin-top:1rem;">
+                                <h4>🛠️ Diagnósticos Internos (Debug)</h4>
+                                <div id="testDebugContent" class="debug-content"></div>
+                            </div>
+
+                            <div class="test-plot" id="testPlotPanel" style="display: none;">
+                                <h4>📊 Espectro</h4>
+                                <img id="testPlotImage" src="" alt="Espectro">
+                            </div>
+                        </div>
+                    </div>
+
                 </div><!-- /batch-container -->
             </section>
 
@@ -983,9 +1174,8 @@
                     <!-- Sub-tabs dentro de Herramientas -->
                     <div class="subtabs">
                         <button class="subtab-btn active" data-subtab="entrenar">🤖 Entrenar Modelos</button>
-                        <button class="subtab-btn" data-subtab="testear">🔬 Test Espectros</button>
-                        <button class="subtab-btn" data-subtab="utilidades">🛠️ Utilidades</button>
                         <button class="subtab-btn" data-subtab="metricas" onclick="loadMetricsHerramientas()">📊 Métricas</button>
+                        <button class="subtab-btn" data-subtab="utilidades">🛠️ Utilidades</button>
                     </div>
 
                     <!-- SUBTAB: ENTRENAR MODELOS -->
@@ -1227,195 +1417,85 @@
                         </div>
                     </div>
 
-                    <!-- SUBTAB: TEST ESPECTROS -->
-                    <div id="subtab-testear" class="subtab-content">
-                        <div class="config-panel">
-                            <h3>🔬 Test de Espectros Individual</h3>
+                    <!-- SUBTAB: MÉTRICAS -->
+                    <div id="subtab-metricas" class="subtab-content">
+                        <div class="nn-metrics-panel" style="margin-top:0; padding-top:1.2rem;">
 
-                            <div class="config-grid">
-                                <!-- Selector de archivo con búsqueda -->
-                                <div class="config-item full-width">
-                                    <div class="label-with-help">
-                                        <label for="testSpectrumFile">📄 Archivo de Espectro</label>
-                                        <span class="help-icon">?
-                                            <div class="tooltip">
-                                                <div class="tooltip-title">Selección de Espectro para Test</div>
-                                                <p>Elige el espectro que quieres clasificar individualmente para diagnóstico.</p>
-                                                <ul>
-                                                    <li><b>Buscar en catálogo:</b> filtra por nombre o tipo espectral</li>
-                                                    <li><b>Subir archivo:</b> carga desde tu PC, pen drive, etc.</li>
-                                                    <li><b>Escribir ruta:</b> ruta relativa o absoluta al archivo</li>
-                                                </ul>
-                                                <p style="margin-top:8px">Formatos admitidos: <code>.txt</code>, <code>.fits</code>, <code>.fit</code></p>
-                                            </div>
-                                        </span>
-                                    </div>
+                            <!-- Cabecera -->
+                            <div class="nn-metrics-header">
+                                <h3>📊 Métricas de Entrenamiento</h3>
+                                <div class="nn-metrics-tabs">
+                                    <button class="nm-tab active" id="hmTab_decision_tree" onclick="switchHmModel('decision_tree',this)">🌿 Árbol / RF / GB</button>
+                                    <button class="nm-tab" id="hmTab_knn"    onclick="switchHmModel('knn',this)">📍 KNN</button>
+                                    <button class="nm-tab" id="hmTab_cnn_1d" onclick="switchHmModel('cnn_1d',this)">〰️ CNN 1D</button>
+                                    <button class="nm-tab" id="hmTab_cnn_2d" onclick="switchHmModel('cnn_2d',this)">🖼️ CNN 2D</button>
+                                </div>
+                                <button class="btn-secondary btn-sm" onclick="loadMetricsHerramientas()" style="margin-left:auto;">🔄 Actualizar</button>
+                            </div>
 
-                                    <!-- Buscador de catálogo -->
-                                    <div class="file-browser-panel">
-                                        <div class="file-browser-controls">
-                                            <select id="testCatalogSelect" onchange="loadCatalogFiles()">
-                                                <option value="data/elodie">📁 data/elodie (catálogo principal)</option>
-                                                <option value="data/espectros">📁 data/espectros</option>
-                                            </select>
-                                            <input type="text" id="testFileSearch" placeholder="🔍 Buscar archivo..." oninput="filterCatalogFiles()">
-                                            <select id="testTypeFilter" onchange="filterCatalogFiles()">
-                                                <option value="">Todos los tipos</option>
-                                                <option value="O">Tipo O</option>
-                                                <option value="B">Tipo B</option>
-                                                <option value="A">Tipo A</option>
-                                                <option value="F">Tipo F</option>
-                                                <option value="G">Tipo G</option>
-                                                <option value="K">Tipo K</option>
-                                                <option value="M">Tipo M</option>
-                                            </select>
-                                        </div>
-                                        <div id="catalogFileList" class="file-list">
-                                            <div class="file-list-hint">Selecciona un catálogo o escribe para buscar...</div>
+                            <!-- Badge de accuracy + info rápida del modelo -->
+                            <div class="hm-summary-row">
+                                <div class="nm-accuracy-badge" id="hmAccuracyBadge" style="margin:0;">—</div>
+                                <div id="hmModelInfo" class="hm-model-info"></div>
+                            </div>
+
+                            <!-- Gráficas accuracy / loss (solo CNN) -->
+                            <div id="hmChartsSection" style="display:none;">
+                                <div class="nm-charts-row">
+                                    <div class="nm-chart-card">
+                                        <h4>Precisión por época</h4>
+                                        <div style="position:relative; height:220px;">
+                                            <canvas id="hmChartAccuracy"></canvas>
                                         </div>
                                     </div>
-
-                                    <!-- Campo de entrada manual -->
-                                    <div class="input-with-btn" style="margin-top: 8px;">
-                                        <input type="text" id="testSpectrumFile" placeholder="Nombre, ruta relativa, o ruta absoluta (ej: E:\espectros\estrella.txt)">
-                                        <input type="file" id="testSpectrumFileInput" accept=".txt,.fits,.fit" style="display: none;">
-                                        <button class="btn-small" onclick="document.getElementById('testSpectrumFileInput').click()" title="Subir archivo desde tu PC o pen drive">📂 Subir archivo</button>
-                                    </div>
-                                    <small>Selecciona de la lista, escribe el nombre/ruta, o haz clic en <b>Subir archivo</b> para cargar desde cualquier ubicación (pen drive, escritorio, etc.)</small>
-                                </div>
-
-                                <!-- Modelo a usar -->
-                                <div class="config-item">
-                                    <div class="label-with-help">
-                                        <label for="testModelSelect">🧠 Modelo a Usar</label>
-                                        <span class="help-icon">?
-                                            <div class="tooltip">
-                                                <div class="tooltip-title">Métodos de Clasificación</div>
-                                                <ul>
-                                                    <li><b>Multi-Método:</b> Combina físico + ML + templates. Votación ponderada para mayor precisión (86.5%).</li>
-                                                    <li><b>Solo Físico:</b> Reglas basadas en líneas espectrales (He, H, Ca, TiO). Interpretable pero menos preciso.</li>
-                                                    <li><b>Solo ML:</b> Árbol de decisión o red neuronal. Requiere modelo entrenado.</li>
-                                                </ul>
-                                                <p style="margin-top:8px"><b>Recomendación:</b> Usa Multi-Método para resultados más confiables.</p>
-                                            </div>
-                                        </span>
-                                    </div>
-                                    <select id="testModelSelect">
-                                        <option value="multi_method" selected>Multi-Método (Recomendado)</option>
-                                        <option value="physical_only">Solo Físico</option>
-                                        <option value="ml_only">Solo Machine Learning</option>
-                                    </select>
-                                </div>
-
-                                <!-- Mostrar detalles -->
-                                <div class="config-item">
-                                    <div class="label-with-help">
-                                        <label for="testShowDetails">📋 Nivel de Detalle</label>
-                                        <span class="help-icon">?
-                                            <div class="tooltip">
-                                                <div class="tooltip-title">Información en Resultados</div>
-                                                <ul>
-                                                    <li><b>Básico:</b> Solo tipo espectral y confianza.</li>
-                                                    <li><b>Detallado:</b> Incluye líneas detectadas, alternativas, y contribución de cada método.</li>
-                                                    <li><b>Debug:</b> Todo lo anterior + valores de EW, profundidades, y diagnósticos internos.</li>
-                                                </ul>
-                                                <p style="margin-top:8px"><b>Para aprender:</b> Usa "Detallado" para ver cómo funciona la clasificación.</p>
-                                            </div>
-                                        </span>
-                                    </div>
-                                    <select id="testShowDetails">
-                                        <option value="basic">Básico</option>
-                                        <option value="detailed" selected>Detallado</option>
-                                        <option value="debug">Debug (muy detallado)</option>
-                                    </select>
-                                </div>
-
-                                <!-- Guardar gráfico -->
-                                <div class="config-item">
-                                    <div class="label-with-help">
-                                        <label>💾 Opciones de Salida</label>
-                                        <span class="help-icon">?
-                                            <div class="tooltip">
-                                                <div class="tooltip-title">Opciones de Guardado</div>
-                                                <ul>
-                                                    <li><b>Generar gráfico:</b> Crea una imagen PNG del espectro con las líneas marcadas</li>
-                                                    <li><b>Exportar a CSV:</b> Guarda las líneas detectadas y sus anchos equivalentes</li>
-                                                </ul>
-                                                <p style="margin-top:8px">Los archivos se guardan en la carpeta <code>results/</code>.</p>
-                                            </div>
-                                        </span>
-                                    </div>
-                                    <div class="checkbox-group">
-                                        <label><input type="checkbox" id="testSavePlot" checked> Generar gráfico</label>
-                                        <label><input type="checkbox" id="testSaveCSV"> Exportar a CSV</label>
+                                    <div class="nm-chart-card">
+                                        <h4>Pérdida (Loss) por época</h4>
+                                        <div style="position:relative; height:220px;">
+                                            <canvas id="hmChartLoss"></canvas>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="config-actions">
-                                <button class="btn-primary" id="btnTestSpectrum" onclick="testSpectrum()">
-                                    🔬 Ejecutar Test
-                                </button>
-                                <button class="btn-secondary" onclick="clearTestResults()">
-                                    🗑️ Limpiar Resultados
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Resultados del test -->
-                        <div id="testResults" class="test-results" style="display: none;">
-                            <h3>📊 Resultado del Test</h3>
-
-                            <div class="test-main-result">
-                                <div class="result-type-box">
-                                    <span class="test-type-badge" id="testResultType">-</span>
-                                    <span class="test-subtype" id="testResultSubtype">-</span>
-                                </div>
-                                <div class="result-confidence-box">
-                                    <div class="confidence-circle" id="testConfidenceCircle">
-                                        <span id="testConfidenceValue">-%</span>
-                                    </div>
-                                    <span class="confidence-label">Confianza</span>
+                            <!-- Curva de diagnóstico (KNN: k vs acc | DT: depth vs acc | RF: n_est vs error) -->
+                            <div id="hmDiagSection" style="display:none;">
+                                <div class="nm-chart-card hm-diag-card">
+                                    <h4 id="hmDiagTitle">Curva de Diagnóstico</h4>
+                                    <p id="hmDiagDesc" class="hm-diag-desc"></p>
+                                    <canvas id="hmChartDiag" height="230"></canvas>
                                 </div>
                             </div>
 
-                            <div class="test-comparison" id="testComparison" style="display: none;">
-                                <h4>📋 Comparación con Tipo Original</h4>
-                                <div class="comparison-grid">
-                                    <div class="comparison-item">
-                                        <span class="comparison-label">Original:</span>
-                                        <span class="comparison-value" id="testOriginalType">-</span>
-                                    </div>
-                                    <div class="comparison-item">
-                                        <span class="comparison-label">Clasificado:</span>
-                                        <span class="comparison-value" id="testClassifiedType">-</span>
-                                    </div>
-                                    <div class="comparison-item">
-                                        <span class="comparison-label">Resultado:</span>
-                                        <span class="comparison-value" id="testMatchResult">-</span>
-                                    </div>
+                            <!-- Matriz de confusión -->
+                            <div id="hmConfusionSection" style="display:none;">
+                                <h4 style="margin-top:1.5rem; color:#e2e8f0;">Matriz de Confusión</h4>
+                                <div id="hmConfusionMatrix" class="nm-confusion-wrap"></div>
+                            </div>
+
+                            <!-- Métricas por clase -->
+                            <div id="hmPerClassSection" style="display:none;">
+                                <h4 style="margin-top:1.5rem; color:#e2e8f0;">Métricas por Clase</h4>
+                                <div id="hmPerClassTable" class="nm-perclass-wrap"></div>
+                            </div>
+
+                            <p id="hmNoData" class="nm-nodata" style="display:none;">
+                                Aún no hay métricas para este modelo. Entrénalo primero.
+                            </p>
+
+                            <!-- ═══ HISTORIAL DE ENTRENAMIENTOS ═══ -->
+                            <div class="hm-history-section">
+                                <div class="hm-history-header">
+                                    <h4>🕐 Historial de Entrenamientos</h4>
+                                    <span id="hmHistoryCount" style="color:#718096; font-size:0.82rem;"></span>
+                                </div>
+                                <div id="hmHistoryList" class="hm-history-list">
+                                    <p class="nm-nodata">Sin historial guardado aún.</p>
                                 </div>
                             </div>
 
-                            <div class="test-details" id="testDetailsPanel">
-                                <h4>📈 Líneas Diagnóstico Medidas</h4>
-                                <div class="lines-table" id="testLinesTable"></div>
-                            </div>
-
-                            <!-- Panel debug: diagnósticos internos -->
-                            <div id="testDebugPanel" style="display:none; margin-top:1rem;">
-                                <h4>🛠️ Diagnósticos Internos (Debug)</h4>
-                                <div id="testDebugContent" class="debug-content"></div>
-                            </div>
-
-                            <div class="test-plot" id="testPlotPanel" style="display: none;">
-                                <h4>📊 Espectro</h4>
-                                <img id="testPlotImage" src="" alt="Espectro">
-                            </div>
                         </div>
                     </div>
 
-                    <!-- SUBTAB: VER MÉTRICAS -->
                     <!-- SUBTAB: UTILIDADES -->
                     <div id="subtab-utilidades" class="subtab-content">
                         <div class="tools-grid">
@@ -1850,81 +1930,6 @@
                         <div id="catalogsList" class="catalogs-list" style="display: none;">
                             <h4>📁 Catálogos Disponibles</h4>
                             <div id="catalogsContent"></div>
-                        </div>
-                    </div>
-
-                    <!-- SUBTAB: MÉTRICAS -->
-                    <div id="subtab-metricas" class="subtab-content">
-                        <div class="nn-metrics-panel" style="margin-top:0; padding-top:1.2rem;">
-
-                            <!-- Cabecera -->
-                            <div class="nn-metrics-header">
-                                <h3>📊 Métricas de Entrenamiento</h3>
-                                <div class="nn-metrics-tabs">
-                                    <button class="nm-tab active" id="hmTab_decision_tree" onclick="switchHmModel('decision_tree',this)">🌿 Árbol / RF / GB</button>
-                                    <button class="nm-tab" id="hmTab_knn"    onclick="switchHmModel('knn',this)">📍 KNN</button>
-                                    <button class="nm-tab" id="hmTab_cnn_1d" onclick="switchHmModel('cnn_1d',this)">〰️ CNN 1D</button>
-                                    <button class="nm-tab" id="hmTab_cnn_2d" onclick="switchHmModel('cnn_2d',this)">🖼️ CNN 2D</button>
-                                </div>
-                                <button class="btn-secondary btn-sm" onclick="loadMetricsHerramientas()" style="margin-left:auto;">🔄 Actualizar</button>
-                            </div>
-
-                            <!-- Badge de accuracy + info rápida del modelo -->
-                            <div class="hm-summary-row">
-                                <div class="nm-accuracy-badge" id="hmAccuracyBadge" style="margin:0;">—</div>
-                                <div id="hmModelInfo" class="hm-model-info"></div>
-                            </div>
-
-                            <!-- Gráficas accuracy / loss (solo CNN) -->
-                            <div id="hmChartsSection" style="display:none;">
-                                <div class="nm-charts-row">
-                                    <div class="nm-chart-card">
-                                        <h4>Precisión por época</h4>
-                                        <canvas id="hmChartAccuracy" height="220"></canvas>
-                                    </div>
-                                    <div class="nm-chart-card">
-                                        <h4>Pérdida (Loss) por época</h4>
-                                        <canvas id="hmChartLoss" height="220"></canvas>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Curva de diagnóstico (KNN: k vs acc | DT: depth vs acc | RF: n_est vs error) -->
-                            <div id="hmDiagSection" style="display:none;">
-                                <div class="nm-chart-card hm-diag-card">
-                                    <h4 id="hmDiagTitle">Curva de Diagnóstico</h4>
-                                    <p id="hmDiagDesc" class="hm-diag-desc"></p>
-                                    <canvas id="hmChartDiag" height="230"></canvas>
-                                </div>
-                            </div>
-
-                            <!-- Matriz de confusión -->
-                            <div id="hmConfusionSection" style="display:none;">
-                                <h4 style="margin-top:1.5rem; color:#e2e8f0;">Matriz de Confusión</h4>
-                                <div id="hmConfusionMatrix" class="nm-confusion-wrap"></div>
-                            </div>
-
-                            <!-- Métricas por clase -->
-                            <div id="hmPerClassSection" style="display:none;">
-                                <h4 style="margin-top:1.5rem; color:#e2e8f0;">Métricas por Clase</h4>
-                                <div id="hmPerClassTable" class="nm-perclass-wrap"></div>
-                            </div>
-
-                            <p id="hmNoData" class="nm-nodata" style="display:none;">
-                                Aún no hay métricas para este modelo. Entrénalo primero.
-                            </p>
-
-                            <!-- ═══ HISTORIAL DE ENTRENAMIENTOS ═══ -->
-                            <div class="hm-history-section">
-                                <div class="hm-history-header">
-                                    <h4>🕐 Historial de Entrenamientos</h4>
-                                    <span id="hmHistoryCount" style="color:#718096; font-size:0.82rem;"></span>
-                                </div>
-                                <div id="hmHistoryList" class="hm-history-list">
-                                    <p class="nm-nodata">Sin historial guardado aún.</p>
-                                </div>
-                            </div>
-
                         </div>
                     </div>
 
